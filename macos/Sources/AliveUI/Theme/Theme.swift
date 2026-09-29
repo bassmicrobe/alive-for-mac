@@ -1,0 +1,67 @@
+// Port of src/Theme.cs (colours, radii, insets, type sizes). Layout numbers are upstream's pixel
+// values at 96 dpi scaled to macOS points; the colours are exact.
+import SwiftUI
+
+extension Color {
+    /// `0xRRGGBB` with optional alpha.
+    init(hex: UInt32, opacity: Double = 1) {
+        self.init(.sRGB,
+                  red: Double((hex >> 16) & 0xFF) / 255,
+                  green: Double((hex >> 8) & 0xFF) / 255,
+                  blue: Double(hex & 0xFF) / 255,
+                  opacity: opacity)
+    }
+}
+
+enum Theme {
+    // MARK: Colours
+    static let bg = Color(hex: 0x1B1B1D)
+    static let surface = Color(hex: 0x28282A)
+    static let surfacePressed = Color(hex: 0x3A3A3E)
+    /// Between `surface` and `surfacePressed`: hover on quiet controls.
+    static let surfaceHover = Color(hex: 0x323235)
+    static let sunken = Color(hex: 0x151519)          // the search field
+    static let light = Color(hex: 0xCACACB)           // primary button / selected pill
+    static let lightTop = Color(hex: 0xF2F2F4)
+    static let lightPressed = Color(hex: 0x9E9EA2)
+    static let text = Color(hex: 0xE9E9EB)
+    static let textDim = Color(hex: 0x919196)
+    static let onLight = Color(hex: 0x1B1B1D)
+    static let green = Color(hex: 0x61E170)
+    static let red = Color(hex: 0xE16161)
+    static let rowHover = Color.white.opacity(0.08)   // 0x14 alpha upstream
+    static let hairline = Color(hex: 0x3A3A3D)
+    /// Keyboard focus ring.
+    static let focus = Color(hex: 0x8CB4FF)
+    static let cardHighlight = Color.white.opacity(0.08)  // top-edge light of glass cards
+    static let cardBorder = Color.white.opacity(0.04)
+
+    // MARK: Sizes (points)
+    static let pad: CGFloat = 24            // window margin (upstream 30 px)
+    static let controlH: CGFloat = 30       // every pill and field in the toolbar (35 px)
+    static let iconSize: CGFloat = 30       // a round icon button (35 px)
+    static let iconGap: CGFloat = 8         // (10 px)
+    static let rowH: CGFloat = 44           // table row pitch (57 px)
+    static let rowPillH: CGFloat = 42       // the row highlight itself (55 px)
+    static let cellPadX: CGFloat = 18       // (24 px)
+    static let panelW: CGFloat = 300        // the detail panel (332 px)
+    static let panelPad: CGFloat = 14       // (16 px)
+    static let windowR: CGFloat = 18
+    static let cardR: CGFloat = 14
+    static let thumbR: CGFloat = 6
+
+    // MARK: Fonts (SF Pro is the counterpart of Segoe UI)
+    static let fTitle = Font.system(size: 13, weight: .semibold)
+    static let fBody = Font.system(size: 13)
+    static let fButton = Font.system(size: 13)
+    static let fLabel = Font.system(size: 12)
+    static let fSmall = Font.system(size: 12)
+    static let fBadge = Font.system(size: 11)
+    static let fMini = Font.system(size: 9.5)
+    static let fHead = Font.system(size: 17, weight: .semibold)
+    static let fDialogTitle = Font.system(size: 22, weight: .semibold)
+
+    // MARK: Motion
+    static let hoverAnimation = Animation.easeOut(duration: 0.12)
+    static let selectAnimation = Animation.spring(response: 0.28, dampingFraction: 0.86)
+}

@@ -1,0 +1,63 @@
+// Port of src/SettingsDialog.cs, reduced to the Mac settings: language, transparency, plugin
+// source, data folder. Update controls come from `UpdatesSection` (S5).
+import SwiftUI
+
+struct SettingsView: View {
+    var body: some View {
+        TabView {
+            GeneralSettingsView()
+                .tabItem { Label(SettingsStrings.tabGeneral.s, systemImage: "gearshape") }
+            AboutView()
+                .tabItem { Label(SettingsStrings.tabAbout.s, systemImage: "info.circle") }
+        }
+        .frame(width: 540, height: 560)
+    }
+}
+
+private struct GeneralSettingsView: View {
+    @Environment(AppModel.self) private var app
+
+    var body: some View {
+        @Bindable var prefs = app.prefs
+        Form {
+            Section {
+                Picker(SettingsStrings.language.s, selection: $prefs.language) {
+                    ForEach(LanguagePreference.allCases) { option in
+                        Text(option.nativeName ?? SettingsStrings.languageSystem.s).tag(option)
+                    }
+                }
+                Toggle(SettingsStrings.transparency.s, isOn: $prefs.transparency)
+                Text(SettingsStrings.transparencyHelp.s)
+                    .font(Theme.fSmall).foregroundStyle(Theme.textDim)
+            }
+            Section {
+                Picker(SettingsStrings.pluginSource.s, selection: $prefs.pluginSource) {
+                    Text(SettingsStrings.pluginSourceLive.s).tag(PluginSource.liveDatabase)
+                    Text(SettingsStrings.pluginSourceFolders.s).tag(PluginSource.pluginFolders)
+                }
+                Text(SettingsStrings.pluginSourceHelp.s)
+                    .font(Theme.fSmall).foregroundStyle(Theme.textDim)
+            }
+            Section(SettingsStrings.dataFolder.s) {
+                LabeledContent {
+                    Button(SettingsStrings.openDataFolder.s, action: openDataFolder)
+                } label: {
+                    Text(DataFolder.url.path)
+                        .font(Theme.fSmall).foregroundStyle(Theme.textDim)
+                        .lineLimit(2).truncationMode(.middle)
+                        .textSelection(.enabled)
+                }
+            }
+            UpdatesSection()
+        }
+        .formStyle(.grouped)
+    }
+
+    private func openDataFolder() {
+        do {
+            try Finder.openFolder(path: DataFolder.ensureExists().path)
+        } catch {
+            app.toast(CommonStrings.folderOpenFailed.f(error.localizedDescription), kind: .error)
+        }
+    }
+}
