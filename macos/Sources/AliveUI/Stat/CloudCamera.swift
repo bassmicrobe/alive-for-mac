@@ -71,6 +71,8 @@ struct CloudCamera: Equatable {
 
 /// The camera fixed for one frame: sines and cosines computed once for all the dots.
 struct Projector {
+    /// Room kept free at the sides / above and below the cube for its axis titles and values.
+    static let labelInset = CGSize(width: 108, height: 64)
     let cx: Double
     let cy: Double
     let scale: Double
@@ -78,7 +80,10 @@ struct Projector {
     private let isOrtho: Bool
 
     init(camera c: CloudCamera, size: CGSize) {
-        scale = Double(min(size.width, size.height)) * 0.33 * c.zoom
+        // The cube is sized so that, square on, its axis captions still fit inside the canvas:
+        // `labelInset` is the room reserved on each side for them.
+        let fit = min(Double(size.width) / 2 - Self.labelInset.width, Double(size.height) / 2 - Self.labelInset.height)
+        scale = max(24, min(Double(min(size.width, size.height)) * 0.33, fit)) * c.zoom
         cx = Double(size.width) / 2 + c.panX
         cy = Double(size.height) / 2 + c.panY
         cosY = cos(c.yaw); sinY = sin(c.yaw)

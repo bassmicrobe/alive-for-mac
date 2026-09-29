@@ -132,7 +132,7 @@ struct HeatmapMetrics: Equatable {
 struct HeatmapFit: Layout {
     let cols: Int
 
-    static let monthH: CGFloat = 15
+    static let monthH: CGFloat = 17
     static let monthGap: CGFloat = 7
 
     static func size(cols: Int, available: CGFloat) -> CGSize {
@@ -167,11 +167,14 @@ struct ActivityHeatmap: View {
         .accessibilityLabel(HomeStrings.activeDays.s)
     }
 
+    /// Month captions: 12 pt medium, so they stay readable at the calendar's real size.
+    private static let monthFont = Font.system(size: 12, weight: .medium)
+
     private var gridTop: CGFloat { HeatmapFit.monthH + HeatmapFit.monthGap }
 
     private func draw(_ context: inout GraphicsContext, _ m: HeatmapMetrics) {
         for label in grid.monthLabels {
-            let text = context.resolve(Text(monthName(label.month)).font(Theme.fCaption).foregroundStyle(Theme.secondaryText))
+            let text = context.resolve(Text(monthName(label.month)).font(Self.monthFont).foregroundStyle(Theme.secondaryText))
             context.draw(text, at: CGPoint(x: CGFloat(label.col) * m.step, y: 0), anchor: .topLeading)
         }
         let radius = m.cell * 0.3

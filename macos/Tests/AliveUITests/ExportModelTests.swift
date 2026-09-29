@@ -18,7 +18,7 @@ final class ExportTextTests: XCTestCase {
 
     func testNumbersAndPlurals() {
         var g = CollectGroup(origin: .elsewhere)
-        XCTAssertEqual(ExportText.groupNumbers(g), "—")
+        XCTAssertEqual(ExportText.groupNumbers(g), "0 files")
         g.files = 1
         g.bytes = 2_000_000
         XCTAssertTrue(ExportText.groupNumbers(g).hasPrefix("1 file    "))

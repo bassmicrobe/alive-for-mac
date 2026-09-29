@@ -18,22 +18,89 @@ enum CloudAxisLabels {
     /// A new edge has to beat the current one by this much (points) before the label moves:
     /// that rules out chatter and flicker while spinning.
     static let hysteresis = 16.0
-    /// Between the cube's edge and a caption: room for the dots that sit right on the edge (they
-    /// reach `maxRadius` past it), so a caption never lies over the data.
-    private static let gap = 18.0
+    /// Between the dots that sit right on the cube's edge and a caption.
+    private static let clearance = 8.0
 
     /// `titles` are the three "X · Tracks" captions. `measure(text, isTitle)` sizes a text in the
     /// font the caller draws it with.
     static func layout(scene: CloudScene, size: CGSize, titles: [String],
                        measure: (String, Bool) -> CGSize) -> [PlacedLabel] {
         let proj = scene.camera.projector(size: size)
+        let zone = DataZone(proj: proj, reach: reach(scene))
         var out: [PlacedLabel] = []
         let axes = [scene.x, scene.y, scene.z]
         for dim in 0..<3 {
             out += axisLabels(dim: dim, axis: axes[dim], title: titles[dim], proj: proj, scene: scene,
-                              size: size, measure: measure)
+                              size: size, gap: zone.reach + clearance, measure: measure)
+                .filter { !zone.covers(rect(of: $0, measure: measure)) }
         }
         return out
+    }
+
+    private static func rect(of l: PlacedLabel, measure: (String, Bool) -> CGSize) -> CGRect {
+        let s = measure(l.text, l.isTitle)
+        return CGRect(x: l.center.x - s.width / 2, y: l.center.y - s.height / 2, width: s.width, height: s.height)
+    }
+
+    /// How far a dot on the cube's edge reaches past it (its drawn radius; perspective swells it).
+    static func reach(_ scene: CloudScene) -> Double {
+        scene.maxRadius * (scene.camera.isOrtho ? 1 : 1.5)
+    }
+
+    /// The region the data occupies on screen: the cube's silhouette grown by the dot radius. A
+    /// caption that would end up inside it (zoomed in, panned, at a canvas edge) is left out rather
+    /// than drawn over the dots.
+    struct DataZone {
+        private let hull: [CGPoint]
+        let reach: Double
+
+        init(proj: Projector, reach: Double) {
+            var pts: [CGPoint] = []
+            for x in [-1.0, 1.0] { for y in [-1.0, 1.0] { for z in [-1.0, 1.0] {
+                let q = proj.project(x, y, z)
+                pts.append(CGPoint(x: q.sx, y: q.sy))
+            } } }
+            hull = Self.convexHull(pts)
+            self.reach = reach
+        }
+
+        func covers(_ r: CGRect) -> Bool {
+            let pts = [CGPoint(x: r.minX, y: r.minY), CGPoint(x: r.maxX, y: r.minY), CGPoint(x: r.minX, y: r.maxY),
+                       CGPoint(x: r.maxX, y: r.maxY), CGPoint(x: r.midX, y: r.midY),
+                       CGPoint(x: r.midX, y: r.minY), CGPoint(x: r.midX, y: r.maxY),
+                       CGPoint(x: r.minX, y: r.midY), CGPoint(x: r.maxX, y: r.midY)]
+            return pts.contains(where: inside)
+        }
+
+        private func inside(_ p: CGPoint) -> Bool {
+            guard hull.count >= 3 else { return false }
+            // Counter-clockwise hull: inside means on the left of every edge, or within `reach`.
+            for i in hull.indices {
+                let a = hull[i], b = hull[(i + 1) % hull.count]
+                let len = hypot(b.x - a.x, b.y - a.y)
+                if len < 0.001 { continue }
+                let side = ((b.x - a.x) * (p.y - a.y) - (b.y - a.y) * (p.x - a.x)) / len
+                if side < -reach { return false }
+            }
+            return true
+        }
+
+        private static func convexHull(_ points: [CGPoint]) -> [CGPoint] {
+            let p = points.sorted { $0.x == $1.x ? $0.y < $1.y : $0.x < $1.x }
+            func cross(_ o: CGPoint, _ a: CGPoint, _ b: CGPoint) -> CGFloat {
+                (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x)
+            }
+            var lower: [CGPoint] = [], upper: [CGPoint] = []
+            for q in p {
+                while lower.count >= 2 && cross(lower[lower.count - 2], lower[lower.count - 1], q) <= 0 { lower.removeLast() }
+                lower.append(q)
+            }
+            for q in p.reversed() {
+                while upper.count >= 2 && cross(upper[upper.count - 2], upper[upper.count - 1], q) <= 0 { upper.removeLast() }
+                upper.append(q)
+            }
+            return Array(lower.dropLast() + upper.dropLast())
+        }
     }
 
     /// The two ends of the `i`-th candidate edge of an axis. For X and Z the axes are always tied
@@ -59,7 +126,7 @@ enum CloudAxisLabels {
     }
 
     private static func axisLabels(dim: Int, axis a: Axis, title: String, proj: Projector, scene: CloudScene,
-                                   size: CGSize, measure: (String, Bool) -> CGSize) -> [PlacedLabel] {
+                                   size: CGSize, gap: Double, measure: (String, Bool) -> CGSize) -> [PlacedLabel] {
         let count = dim == 1 ? 4 : 2
         var best = Edge(), bestIdx = 0
         var last = Edge()

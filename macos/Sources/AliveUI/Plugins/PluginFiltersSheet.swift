@@ -7,6 +7,8 @@ import AliveCore
 struct PluginFiltersSheet: View {
     @Environment(AppModel.self) private var app
     @Environment(\.dismiss) private var dismiss
+    /// Takes the sheet's initial focus so no field starts with a ring; click or Tab moves on.
+    @FocusState private var restingFocus: Bool
 
     var body: some View {
         @Bindable var model = app.plugins
@@ -39,6 +41,8 @@ struct PluginFiltersSheet: View {
                 footer(facets)
             }
         }
+        .background(Color.clear.focusable().focused($restingFocus).focusEffectDisabled())
+        .defaultFocus($restingFocus, true)
         .onExitCommand { dismiss() }
     }
 

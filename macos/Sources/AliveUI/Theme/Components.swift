@@ -61,20 +61,30 @@ struct PillButtonStyle: ButtonStyle {
         var body: some View {
             configuration.label
                 .font(Theme.fButton)
-                .foregroundStyle(kind == .primary ? Theme.onLight : Theme.text)
+                .foregroundStyle(foreground)
                 .padding(.horizontal, 16)
                 .frame(minHeight: Theme.controlH)
                 .background(fill, in: Capsule())
-                .overlay(Capsule().strokeBorder(Theme.cardBorder, lineWidth: 1))
+                .overlay(Capsule().strokeBorder(isDimmedPrimary ? Theme.hairline : Theme.cardBorder, lineWidth: 1))
                 .focusRing(isFocused, cornerRadius: Theme.controlH / 2)
                 .scaleEffect(configuration.isPressed ? 0.97 : 1)
-                .opacity(isEnabled ? 1 : 0.4)
+                .opacity(isEnabled || isDimmedPrimary ? 1 : 0.4)
                 .animation(Theme.hoverAnimation, value: hovering)
                 .animation(Theme.hoverAnimation, value: configuration.isPressed)
                 .onHover { hovering = $0 }
         }
 
+        /// A disabled primary button turns into a dark, outlined pill with legible secondary text
+        /// (fading the light gradient to 40 % left grey-on-grey text) — readable, yet plainly off.
+        private var isDimmedPrimary: Bool { kind == .primary && !isEnabled }
+
+        private var foreground: Color {
+            if isDimmedPrimary { return Theme.secondaryText }
+            return kind == .primary ? Theme.onLight : Theme.text
+        }
+
         private var fill: AnyShapeStyle {
+            if isDimmedPrimary { return AnyShapeStyle(Theme.surface) }
             switch kind {
             case .quiet:
                 let color = configuration.isPressed ? Theme.surfacePressed

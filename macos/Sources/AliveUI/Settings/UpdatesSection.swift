@@ -24,7 +24,7 @@ struct UpdatesSection: View {
                 if updates.isChecking {
                     ProgressView().controlSize(.small).accessibilityLabel(UpdateStrings.checking.s)
                 }
-                PillButton(title: buttonTitle, kind: updates.releaseURL == nil ? .quiet : .primary, action: pressButton)
+                PillButton(title: buttonTitle, kind: .quiet, action: pressButton)
                     .disabled(updates.isChecking)
             }
             Toggle(UpdateStrings.dailyToggle.s, isOn: $prefs.dailyUpdateCheck)

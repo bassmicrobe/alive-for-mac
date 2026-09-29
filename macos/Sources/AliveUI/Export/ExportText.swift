@@ -12,9 +12,9 @@ enum ExportText {
         return formatter.string(fromByteCount: n)
     }
 
-    /// "3 files    25 MB", or "—" for none.
+    /// "3 files    25 MB", or "0 files" for none.
     static func groupNumbers(_ g: CollectGroup) -> String {
-        g.files == 0 ? "—" : ExportStrings.files(g.files) + "    " + bytes(g.bytes)
+        g.files == 0 ? ExportStrings.files(0) : ExportStrings.files(g.files) + "    " + bytes(g.bytes)
     }
 
     static func label(_ origin: CollectOrigin) -> String {

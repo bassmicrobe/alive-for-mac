@@ -210,6 +210,55 @@ final class CloudInputNSView: NSView {
 
     override func accessibilityHelp() -> String? { StatStrings.cloudHelp.s }
 
+    /// The most projects offered as children: a screen reader cannot walk thousands of dots, and
+    /// the next/previous actions on the group reach the rest.
+    static let maxAccessibleChildren = 250
+
+    /// The projects currently on screen, in reading order (top to bottom, left to right), each a
+    /// virtual element over its dot. Built on demand — only when assistive technology asks.
+    override func accessibilityChildren() -> [Any]? {
+        guard let model else { return [] }
+        let scene = model.scene
+        let sets = scene.sets
+        let area = bounds
+        let visible = scene.nodes.indices.filter { i in
+            let n = scene.nodes[i]
+            return i < sets.count && n.sr >= 0.4 && area.contains(CGPoint(x: n.sx, y: n.sy))
+        }
+        let ordered = visible.sorted {
+            let a = scene.nodes[$0], b = scene.nodes[$1]
+            return abs(a.sy - b.sy) > 6 ? a.sy < b.sy : a.sx < b.sx
+        }
+        return ordered.prefix(Self.maxAccessibleChildren).map { i in
+            let n = scene.nodes[i]
+            let r = max(n.sr, 6)
+            let element = NSAccessibilityElement()
+            element.setAccessibilityParent(self)
+            element.setAccessibilityRole(.button)
+            element.setAccessibilityLabel(sets[i].name)
+            element.setAccessibilitySelected(i == scene.selected)
+            element.setAccessibilityFrameInParentSpace(CGRect(x: n.sx - r, y: n.sy - r, width: r * 2, height: r * 2))
+            let path = sets[i].path
+            element.setAccessibilityCustomActions([
+                NSAccessibilityCustomAction(name: CommonStrings.openInLive.s) { [weak self] in
+                    self?.select(path: path); self?.onKey(.openInLive); return true
+                },
+                NSAccessibilityCustomAction(name: CommonStrings.showInFinder.s) { [weak self] in
+                    self?.select(path: path); self?.onDoubleClick(); return true
+                },
+            ])
+            return element
+        }
+    }
+
+    /// Makes one project the selection (through the main window's, as the keys do).
+    private func select(path: String) {
+        guard let model else { return }
+        model.app.selectedSetPath = path
+        model.followMainSelection()
+        NSAccessibility.post(element: self, notification: .valueChanged)
+    }
+
     override func accessibilityCustomActions() -> [NSAccessibilityCustomAction]? {
         var actions = [
             NSAccessibilityCustomAction(name: StatStrings.nextProject.s) { [weak self] in self?.selectAdjacent(+1) ?? false },

@@ -129,11 +129,16 @@ enum ArrangementRender {
                     notesDrawn += drawNotes(g, rect: rect, plot: plot, clip: c, color: col,
                                             pxPerBeat: pxPerBeat, alpha: c.disabled ? 0x90 : 0xFF)
                 }
-                if o.showClipNames, lay.laneH >= px(o, 13), w >= CGFloat(px(o, 44)), !c.name.isEmpty {
-                    g.setShouldAntialias(true)
-                    ChartText.draw(g, c.name, in: CGRect(x: rect.minX + 3, y: rect.minY, width: rect.width - 5, height: rect.height),
-                                   size: 11 * o.scale, color: ink)
-                    g.setShouldAntialias(false)
+                if o.showClipNames, lay.laneH >= px(o, 13), !c.name.isEmpty {
+                    // Drawn whole, or ellipsized to the clip's width; a clip too narrow for even a
+                    // few letters gets none rather than a cut-off fragment.
+                    let size = 11 * o.scale
+                    if let label = ChartText.fitted(c.name, size: size, maxWidth: Double(w) - 6) {
+                        g.setShouldAntialias(true)
+                        ChartText.draw(g, label, in: CGRect(x: rect.minX + 3, y: rect.minY, width: rect.width - 5, height: rect.height),
+                                       size: size, color: ink)
+                        g.setShouldAntialias(false)
+                    }
                 }
             }
         }
@@ -269,6 +274,19 @@ enum ChartText {
         let attrs: [NSAttributedString.Key: Any] = [NSAttributedString.Key(kCTFontAttributeName as String): font]
         let line = CTLineCreateWithAttributedString(NSAttributedString(string: text, attributes: attrs))
         return CTLineGetTypographicBounds(line, nil, nil, nil)
+    }
+
+    /// `text` if it fits in `maxWidth`, else its longest prefix that fits with a trailing "…"; `nil`
+    /// when not even two letters and the ellipsis fit.
+    static func fitted(_ text: String, size: Double, maxWidth: Double) -> String? {
+        if width(text, size: size) <= maxWidth { return text }
+        let chars = Array(text)
+        var lo = 0, hi = chars.count - 1
+        while lo < hi {
+            let mid = (lo + hi + 1) / 2
+            if width(String(chars[0..<mid]) + "…", size: size) <= maxWidth { lo = mid } else { hi = mid - 1 }
+        }
+        return lo >= 2 ? String(chars[0..<lo]) + "…" : nil
     }
 
     static func draw(_ g: CGContext, _ text: String, in rect: CGRect, size: Double, color: CGColor, clip: Bool = true) {
