@@ -86,7 +86,10 @@ final class RescueModel {
     }
 
     var probeFileName: String {
-        session.map { (RescueProbe.path(for: $0.set) as NSString).lastPathComponent } ?? ""
+        guard let s = session else { return "" }
+        // The real probe may have a different name than the first choice (a free one is picked).
+        let actual = s.probePath.isEmpty ? RescueProbe.freePath(for: s.set) : s.probePath
+        return (actual as NSString).lastPathComponent
     }
 
     // MARK: lifecycle

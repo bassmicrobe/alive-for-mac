@@ -28,6 +28,7 @@ final class CollectSafetyTests: XCTestCase {
             symlink("Proj Project/Samples/link-secret.wav", to: t.sub("outside/secret.txt"))
             symlink("Proj Project/Samples/link-ssh.wav", to: t.sub("home/.ssh/key.wav"))
             symlink("Proj Project/Samples/link-dir.wav", to: t.sub("docs/folder"))
+            symlink("Proj Project/Ableton Project Info/stolen.cfg", to: t.sub("home/.ssh/id_rsa"))
 
             func ref(_ rel: String, _ abs: String, _ type: Int) -> String {
                 Fx.fileRef(rel: rel, abs: abs, type: type, size: 1)
@@ -112,6 +113,8 @@ final class CollectSafetyTests: XCTestCase {
 
         let tree = (FileManager.default.subpaths(atPath: out) ?? []).sorted()
         XCTAssertTrue(tree.contains("Samples/kick.wav"))
+        XCTAssertTrue(tree.contains("Ableton Project Info/Project.cfg"))
+        XCTAssertFalse(tree.contains("Ableton Project Info/stolen.cfg"), "a link in the info folder is not followed")
         XCTAssertTrue(tree.contains("Samples/Imported/link-real.wav"), "the link's target was collected, as a file")
         XCTAssertTrue(tree.contains("Samples/Imported/hit.wav"))
         for forbidden in ["id_rsa", "key.wav", "notes.txt", "inside.wav", "secret", "link-secret.wav", "link-ssh.wav"] {

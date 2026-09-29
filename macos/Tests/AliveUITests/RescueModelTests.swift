@@ -333,6 +333,7 @@ final class RescueModelTests: XCTestCase {
         XCTAssertEqual(model.phase, .waiting)
         XCTAssertEqual(opened.count, 1)
         XCTAssertNotEqual(opened.first, mine)
+        XCTAssertEqual(model.probeFileName, (opened.first! as NSString).lastPathComponent, "the sheet names the real probe")
         model.close()
         XCTAssertEqual(try String(contentsOfFile: mine), "mine")
         XCTAssertEqual(siblings(), ["Song.alive-probe.als", "Song.als"])

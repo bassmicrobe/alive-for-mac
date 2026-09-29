@@ -257,5 +257,7 @@ final class TextFileSafetyTests: XCTestCase {
         XCTAssertEqual(Diag.redacted("cannot copy /Users/jane/Music/x.wav", home: "/Users/jane"),
                        "cannot copy ~/Music/x.wav")
         XCTAssertEqual(Diag.redacted("path /x", home: "/"), "path /x")
+        XCTAssertEqual(Diag.redacted("/Users/janedoe/x and /Users/jane", home: "/Users/jane"),
+                       "/Users/janedoe/x and ~", "another user's folder is not rewritten")
     }
 }

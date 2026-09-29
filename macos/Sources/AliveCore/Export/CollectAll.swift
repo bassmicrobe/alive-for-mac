@@ -298,6 +298,14 @@ public enum CollectAll {
         try fm.createDirectory(atPath: dst, withIntermediateDirectories: true)
         do {
             for n in names where !n.hasPrefix(".") {
+                // A link in a project's info folder is not followed: it could point anywhere
+                // (a private key), and nothing there needs to be a link.
+                var st = stat()
+                guard lstat((src as NSString).appendingPathComponent(n), &st) == 0,
+                      (st.st_mode & S_IFMT) != S_IFLNK else {
+                    Diag.info("collect: project info: skipped a link (\(n))")
+                    continue
+                }
                 try put((src as NSString).appendingPathComponent(n), to: (dst as NSString).appendingPathComponent(n), anyFolder: true)
             }
         } catch { Diag.info("collect: project info: \(error.localizedDescription)") }

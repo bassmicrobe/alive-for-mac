@@ -75,8 +75,8 @@ enum CommonStrings: LocalizedStrings {
         case .pathMissing: return ("The file no longer exists: %@", "ファイルが見つかりません: %@")
         case .settingsSaveFailed: return ("Could not save settings: %@", "設定を保存できませんでした: %@")
         case .dataFileBackedUp:
-            return ("“%1$@” could not be read. The original was kept as “%1$@.bak”.",
-                    "「%1$@」を読み込めませんでした。元のファイルは「%1$@.bak」として残してあります。")
+            return ("“%1$@” was not a plain UTF-8 text file. The original was kept as “%1$@.bak”.",
+                    "「%1$@」は通常の UTF-8 テキストではありませんでした。元のファイルは「%1$@.bak」として残してあります。")
         case .rootAdded: return ("Added %@", "%@を追加しました")
         case .rootsAdded: return ("Added %lld folders", "%lld 個のフォルダを追加しました")
         case .alreadyWatching: return ("Already watching that folder", "そのフォルダはすでに監視しています")

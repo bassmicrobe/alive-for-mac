@@ -50,7 +50,12 @@ public enum Diag {
     /// inside every path is nobody's business but the owner's.
     static func redacted(_ text: String, home: String = NSHomeDirectory()) -> String {
         guard home.count > 1 else { return text }
-        return text.replacingOccurrences(of: home, with: "~")
+        let base = home.hasSuffix("/") ? String(home.dropLast()) : home
+        // Whole path components only: "/Users/jane" must not eat into "/Users/janedoe".
+        let pattern = NSRegularExpression.escapedPattern(for: base) + "(?![^/\\s\"'),:;\\]])"
+        guard let re = try? NSRegularExpression(pattern: pattern) else { return text }
+        return re.stringByReplacingMatches(in: text, range: NSRange(text.startIndex..., in: text),
+                                           withTemplate: "~")
     }
 
     private static func append(_ text: String) {
