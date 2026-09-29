@@ -96,6 +96,12 @@ public struct PluginFailureGroup: Equatable, Identifiable, Sendable {
     public var format: String
     public var count: Int
 
+    public init(name: String, format: String, count: Int) {
+        self.name = name
+        self.format = format
+        self.count = count
+    }
+
     public var id: String { format + "|" + name.lowercased() }
 }
 

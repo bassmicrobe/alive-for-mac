@@ -18,6 +18,12 @@ public struct CollectFailure: Equatable, Sendable {
     public var name: String
     public var path: String
     public var reason: String
+
+    public init(name: String, path: String, reason: String) {
+        self.name = name
+        self.path = path
+        self.reason = reason
+    }
 }
 
 public struct CollectProgress: Equatable, Sendable {
@@ -26,6 +32,13 @@ public struct CollectProgress: Equatable, Sendable {
     public var done = 0
     public var total = 0
     public var current = ""
+
+    public init(phase: Phase, done: Int = 0, total: Int = 0, current: String = "") {
+        self.phase = phase
+        self.done = done
+        self.total = total
+        self.current = current
+    }
 }
 
 public struct CollectResult: Equatable, Sendable {
@@ -35,6 +48,8 @@ public struct CollectResult: Equatable, Sendable {
     public var copiedBytes: Int64 = 0
     /// Files that could not be copied — their references stay as they were in the original.
     public var failed: [CollectFailure] = []
+
+    public init(output: String = "") { self.output = output }
 }
 
 /// Collecting a project into a portable folder or archive. The logic sits apart from the sheet.

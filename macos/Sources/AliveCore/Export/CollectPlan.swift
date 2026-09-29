@@ -55,6 +55,7 @@ public struct CollectGroup: Equatable, Identifiable, Sendable {
     /// The switch is on (always true for `.inProject`).
     public var included = true
 
+    public init(origin: CollectOrigin) { self.origin = origin }
     public var id: String { "\(origin)" }
 }
 

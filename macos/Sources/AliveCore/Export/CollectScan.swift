@@ -43,6 +43,8 @@ public struct CollectDependency: Sendable, Identifiable {
     /// FileRef numbers in document order — `AlsSamplePatch` addresses by them.
     public var refIndexes: [Int] = []
 
+    public init(resolved: ResolvedRef) { self.resolved = resolved }
+
     public var path: String { resolved.resolvedPath }
     public var name: String { (path as NSString).lastPathComponent }
 }
