@@ -49,7 +49,7 @@ private struct SetDetail: View {
                     DetailFiles(set: set)
                     if !extras.sampleFolders.isEmpty { DetailSampleFolders(groups: extras.sampleFolders) }
                     if !set.error.isEmpty {
-                        Text(set.error).font(Theme.fLabel).foregroundStyle(Theme.red)
+                        Text(ReadErrorLog.note(set.error, of: set.path)).font(Theme.fLabel).foregroundStyle(Theme.errorText)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                     DetailPlugins(set: set)

@@ -198,7 +198,7 @@ private struct PillTab: View {
         Button(action: action) {
             Text(title)
                 .font(Theme.fButton)
-                .foregroundStyle(isSelected ? Theme.onLight : hovering ? Color.white : Theme.textDim)
+                .foregroundStyle(isSelected ? Theme.onLight : hovering ? Color.white : Theme.secondaryText)
                 .padding(.horizontal, 15)
                 .frame(height: Theme.controlH - 6)
                 .background {
@@ -239,7 +239,7 @@ struct TagPill: View {
     var body: some View {
         Text(text)
             .font(Theme.fBadge)
-            .foregroundStyle(tint ?? Theme.textDim)
+            .foregroundStyle(tint ?? Theme.tagText)
             .padding(.horizontal, 8)
             .padding(.vertical, 2)
             .background((tint ?? Color.white).opacity(0.10), in: Capsule())
@@ -274,7 +274,7 @@ struct SectionHeader<Trailing: View>: View {
 
     var body: some View {
         HStack {
-            Text(title).font(Theme.fLabel).foregroundStyle(Theme.textDim)
+            Text(title).font(Theme.fLabel).foregroundStyle(Theme.secondaryText)
             Spacer(minLength: 8)
             trailing()
         }
@@ -295,12 +295,12 @@ struct EmptyState: View {
     var body: some View {
         VStack(spacing: 10) {
             IconView(icon: icon, size: 26, weight: .light)
-                .foregroundStyle(Theme.textDim)
+                .foregroundStyle(Theme.secondaryText)
             Text(title).font(Theme.fHead).foregroundStyle(Theme.text)
             if let message {
                 Text(message)
                     .font(Theme.fBody)
-                    .foregroundStyle(Theme.textDim)
+                    .foregroundStyle(Theme.secondaryText)
                     .multilineTextAlignment(.center)
                     .frame(maxWidth: 360)
             }

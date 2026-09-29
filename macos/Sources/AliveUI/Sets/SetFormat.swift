@@ -27,6 +27,18 @@ enum SetFormat {
         return SetFilter.formatDate(date, calendar: calendar)
     }
 
+    /// Names (and paths) from real libraries often start with a space; shown as they are, that
+    /// looks like broken layout. Display only: the exact text goes into help and file operations.
+    static func displayName(_ text: String) -> String {
+        String(text.drop(while: { $0.isWhitespace }))
+    }
+
+    /// "/Users/me/Music/Live" as "~/Music/Live" (the same form the folder suggestions use); the
+    /// absolute path stays in help text and accessibility values.
+    static func homeAbbreviated(_ path: String) -> String {
+        (path as NSString).abbreviatingWithTildeInPath
+    }
+
     /// Plugin and file counts: nothing rather than "0".
     static func count(_ n: Int) -> String { n > 0 ? String(n) : "" }
 }

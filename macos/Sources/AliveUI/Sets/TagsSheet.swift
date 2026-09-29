@@ -19,7 +19,7 @@ struct TagsSheet: View {
         SheetFrame(title: set?.name ?? (path as NSString).lastPathComponent, width: 560, height: 500) {
             VStack(alignment: .leading, spacing: 14) {
                 if set == nil {
-                    Text(SetsStrings.setGone.s).font(Theme.fBody).foregroundStyle(Theme.textDim)
+                    Text(SetsStrings.setGone.s).font(Theme.fBody).foregroundStyle(Theme.secondaryText)
                 }
                 VStack(alignment: .leading, spacing: 6) {
                     SectionHeader(SetsStrings.tagsLabel.s)
@@ -36,12 +36,29 @@ struct TagsSheet: View {
                         .padding(8)
                         .frame(maxHeight: .infinity)
                         .background(Theme.sunken, in: RoundedRectangle(cornerRadius: Theme.cardR - 2, style: .continuous))
+                        .overlay(alignment: .topLeading) {
+                            // TextEditor has no placeholder of its own; 13 pt = the editor's 8 pt
+                            // padding plus the text container's 5 pt line inset.
+                            if note.isEmpty {
+                                Text(SetsStrings.notePlaceholder.s)
+                                    .font(Theme.fBody)
+                                    .foregroundStyle(Theme.secondaryText)
+                                    .padding(.leading, 13).padding(.top, 8)
+                                    .allowsHitTesting(false)
+                                    .accessibilityHidden(true)
+                            }
+                        }
                         .focusRing(noteFocused, cornerRadius: Theme.cardR - 2)
                 }
                 HStack {
-                    Text(SetsStrings.appliesToProject.f(((set?.projectDir ?? path) as NSString).lastPathComponent))
-                        .font(Theme.fBadge).foregroundStyle(Theme.textDim).lineLimit(1)
-                    Spacer()
+                    // Two lines, so the folder the tags apply to is not cut off; a leading space in a
+                    // real folder name is dropped from the text only (the help keeps the full name).
+                    let projectName = ((set?.projectDir ?? path) as NSString).lastPathComponent
+                    Text(SetsStrings.appliesToProject.f(SetFormat.displayName(projectName)))
+                        .font(Theme.fBadge).foregroundStyle(Theme.secondaryText)
+                        .lineLimit(2).fixedSize(horizontal: false, vertical: true)
+                        .help(SetsStrings.appliesToProject.f(projectName))
+                    Spacer(minLength: 12)
                     PillButton(title: CommonStrings.cancel.s) { dismiss() }
                     PillButton(title: SetsStrings.save.s, kind: .primary, action: save)
                         .keyboardShortcut(.return, modifiers: .command)
@@ -96,7 +113,7 @@ private struct SuggestionPill: View {
                 Text(text)
             }
             .font(Theme.fBadge)
-            .foregroundStyle(hovering ? Theme.text : Theme.textDim)
+            .foregroundStyle(hovering ? Theme.text : Theme.secondaryText)
             .padding(.horizontal, 9)
             .frame(height: 22)
             .background(hovering ? Theme.surfaceHover : Theme.surface, in: Capsule())

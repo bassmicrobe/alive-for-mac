@@ -13,7 +13,7 @@ private struct PanelHeading: View {
 
     var body: some View {
         HStack {
-            Text(title).font(Theme.fLabel).foregroundStyle(Theme.textDim)
+            Text(title).font(Theme.fLabel).foregroundStyle(Theme.secondaryText)
             Spacer(minLength: 8)
             if let trailing {
                 Text(trailing).font(Theme.fLabel).foregroundStyle(trailingTint)
@@ -27,7 +27,7 @@ private struct PanelLinkRow: View {
     let text: String
     var note: String?
     var tint: Color = Theme.text
-    var noteTint: Color = Theme.textDim
+    var noteTint: Color = Theme.secondaryText
     var isCurrent = false
     var help: String?
     let action: () -> Void
@@ -103,7 +103,7 @@ struct DetailHeader: View {
             Spacer(minLength: 4)
             Text(SetFormat.size(set.projectSize))
                 .font(Theme.fLabel)
-                .foregroundStyle(Theme.textDim)
+                .foregroundStyle(Theme.secondaryText)
                 .help(SetsStrings.projectSizeHelp.s)
         }
     }
@@ -143,7 +143,7 @@ struct DetailPath: View {
         Button { app.revealInFinder(path: path) } label: {
             Text(path)
                 .font(Theme.fLabel)
-                .foregroundStyle(hovering ? Theme.text : Theme.textDim)
+                .foregroundStyle(hovering ? Theme.text : Theme.secondaryText)
                 .multilineTextAlignment(.leading)
                 .lineLimit(4)
                 .truncationMode(.middle)
@@ -176,7 +176,7 @@ struct DetailTagsAndNote: View {
                         IconView(icon: .tag, size: 12)
                         Text(SetsStrings.addTagsOrNote.s).font(Theme.fBadge)
                     }
-                    .foregroundStyle(hovering ? Theme.text : Theme.textDim)
+                    .foregroundStyle(hovering ? Theme.text : Theme.secondaryText)
                 } else {
                     if !tags.isEmpty {
                         SetsFlowLayout { ForEach(tags, id: \.self) { TagPill(text: $0) } }
@@ -218,7 +218,7 @@ struct DetailVersions: View {
                     .padding(.bottom, 2)
                 ForEach(all) { version in
                     PanelLinkRow(text: version.name, note: SetFormat.day(version.modified),
-                                 tint: version.path == set.path ? Theme.text : Theme.textDim,
+                                 tint: version.path == set.path ? Theme.text : Theme.secondaryText,
                                  isCurrent: version.path == set.path) {
                         app.sets.select(path: version.path)
                     }
@@ -280,7 +280,7 @@ struct DetailPlugins: View {
                          trailing: known && set.missingPlugins > 0 ? SetsStrings.notInstalledCount.f(set.missingPlugins) : nil)
                 .padding(.bottom, 2)
             if set.plugins.isEmpty {
-                Text(SetsStrings.onlyLiveDevices.s).font(Theme.fLabel).foregroundStyle(Theme.textDim)
+                Text(SetsStrings.onlyLiveDevices.s).font(Theme.fLabel).foregroundStyle(Theme.secondaryText)
             } else {
                 let inventory = app.catalog.index.inventory
                 ForEach(Array(set.plugins.enumerated()), id: \.offset) { index, name in
@@ -288,14 +288,14 @@ struct DetailPlugins: View {
                     let match = known ? inventory.match(uid: uid, name: name).kind : .exact
                     PanelLinkRow(text: name,
                                  note: match == .otherFormat ? SetsStrings.otherFormat.s : nil,
-                                 tint: match == .missing ? Theme.textDim.opacity(0.7) : Theme.text,
+                                 tint: match == .missing ? Theme.secondaryText.opacity(0.7) : Theme.text,
                                  help: SetsStrings.showPluginHelp.f(name)) {
                         app.plugins.show(pluginNamed: name)
                     }
                 }
                 if !known {
                     Text(SetsStrings.pluginStatusUnknown.s)
-                        .font(Theme.fBadge).foregroundStyle(Theme.textDim)
+                        .font(Theme.fBadge).foregroundStyle(Theme.secondaryText)
                         .padding(.top, 4)
                 }
             }
@@ -323,7 +323,7 @@ struct DetailRenders: View {
             }
             if renders.count > Self.shown {
                 Text(SetsStrings.moreItems.f(renders.count - Self.shown))
-                    .font(Theme.fLabel).foregroundStyle(Theme.textDim)
+                    .font(Theme.fLabel).foregroundStyle(Theme.secondaryText)
             }
         }
     }

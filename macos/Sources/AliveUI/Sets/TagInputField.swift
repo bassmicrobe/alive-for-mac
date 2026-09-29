@@ -41,7 +41,7 @@ struct TagInputField: View {
             ForEach(tags, id: \.self) { tag in
                 RemovableTag(text: tag) { tags.removeAll { $0 == tag } }
             }
-            TextField("", text: $draft, prompt: Text(tags.isEmpty ? cue : "").foregroundStyle(Theme.textDim))
+            TextField("", text: $draft, prompt: Text(tags.isEmpty ? cue : "").foregroundStyle(Theme.secondaryText))
                 .textFieldStyle(.plain)
                 .font(Theme.fBody)
                 .foregroundStyle(Theme.text)
@@ -87,7 +87,7 @@ private struct RemovableTag: View {
             Text(text).font(Theme.fBadge).foregroundStyle(Theme.text)
             Button(action: remove) {
                 IconView(icon: .close, size: 8, weight: .bold)
-                    .foregroundStyle(hovering ? Theme.text : Theme.textDim)
+                    .foregroundStyle(hovering ? Theme.text : Theme.secondaryText)
             }
             .buttonStyle(.plain)
             .help(SetsStrings.removeTag.f(text))

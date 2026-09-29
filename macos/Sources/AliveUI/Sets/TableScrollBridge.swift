@@ -50,16 +50,23 @@ struct TableScrollBridge: NSViewRepresentable {
     }
 
     /// Scrolls so the row sits in the middle of the visible area (as far as the ends allow).
+    /// "Visible" is what is left of the clip view below the sticky header: the header takes its
+    /// height either from the clip view's top content inset (a floating header) or from a separate
+    /// header clip view that is not part of these bounds. The inset is the only thing to subtract:
+    /// subtracting the header height as well counted it twice and left the first rows under it.
     static func center(row: Int, in table: NSTableView) {
         guard let scroll = table.enclosingScrollView else { table.scrollRowToVisible(row); return }
         let clip = scroll.contentView
         table.layoutSubtreeIfNeeded()
         let rect = table.rect(ofRow: row)
-        let top = table.headerView?.frame.height ?? 0
-        let visibleHeight = clip.bounds.height - top
-        let target = rect.midY - top - visibleHeight / 2
-        let maxY = max(0, table.frame.height - clip.bounds.height)
-        let y = min(max(-clip.contentInsets.top, target), maxY)
+        let inset = clip.contentInsets
+        let visibleHeight = max(rect.height, clip.bounds.height - inset.top - inset.bottom)
+        var y = rect.midY - inset.top - visibleHeight / 2
+        // A row taller than the room shows its top; never one hidden under the header.
+        y = min(y, rect.minY - inset.top)
+        let minY = -inset.top
+        let maxY = max(minY, table.frame.height - clip.bounds.height + inset.bottom)
+        y = min(max(minY, y), maxY)
         clip.scroll(to: NSPoint(x: clip.bounds.origin.x, y: y))
         scroll.reflectScrolledClipView(clip)
     }

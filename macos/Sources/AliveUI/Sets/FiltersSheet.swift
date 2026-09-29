@@ -14,15 +14,18 @@ struct FiltersSheet: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     row(SetsStrings.fltModified.s) {
-                        HStack(spacing: 10) {
-                            DateFilterField(cue: SetsStrings.fltFrom.s, upperBound: false, date: $sets.filter.from)
-                            DateFilterField(cue: SetsStrings.fltTo.s, upperBound: true, date: $sets.filter.to)
+                        VStack(alignment: .leading, spacing: 6) {
+                            HStack(spacing: 10) {
+                                DateFilterField(cue: SetsStrings.fltFrom.s, upperBound: false, date: $sets.filter.from)
+                                DateFilterField(cue: SetsStrings.fltTo.s, upperBound: true, date: $sets.filter.to)
+                            }
+                            Text(SetsStrings.fltDateHint.s).font(Theme.fBadge).foregroundStyle(Theme.secondaryText)
                         }
                     }
                     row(SetsStrings.fltVersion.s) {
                         ChoicePills(options: facets.versions.map { .init(value: $0, title: $0) },
                                     selection: $sets.filter.versions, disabled: facets.disabledVersions,
-                                    placeholder: SetsStrings.fltNone.s)
+                                    placeholder: SetsStrings.fltNone.s, collapsedLimit: 12)
                     }
                     row(SetsStrings.fltKeyRoot.s) {
                         ChoicePills(options: facets.roots.map { .init(value: $0, title: Self.rootTitle($0)) },
@@ -73,6 +76,8 @@ struct FiltersSheet: View {
                 }
                 .padding(.vertical, 4)
             }
+            // Room under the last row, so it is never cut by the footer.
+            .contentMargins(.bottom, 20, for: .scrollContent)
             footer
         }
         .onAppear(perform: refreshFacets)
@@ -102,7 +107,7 @@ struct FiltersSheet: View {
                                  isEnabled: known && (facets.canPickAllInstalled || sets.filter.pluginsAllInstalled))
                 }
                 if !known {
-                    Text(SetsStrings.pluginStatusUnknown.s).font(Theme.fBadge).foregroundStyle(Theme.textDim)
+                    Text(SetsStrings.pluginStatusUnknown.s).font(Theme.fBadge).foregroundStyle(Theme.secondaryText)
                 }
             }
         }
@@ -112,7 +117,9 @@ struct FiltersSheet: View {
         HStack(spacing: 10) {
             Text(SetsStrings.fltMatches.f(facets.matches, app.catalog.sets.count))
                 .font(Theme.fBody)
-                .foregroundStyle(Theme.textDim)
+                .foregroundStyle(Theme.secondaryText)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
                 .monospacedDigit()
             Spacer()
             PillButton(title: SetsStrings.fltReset.s) { app.sets.filter.clear() }
@@ -125,7 +132,7 @@ struct FiltersSheet: View {
         HStack(alignment: .firstTextBaseline, spacing: 12) {
             Text(label)
                 .font(Theme.fBody)
-                .foregroundStyle(Theme.textDim)
+                .foregroundStyle(Theme.secondaryText)
                 .frame(width: 130, alignment: .leading)
             content().frame(maxWidth: .infinity, alignment: .leading)
         }
