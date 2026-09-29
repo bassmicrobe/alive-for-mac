@@ -74,3 +74,6 @@ README.ru.md	-	-	not ported
 build.cmd	scripts/build-app.sh	1A	
 tools/	-	-	Windows test harnesses; Swift tests live in Tests/
 LICENSE	-	-	kept verbatim; copied into the .app
+.gitattributes	-	-	upstream repo setting
+.gitignore	-	-	upstream repo setting; macos/.gitignore covers the port
+docs/	-	-	upstream screenshots/icons; Mac screenshots live in .github/
