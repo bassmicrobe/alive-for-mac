@@ -32,7 +32,7 @@ src/MediaDecoder.cs	-	-	N/A: AVFoundation decodes
 src/MediaKeys.cs	Sources/AliveUI/Home/MediaKeys.swift	S2	MPRemoteCommandCenter
 src/MfInterop.cs	-	-	N/A: Media Foundation
 src/NotesDialog.cs	Sources/AliveUI/Sets/TagsSheet.swift	S1	
-src/OverviewPanel.cs	Sources/AliveUI/Sets/OverviewPanel.swift	S1	
+src/OverviewPanel.cs	Sources/AliveUI/Home/OverviewPanel.swift	S2	
 src/PlayerDialog.cs	Sources/AliveUI/Home/PlayerWindow.swift	S2	
 src/PluginFilter.cs	Sources/AliveCore/Plugins/PluginFilter.swift	S3	
 src/PluginFiltersDialog.cs	Sources/AliveUI/Plugins/PluginFiltersSheet.swift	S3	

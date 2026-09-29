@@ -237,9 +237,9 @@ scan, a working minimal Sets list, end-to-end run against a real library.
 
 **Wave 2 (parallel vertical slices, core + UI + strings + tests)**
 - **S1 Sets** — `Catalog/{FolderWatch,SetFilter}.swift`; `AliveUI/Sets/*` (SetsView table with
-  configurable columns, version folding, sort, search, pin; OverviewPanel; DetailPanel inspector;
+  configurable columns, version folding, sort, search, pin; DetailPanel inspector;
   FiltersSheet; TagsSheet (tags+notes); RootsSheet (project and sample roots)).
-- **S2 Home / preview / player** — `AliveUI/Home/*` (HomeView tiles + year of activity,
+- **S2 Home / preview / player** — `AliveUI/Home/*` (HomeView tiles + OverviewPanel (year of activity),
   ArrangementRender, ThumbCache, PreviewSheet, PlayerWindow + PlayerModel, MediaKeys).
 - **S3 Plugins** — `Plugins/{PluginInventory,PluginFilter}.swift`; `AliveUI/Plugins/*`.
 - **S4 Samples** — `AliveCore/Samples/*`; `AliveUI/Samples/*`.

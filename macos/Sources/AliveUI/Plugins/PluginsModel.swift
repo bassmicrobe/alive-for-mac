@@ -12,4 +12,10 @@ final class PluginsModel {
     }
 
     var shownCount: Int { 0 }
+
+    /// Opens the Plugins tab on one plugin (from a set's plugin list in the Sets inspector).
+    /// Cross-feature entry point: keep this signature.
+    func show(pluginNamed name: String) {
+        app.tab = .plugins
+    }
 }

@@ -19,4 +19,10 @@ final class SamplesModel {
     func togglePlaySelected() {}
 
     func rescan() {}
+
+    /// Opens the Samples tab on a library folder (from a set's "sample folders" in the Sets
+    /// inspector). Cross-feature entry point: keep this signature.
+    func showFolder(_ path: String) {
+        app.tab = .samples
+    }
 }
