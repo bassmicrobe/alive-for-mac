@@ -55,7 +55,7 @@ private struct HomeContent: View {
                 }
                 .onAppear { keys.start { key in handle(key) } }
                 .onDisappear { keys.stop() }
-            }
+                            }
             if app.player.isStripVisible {
                 NowPlayingStrip().transition(.move(edge: .bottom).combined(with: .opacity))
             }
