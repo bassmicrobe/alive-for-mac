@@ -162,4 +162,29 @@ final class ArrangementLoaderTests: XCTestCase {
         XCTAssertLessThanOrEqual(cachedCount, ArrangementLoader.cacheSize)
         XCTAssertNil(loader.cached(""))
     }
+
+    func testResavedSetIsReparsedNotServedFromTheCache() async {
+        let t = makeTemp()
+        let path = makeSet(t, "a.als")
+        let loader = ArrangementLoader()
+        let first = await loader.load(path)
+        XCTAssertEqual(first.clipCount, 1)
+        // Re-save with two clips and another modification time.
+        let clip = "<AudioClip><CurrentStart Value=\"0\"/><CurrentEnd Value=\"8\"/><Name Value=\"c\"/></AudioClip>"
+        let track = Fx.track("AudioTrack", extra: "<DeviceChain><Sample><ArrangerAutomation><Events>\(clip)\(clip)</Events></ArrangerAutomation></Sample></DeviceChain>")
+        _ = t.als("a.als", Fx.als(live: Fx.tracks(track)))
+        try? FileManager.default.setAttributes([.modificationDate: Date(timeIntervalSinceNow: 120)], ofItemAtPath: path)
+        XCTAssertNil(loader.cached(path), "a stale entry is not served")
+        let second = await loader.load(path)
+        XCTAssertEqual(second.clipCount, 2)
+        XCTAssertNotNil(loader.cached(path))
+    }
+
+    func testLoadOfEmptyPathCompletesAndDoesNotLeak() async {
+        let loader = ArrangementLoader()
+        for _ in 0..<5 {
+            let a = await loader.load("")
+            XCTAssertFalse(a.hasContent)
+        }
+    }
 }

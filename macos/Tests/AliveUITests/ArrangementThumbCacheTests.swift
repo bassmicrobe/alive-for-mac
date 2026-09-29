@@ -85,6 +85,44 @@ final class ArrangementThumbCacheTests: XCTestCase {
         XCTAssertNil(ThumbCache(dataDir: t.sub("d")).loadFromMemory(set))
     }
 
+    func testMemoryLookupNeedsNoStatAndLoadDropsAStaleDraft() throws {
+        let t = makeHomeScratch()
+        let set = makeSet(t)
+        let cache = ThumbCache(dataDir: t.sub("d"))
+        cache.save(set, image: try picture())
+        // The file is gone: a stat would fail, the memory lookup does not stat.
+        try FileManager.default.removeItem(atPath: set)
+        XCTAssertNotNil(cache.loadFromMemory(set))
+        XCTAssertNil(cache.load(set), "validation (off the main thread) notices")
+        XCTAssertNil(cache.loadFromMemory(set))
+    }
+
+    func testResavedSetDropsTheMemoryDraft() throws {
+        let t = makeHomeScratch()
+        let set = makeSet(t)
+        let cache = ThumbCache(dataDir: t.sub("d"))
+        cache.save(set, image: try picture())
+        t.setModified(set, Date(timeIntervalSinceNow: 3600))
+        XCTAssertNotNil(cache.loadFromMemory(set), "still the last known draft")
+        XCTAssertNil(cache.load(set))
+        XCTAssertNil(cache.loadFromMemory(set))
+    }
+
+    func testSweepRemovesOnlyOldOrphanedTempFilesInItsOwnFolder() throws {
+        let t = makeHomeScratch()
+        let cache = ThumbCache(dataDir: t.sub("d"))
+        try FileManager.default.createDirectory(atPath: cache.dir, withIntermediateDirectories: true)
+        let old = cache.dir + "/abc.png.1234.tmp", fresh = cache.dir + "/def.png.5678.tmp"
+        let outside = t.write("elsewhere.tmp")
+        for p in [old, fresh] { FileManager.default.createFile(atPath: p, contents: Data([1])) }
+        t.setModified(old, Date(timeIntervalSinceNow: -3600))
+        t.setModified(outside, Date(timeIntervalSinceNow: -3600))
+        cache.sweep()
+        XCTAssertFalse(FileManager.default.fileExists(atPath: old))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: fresh), "a save in progress")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: outside))
+    }
+
     func testSweepKeepsTheNewest() throws {
         let t = makeHomeScratch()
         let cache = ThumbCache(dataDir: t.sub("d"))

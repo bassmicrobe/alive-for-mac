@@ -35,18 +35,24 @@ final class ThumbCache: @unchecked Sendable {
 
     let dir: String
     private let memory = NSCache<NSString, Box>()
+    /// The last answer per set path, whatever its stamp was: lets the main thread show a picture
+    /// without a `stat`. It is only a first draft; `load` (off the main thread) checks the stamp
+    /// and replaces or drops it.
+    private let latest = NSCache<NSString, Box>()
     private let sweepLock = NSLock()
     private var swept = false
 
     private final class Box {
         let entry: ThumbEntry
-        init(_ entry: ThumbEntry) { self.entry = entry }
+        let file: String
+        init(_ entry: ThumbEntry, file: String = "") { self.entry = entry; self.file = file }
     }
 
     /// `dataDir` is the app's data folder; the pictures live in its `thumbs` subfolder.
     init(dataDir: String) {
         dir = (dataDir as NSString).appendingPathComponent("thumbs")
         memory.totalCostLimit = Self.memoryLimit
+        latest.totalCostLimit = Self.memoryLimit
     }
 
     // MARK: key
@@ -83,32 +89,44 @@ final class ThumbCache: @unchecked Sendable {
         return memory.object(forKey: file as NSString) != nil || FileManager.default.fileExists(atPath: file)
     }
 
-    /// Only what is already decoded in memory: no disk read, safe on the main thread.
+    /// Only what is already decoded in memory: no disk access at all (not even a `stat`), safe on
+    /// the main thread. The answer is the last known one for the path; `load` validates it.
     func loadFromMemory(_ setPath: String) -> ThumbEntry? {
-        guard let file = keyFile(for: setPath) else { return nil }
-        return memory.object(forKey: file as NSString)?.entry
+        latest.object(forKey: setPath as NSString)?.entry
     }
 
     /// The remembered answer, or nil when there is none (parse the set as usual). A corrupt
     /// file is removed so the picture gets redrawn.
     func load(_ setPath: String) -> ThumbEntry? {
-        guard let file = keyFile(for: setPath) else { return nil }
-        if let hit = memory.object(forKey: file as NSString) { return hit.entry }
+        guard let file = keyFile(for: setPath) else {
+            latest.removeObject(forKey: setPath as NSString)
+            return nil
+        }
+        // The set changed since the last answer (re-saved): the remembered draft is stale.
+        if let draft = latest.object(forKey: setPath as NSString), draft.file != file {
+            latest.removeObject(forKey: setPath as NSString)
+        }
+        if let hit = memory.object(forKey: file as NSString) {
+            latest.setObject(Box(hit.entry, file: file), forKey: setPath as NSString)
+            return hit.entry
+        }
         // Read fully into memory: a file kept open by a lazy decoder could not be swept.
         guard let data = FileManager.default.contents(atPath: file) else { return nil }
-        if data.isEmpty { return remember(.empty, file: file, cost: 1) }
+        if data.isEmpty { return remember(.empty, setPath: setPath, file: file, cost: 1) }
         let options = [kCGImageSourceShouldCacheImmediately: true] as CFDictionary
         guard let source = CGImageSourceCreateWithData(data as CFData, nil),
               let image = CGImageSourceCreateImageAtIndex(source, 0, options) else {
             try? FileManager.default.removeItem(atPath: file)
             return nil
         }
-        return remember(.image(ThumbImage(cgImage: image)), file: file, cost: image.bytesPerRow * image.height)
+        return remember(.image(ThumbImage(cgImage: image)), setPath: setPath, file: file,
+                        cost: image.bytesPerRow * image.height)
     }
 
     @discardableResult
-    private func remember(_ entry: ThumbEntry, file: String, cost: Int) -> ThumbEntry {
+    private func remember(_ entry: ThumbEntry, setPath: String, file: String, cost: Int) -> ThumbEntry {
         memory.setObject(Box(entry), forKey: file as NSString, cost: cost)
+        latest.setObject(Box(entry, file: file), forKey: setPath as NSString, cost: cost)
         return entry
     }
 
@@ -140,9 +158,10 @@ final class ThumbCache: @unchecked Sendable {
             return
         }
         if let image {
-            remember(.image(ThumbImage(cgImage: image)), file: file, cost: image.bytesPerRow * image.height)
+            remember(.image(ThumbImage(cgImage: image)), setPath: setPath, file: file,
+                     cost: image.bytesPerRow * image.height)
         } else {
-            remember(.empty, file: file, cost: 1)
+            remember(.empty, setPath: setPath, file: file, cost: 1)
         }
         sweepOnce()
     }
@@ -166,11 +185,21 @@ final class ThumbCache: @unchecked Sendable {
         DispatchQueue.global(qos: .utility).async { [self] in sweep() }
     }
 
-    /// Keeps the folder within `maxFiles`, deleting the oldest. Returns how many were removed.
+    /// A temporary file this old belongs to a save that died, not to one in progress.
+    static let orphanAge: TimeInterval = 60
+
+    /// Keeps the folder within `maxFiles`, deleting the oldest, and removes orphaned `*.tmp` files
+    /// (a crash between write and rename) from this folder only. Returns how many pictures were removed.
     @discardableResult
     func sweep(keeping limit: Int = ThumbCache.maxFiles) -> Int {
         let fm = FileManager.default
         guard let names = try? fm.contentsOfDirectory(atPath: dir) else { return 0 }
+        for name in names where name.hasSuffix(".tmp") {
+            let path = (dir as NSString).appendingPathComponent(name)
+            guard let stat = FileStat.of(path), !stat.isDirectory,
+                  Date().timeIntervalSince(stat.modified) > Self.orphanAge else { continue }
+            try? fm.removeItem(atPath: path)
+        }
         let files = names.filter { $0.hasSuffix(".png") }.compactMap { name -> (path: String, date: Date)? in
             let path = (dir as NSString).appendingPathComponent(name)
             guard let date = FileStat.of(path)?.modified else { return nil }

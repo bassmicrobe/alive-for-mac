@@ -72,6 +72,8 @@ struct PreviewSheet: View {
     @State private var zoomIndex = 0
     @State private var taller = false
     @State private var picture: PicturePlan?
+    /// Looked up once per catalog revision, not on every body evaluation.
+    @State private var entry: SetEntry?
 
     private struct PicturePlan {
         var image: CGImage
@@ -87,7 +89,6 @@ struct PreviewSheet: View {
         var scale: Double
     }
 
-    private var entry: SetEntry? { app.catalog.sets.first { $0.path == path } }
     private var title: String { entry?.name ?? ((path as NSString).lastPathComponent as NSString).deletingPathExtension }
     private var directory: String { entry?.directory ?? (path as NSString).deletingLastPathComponent }
 
@@ -102,6 +103,7 @@ struct PreviewSheet: View {
         .background(Theme.bg)
         .preferredColorScheme(.dark)
         .background(shortcuts)
+        .task(id: app.catalog.revision) { entry = app.catalog.sets.first { $0.path == path } }
         .task { arrangement = await app.home.previewLoader.load(path) }
         .task(id: renderKey) { await render() }
     }

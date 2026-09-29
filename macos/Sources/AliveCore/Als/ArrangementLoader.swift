@@ -17,7 +17,21 @@ public final class ArrangementLoader: @unchecked Sendable {
     static let maxWorkers = 3
 
     private let lock = NSLock()
-    private var cache: [String: Arrangement] = [:]
+    /// What the file looked like when it was parsed: a re-saved set has another stamp, so an
+    /// old picture of it is never served.
+    private struct Stamp: Equatable {
+        let size: Int64
+        let modified: Date
+        static func of(_ path: String) -> Stamp? {
+            FileStat.of(path).map { Stamp(size: $0.size, modified: $0.modified) }
+        }
+    }
+    private struct Entry {
+        let arrangement: Arrangement
+        let stamp: Stamp?
+    }
+
+    private var cache: [String: Entry] = [:]
     private var order: [String] = []
     private var pending: [String] = []          // served from the end: the freshest request first
     private var working = Set<String>()
@@ -33,8 +47,17 @@ public final class ArrangementLoader: @unchecked Sendable {
 
     public func cached(_ path: String) -> Arrangement? {
         guard !path.isEmpty else { return nil }
+        return lookup(path, stamp: Stamp.of(path))
+    }
+
+    /// The cached arrangement when it still matches the file on disk; a stale one is dropped.
+    private func lookup(_ path: String, stamp: Stamp?) -> Arrangement? {
         lock.lock(); defer { lock.unlock() }
-        return cache[path]
+        guard let entry = cache[path] else { return nil }
+        if entry.stamp == stamp { return entry.arrangement }
+        cache[path] = nil
+        order.removeAll { $0 == path }
+        return nil
     }
 
     /// Requests a parse. The queue is served from the end (the freshest request goes first, the
@@ -54,12 +77,19 @@ public final class ArrangementLoader: @unchecked Sendable {
 
     /// Async variant: returns the cached arrangement, or waits for the background parse.
     public func load(_ path: String) async -> Arrangement {
-        if let a = cached(path) { return a }
+        // Nothing to parse (and nobody to ever resume a waiter): answer at once.
+        guard !path.isEmpty else {
+            var empty = Arrangement()
+            empty.error = "no path"
+            return empty
+        }
+        let stamp = Stamp.of(path)
+        if let a = lookup(path, stamp: stamp) { return a }
         return await withCheckedContinuation { cont in
             lock.lock()
-            if let a = cache[path] {      // finished between the check above and now
+            if let entry = cache[path], entry.stamp == stamp {      // finished between the check above and now
                 lock.unlock()
-                cont.resume(returning: a)
+                cont.resume(returning: entry.arrangement)
                 return
             }
             waiters[path, default: []].append(cont)
@@ -77,17 +107,19 @@ public final class ArrangementLoader: @unchecked Sendable {
 
     private func work() {
         while let path = nextPath() {
-            let arrangement = cached(path) ?? Arrangement.read(path: path)
-            store(arrangement, for: path)
+            // Stamp first: a save during the parse leaves the entry stale rather than fresh.
+            let stamp = Stamp.of(path)
+            let arrangement = lookup(path, stamp: stamp) ?? Arrangement.read(path: path)
+            store(arrangement, for: path, stamp: stamp)
             onReady?(arrangement)
         }
     }
 
-    private func store(_ a: Arrangement, for path: String) {
+    private func store(_ a: Arrangement, for path: String, stamp: Stamp?) {
         lock.lock()
-        if cache[path] == nil {
-            cache[path] = a
-            order.append(path)
+        if cache[path]?.stamp != stamp || cache[path] == nil {
+            if cache[path] == nil { order.append(path) }
+            cache[path] = Entry(arrangement: a, stamp: stamp)
             while order.count > Self.cacheSize { cache[order.removeFirst()] = nil }
         }
         // Clear the mark whatever happens: otherwise a set could never be requested again.

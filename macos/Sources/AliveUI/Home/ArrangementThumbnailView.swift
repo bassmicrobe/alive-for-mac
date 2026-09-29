@@ -8,6 +8,8 @@ struct ArrangementThumbnailView: View {
 
     @Environment(AppModel.self) private var app
     @State private var result: ThumbResult?
+    /// The path `result` belongs to (the view can be reused for another set).
+    @State private var shownPath: String?
 
     var body: some View {
         ZStack {
@@ -55,10 +57,15 @@ struct ArrangementThumbnailView: View {
 
     private func load() async {
         let pipeline = app.home.thumbnails
-        // Memory only on the main thread; reading and decoding a PNG happens in `produce`.
-        if let hit = pipeline.cachedInMemory(path) {
-            result = hit
-            return
+        // The view may be reused for another set (the inspector): never show the old picture under
+        // the new name. Memory only on the main thread, without a stat; the stamp is checked in
+        // `produce`, off the main thread, so a draft of a re-saved set is replaced right after.
+        let draft = pipeline.cachedInMemory(path)
+        if shownPath != path {
+            shownPath = path
+            result = draft
+        } else if result == nil {
+            result = draft
         }
         let produced = await pipeline.produce(path)
         if Task.isCancelled { return }
