@@ -20,7 +20,7 @@ concurrency:
 jobs:
   build-test:
     name: Build and test
-    runs-on: macos-15
+    runs-on: macos-26
     defaults:
       run:
         working-directory: macos
@@ -47,7 +47,7 @@ jobs:
     name: Package and release
     needs: build-test
     if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
-    runs-on: macos-15
+    runs-on: macos-26
     permissions:
       contents: write
     steps:

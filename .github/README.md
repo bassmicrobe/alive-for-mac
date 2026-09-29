@@ -83,7 +83,7 @@ DMG にはアプリのほか、ライセンス文書（`LICENSE`、`LICENSE-maco
 
 ## ソースからのビルド
 
-macOS 14 以降で Xcode 15 以降、または Swift 5.10 ツールチェーンが必要です。サードパーティの依存はありません。
+Swift Package（`swift-tools-version:5.10`）です。Xcode 27（Swift 6.4）でのビルドを確認しており、GitHub Actions では `macos-26` ランナーの最新安定版 Xcode でビルドとテストを行います。サードパーティの依存はありません。
 
 ```sh
 cd macos

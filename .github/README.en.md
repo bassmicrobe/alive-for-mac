@@ -95,7 +95,7 @@ shows a sample in the tree, `⇧Return` reveals it in Finder.
 
 ## Building from source
 
-Needs Xcode 15+ or the Swift 5.10 toolchain on macOS 14+. No third-party dependencies.
+A Swift package (`swift-tools-version:5.10`). Verified with Xcode 27 (Swift 6.4); GitHub Actions builds and tests it with the latest stable Xcode on the `macos-26` runner. No third-party dependencies.
 
 ```sh
 cd macos
