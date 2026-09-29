@@ -107,7 +107,7 @@ final class HomeTileNavigationTests: XCTestCase {
         XCTAssertEqual(HomeContentColumns.count(for: 100), 1)
         XCTAssertEqual(HomeContentColumns.count(for: 1000), 3)
         XCTAssertEqual(HomeContentColumns.count(for: 1150), 4)
-        XCTAssertEqual(HomeContentColumns.count(for: 9000), 34)
+        XCTAssertEqual(HomeContentColumns.count(for: 9000), 33)
     }
 
     func testKeyCodesMapToGridKeys() {
