@@ -4,6 +4,7 @@ import SwiftUI
 
 struct MainWindow: View {
     @Environment(AppModel.self) private var app
+    @Environment(\.openWindow) private var openWindow
 
     var body: some View {
         @Bindable var app = app
@@ -22,6 +23,7 @@ struct MainWindow: View {
         .task {
             AppDelegate.attach(app)
             app.start()
+            await DebugLaunch.apply(to: app) { openWindow(id: $0) }
         }
     }
 
