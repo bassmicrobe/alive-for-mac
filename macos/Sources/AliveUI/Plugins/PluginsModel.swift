@@ -36,19 +36,27 @@ final class PluginsModel {
     /// Everything derived from one catalog revision. Built off the main actor.
     struct Snapshot: Sendable {
         let revision: Int
+        /// The core's generation of the catalog + inventory the snapshot was derived from.
+        let generation: Int
         let table: PluginTable
         let health: PluginHealth
         let available: Bool
         let stats: [PluginStat]
 
-        static let empty = Snapshot(revision: -1, table: PluginTable(usage: [], sets: []), health: PluginHealth(),
+        static let empty = Snapshot(revision: -1, generation: -1, table: PluginTable(usage: [], sets: []), health: PluginHealth(),
                                     available: false, stats: [])
 
         /// The catalog's plugin usage, cross-checks, health and table: the whole derivation.
-        static func make(revision: Int, index: ProjectIndex) -> Snapshot {
-            let usage = index.pluginUsage()
-            return Snapshot(revision: revision, table: PluginTable(usage: usage, sets: index.sets),
-                            health: index.health(usage), available: index.inventory.isAvailable, stats: usage)
+        /// Everything comes from one `pluginSnapshot()` (generation, sets and inventory taken
+        /// together); nil when `isCancelled` turned true on the way.
+        static func make(revision: Int, index: ProjectIndex, isCancelled: () -> Bool = { false }) -> Snapshot? {
+            let snap = index.pluginSnapshot()
+            guard let usage = index.pluginUsage(of: snap, isCancelled: isCancelled), !isCancelled() else { return nil }
+            let table = PluginTable(usage: usage, sets: snap.sets)
+            if isCancelled() { return nil }
+            return Snapshot(revision: revision, generation: snap.generation, table: table,
+                            health: index.health(usage, inventory: snap.inventory),
+                            available: snap.inventory.isAvailable, stats: usage)
         }
     }
 
@@ -61,13 +69,14 @@ final class PluginsModel {
 
     private func ensureSnapshot() {
         let revision = app.catalog.revision
-        if snapshot?.revision == revision || buildingRevision == revision { return }
+        if snapshot?.revision == revision, snapshot?.generation == app.catalog.index.generation { return }
+        if buildingRevision == revision { return }
         snapshotTask?.cancel()
         buildingRevision = revision
         let index = app.catalog.index
         snapshotTask = Task { [weak self] in
             let made = await BlockingWork.run { isCancelled in
-                isCancelled() ? nil : Snapshot.make(revision: revision, index: index)
+                isCancelled() ? nil : Snapshot.make(revision: revision, index: index, isCancelled: isCancelled)
             }
             self?.publish(made, revision: revision)
         }
@@ -77,7 +86,9 @@ final class PluginsModel {
         guard buildingRevision == revision else { return }        // a newer revision took over
         buildingRevision = nil
         snapshotTask = nil
-        guard let made, made.revision == app.catalog.revision else {
+        // Published only when both the UI revision and the core's generation are still the ones it
+        // was derived from; otherwise it is derived again from the newer state.
+        guard let made, made.revision == app.catalog.revision, made.generation == app.catalog.index.generation else {
             if made != nil { ensureSnapshot() }                  // the catalog moved on while it was built
             return
         }

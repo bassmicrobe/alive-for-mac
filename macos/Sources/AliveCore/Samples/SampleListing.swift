@@ -57,7 +57,8 @@ public enum SampleLister {
     /// `open` — lowercased paths of the folders shown open in the tree.
     public static func listing(index: SampleIndex, usage: SampleUsage, copies: SampleCopies,
                                lens: SampleLens, sort: SampleSort, open: Set<String>, query: String,
-                               keys: SampleNameKeys? = nil, cap: Int = searchCap) -> SampleListing {
+                               keys: SampleNameKeys? = nil, cap: Int = searchCap,
+                               isCancelled: () -> Bool = { false }) -> SampleListing {
         let q = query.trimmingCharacters(in: .whitespaces).lowercased()
         let ctx = Context(index: index, usage: usage, copies: copies, sort: sort)
         var out = SampleListing()
@@ -83,9 +84,12 @@ public enum SampleLister {
         }
         if !q.isEmpty {
             let k = keys ?? SampleNameKeys(index)
+            if isCancelled() { return out }
             folders = folders.filter { k.folders[$0].contains(q) }
+            if isCancelled() { return out }
             files = files.filter { k.files[$0].contains(q) }
         }
+        if isCancelled() { return out }
 
         out.matches = folders.count + files.count
         // The cut goes before the sort: ordering a hundred thousand names on every letter typed
@@ -93,11 +97,13 @@ public enum SampleLister {
         if folders.count > cap { folders = Array(folders.prefix(cap)) }
         if files.count > cap - folders.count { files = Array(files.prefix(max(0, cap - folders.count))) }
 
+        if isCancelled() { return out }
         if sort.column == nil && lens == .neverUsed {
             folders.sort { index.folders[$0].totalBytes > index.folders[$1].totalBytes }
         } else {
             folders = ctx.sortedFolders(folders, isRoot: false)
         }
+        if isCancelled() { return out }
         // Duplicates keep the copies' order: the most room wasted first, copies side by side.
         if lens == .mostUsed && sort.column == nil {
             files.sort { usage.compareUse($0, $1, in: index) }

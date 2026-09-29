@@ -70,8 +70,27 @@ extension ProjectIndex {
         return out
     }
 
+    /// The catalog and the inventory as one value, taken under one lock: what a derivation (the
+    /// plugin table, the health cards) must be built from, so it never mixes two catalogs.
+    public struct PluginSnapshot: Sendable {
+        public let generation: Int
+        public let sets: [SetEntry]
+        public let inventory: PluginInventory
+    }
+
+    public func pluginSnapshot() -> PluginSnapshot {
+        lock.lock(); defer { lock.unlock() }
+        return PluginSnapshot(generation: _generation, sets: _sets, inventory: _inventory)
+    }
+
+    /// Bumps whenever the sets or the inventory change.
+    public var generation: Int { lock.lock(); defer { lock.unlock() }; return _generation }
+
     public func health(_ usage: [PluginStat]) -> PluginHealth {
-        let inv = inventory
+        health(usage, inventory: inventory)
+    }
+
+    public func health(_ usage: [PluginStat], inventory inv: PluginInventory) -> PluginHealth {
         var h = PluginHealth()
         h.installedTotal = inv.all.count
         h.filesGone = inv.all.filter(\.fileMissing).count
@@ -93,11 +112,13 @@ extension ProjectIndex {
     /// The names that have turned up at least once as a genuine vendor (the VST3:Vendor:Name
     /// form, or an AU's Manufacturer field). Vendors from the inventory are above suspicion: if
     /// "Arturia" is there, a browser folder by that name is no invention either.
-    public var knownVendors: Set<String> {
+    public var knownVendors: Set<String> { knownVendors(in: pluginSnapshot()) }
+
+    func knownVendors(in snap: PluginSnapshot) -> Set<String> {
         lock.lock()
-        if let c = _vendorCache, c.generation == _generation { lock.unlock(); return c.set }
-        let generation = _generation, sets = _sets, inv = _inventory
+        if let c = _vendorCache, c.generation == snap.generation { lock.unlock(); return c.set }
         lock.unlock()
+        let generation = snap.generation, sets = snap.sets, inv = snap.inventory
 
         var names = Set<String>()
         for p in inv.all where !p.vendor.isEmpty { names.insert(p.vendor.lowercased()) }
@@ -116,9 +137,13 @@ extension ProjectIndex {
     /// accepted only if it has been confirmed somewhere as a genuine vendor — "Arturia" passes,
     /// "Eff" does not.
     public func acceptVendor(_ vendor: String, confident: Bool) -> String {
-        if vendor.isEmpty { return "" }
-        if confident { return vendor }
+        if vendor.isEmpty || confident { return vendor }
         return knownVendors.contains(vendor.lowercased()) ? vendor : ""
+    }
+
+    private func acceptVendor(_ vendor: String, confident: Bool, known: Set<String>) -> String {
+        if vendor.isEmpty || confident { return vendor }
+        return known.contains(vendor.lowercased()) ? vendor : ""
     }
 
     /// A summary of the plugins: the name, the developer, how many sets it occurs in and whether
@@ -126,28 +151,39 @@ extension ProjectIndex {
     /// otherwise such plugins cannot be found at all. Remembered per catalog/inventory snapshot:
     /// it is asked for on every keystroke in the plugins tab.
     public func pluginUsage() -> [PluginStat] {
+        pluginUsage(of: pluginSnapshot()) ?? []
+    }
+
+    /// The same, derived from one snapshot (see `pluginSnapshot()`) and nothing else, so a
+    /// scan publishing meanwhile cannot mix into it. Polls `isCancelled` between sets and
+    /// plugins; nil when it turned true (nothing is remembered then).
+    public func pluginUsage(of snap: PluginSnapshot, isCancelled: () -> Bool = { false }) -> [PluginStat]? {
         lock.lock()
-        if let c = _usageCache, c.generation == _generation { lock.unlock(); return c.list }
-        let generation = _generation, sets = _sets, inv = _inventory
+        if let c = _usageCache, c.generation == snap.generation { lock.unlock(); return c.list }
         lock.unlock()
 
-        var use = usedPlugins(sets)
-        crossCheck(&use, with: inv)
-        var list = Array(use.values) + unusedPlugins(inv, used: use)
+        let known = knownVendors(in: snap)
+        guard var use = usedPlugins(snap.sets, known: known, isCancelled: isCancelled) else { return nil }
+        crossCheck(&use, with: snap.inventory)
+        var list = Array(use.values) + unusedPlugins(snap.inventory, used: use)
         list.sort {
             $0.sets != $1.sets ? $0.sets > $1.sets
                 : $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
         }
-        lock.lock(); _usageCache = (generation, list); lock.unlock()
+        if isCancelled() { return nil }
+        lock.lock(); _usageCache = (snap.generation, list); lock.unlock()
         return list
     }
 
-    private func usedPlugins(_ sets: [SetEntry]) -> [String: PluginStat] {
+    private func usedPlugins(_ sets: [SetEntry], known: Set<String>,
+                             isCancelled: () -> Bool) -> [String: PluginStat]? {
         var use: [String: PluginStat] = [:]
-        for e in sets {
+        for (n, e) in sets.enumerated() {
+            if n % 256 == 0, isCancelled() { return nil }
             for (i, name) in e.plugins.enumerated() {
                 let rawConf = i < e.pluginVendorConfident.count && e.pluginVendorConfident[i]
-                let vendor = acceptVendor(i < e.pluginVendors.count ? e.pluginVendors[i] : "", confident: rawConf)
+                let vendor = acceptVendor(i < e.pluginVendors.count ? e.pluginVendors[i] : "", confident: rawConf,
+                                          known: known)
                 var st = use[name.lowercased()] ?? PluginStat()
                 if st.name.isEmpty { st.name = name }
                 st.sets += 1

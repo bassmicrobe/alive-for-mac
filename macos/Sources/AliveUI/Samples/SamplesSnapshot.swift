@@ -48,13 +48,13 @@ enum SamplesSnapshotBuilder {
         if let prev, sameIndex, prev.key.catalogRevision == key.catalogRevision {
             usage = prev.usage
         } else {
-            usage = SampleUsage.compute(index: input.index, sets: input.sets)
+            usage = SampleUsage.compute(index: input.index, sets: input.sets, isCancelled: isCancelled)
         }
         if isCancelled() { return nil }
 
         // Found when something asks; once found for an index they are kept for it.
         var copies: SampleCopies? = sameIndex ? prev?.copies : nil
-        if key.wantsCopies, copies == nil { copies = SampleCopies.find(in: input.index) }
+        if key.wantsCopies, copies == nil { copies = SampleCopies.find(in: input.index, isCancelled: isCancelled) }
         if isCancelled() { return nil }
 
         var keys: SampleNameKeys?
@@ -66,7 +66,9 @@ enum SamplesSnapshotBuilder {
         if isCancelled() { return nil }
 
         let listing = SampleLister.listing(index: input.index, usage: usage, copies: copies ?? .empty, lens: key.lens,
-                                           sort: key.sort, open: input.open, query: key.query, keys: keys)
+                                           sort: key.sort, open: input.open, query: key.query, keys: keys,
+                                           isCancelled: isCancelled)
+        if isCancelled() { return nil }
         return SamplesSnapshot(key: key, usage: usage, copies: copies, listing: listing, nameKeys: keys)
     }
 }

@@ -76,12 +76,24 @@ enum IndexCache {
     /// Atomic (temp file + rename), and skipped when the file already holds exactly this: a
     /// rescan that changed nothing leaves index.cache (and its mtime) alone. The cache is not
     /// critical — the worst case is a rescan — but a failure is logged.
-    static func save(_ sets: [SetEntry], dir: String) {
+    enum SaveResult: Equatable {
+        case written
+        case unchanged     // the file on disk already holds exactly this
+        case failed
+    }
+
+    @discardableResult
+    static func save(_ sets: [SetEntry], dir: String) -> SaveResult {
         var w = DotNetWriter()
         w.int32(version)
         w.int32(Int32(clamping: sets.count))
         for e in sets { write(e, to: &w) }
-        do { try AppHome.writeAtomicallyIfChanged(w.data, to: path(dir: dir)) } catch { Diag.fail("index.cache write", error) }
+        do {
+            return try AppHome.writeAtomicallyIfChanged(w.data, to: path(dir: dir)) ? .written : .unchanged
+        } catch {
+            Diag.fail("index.cache write", error)
+            return .failed
+        }
     }
 
     private static func write(_ e: SetEntry, to w: inout DotNetWriter) {

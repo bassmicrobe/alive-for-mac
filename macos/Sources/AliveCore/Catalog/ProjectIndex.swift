@@ -152,7 +152,8 @@ public final class ProjectIndex: @unchecked Sendable {
 
         let counters = Counters()
         let built: [(entry: SetEntry, reused: Bool)?] = Parallel.map(count: files.count, isCancelled: isCancelled) { i in
-            let r = self.entry(for: files[i], cache: cache, env: env, probe: probe, counters: counters)
+            let r = self.entry(for: files[i], cache: cache, env: env, probe: probe, counters: counters,
+                               isCancelled: isCancelled)
             let n = counters.done()
             if let progress, n % 8 == 0 || n == files.count { progress(n, files.count, r.entry.name) }
             return r
@@ -193,8 +194,8 @@ public final class ProjectIndex: @unchecked Sendable {
         _weightMemo = walked.memo
         lock.unlock()
         activity.saveCache(dir: dir)
-        IndexCache.save(fresh, dir: dir)
-        rememberCache(fresh)
+        // The reuse map follows the file on disk: a failed save leaves it as it was.
+        if IndexCache.save(fresh, dir: dir) != .failed { rememberCache(fresh) }
         refreshInstalled()
         progress?(fresh.count, files.count, "")
 
@@ -236,7 +237,8 @@ public final class ProjectIndex: @unchecked Sendable {
     }
 
     private func entry(for file: String, cache: [String: SetEntry], env: LiveEnvironment,
-                       probe: ProbeCache, counters: Counters) -> (entry: SetEntry, reused: Bool) {
+                       probe: ProbeCache, counters: Counters,
+                       isCancelled: () -> Bool) -> (entry: SetEntry, reused: Bool) {
         guard let stamp = SetBuilder.stamp(of: file) else {
             counters.failed()
             return (SetBuilder.failed(path: file, error: "cannot read file attributes"), false)
@@ -247,7 +249,7 @@ public final class ProjectIndex: @unchecked Sendable {
             return (cached, true)                  // the file has not changed — take it from the cache
         }
         counters.parse()
-        return (SetBuilder.build(path: file, stamp: stamp, env: env, probe: probe), false)
+        return (SetBuilder.build(path: file, stamp: stamp, env: env, probe: probe, isCancelled: isCancelled), false)
     }
 
     /// What the walk of the project folders brought in, in the order of `dirs`.

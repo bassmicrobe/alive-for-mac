@@ -24,7 +24,8 @@ enum SetBuilder {
         return e
     }
 
-    static func build(path: String, stamp: FileStamp, env: LiveEnvironment, probe: ProbeCache) -> SetEntry {
+    static func build(path: String, stamp: FileStamp, env: LiveEnvironment, probe: ProbeCache,
+                      isCancelled: () -> Bool = { false }) -> SetEntry {
         var e = SetEntry()
         e.path = path
         e.name = ((path as NSString).lastPathComponent as NSString).deletingPathExtension
@@ -34,7 +35,7 @@ enum SetBuilder {
         e.isBackup = path.range(of: "/Backup/", options: .caseInsensitive) != nil
         e.projectName = e.projectNameFromPath
 
-        let info = AlsFile.read(path: path)
+        let info = AlsFile.read(path: path, isCancelled: isCancelled)
         if let err = info.error { e.error = err; return e }
 
         e.creator = info.creator

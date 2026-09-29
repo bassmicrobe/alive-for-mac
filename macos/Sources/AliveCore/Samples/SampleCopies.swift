@@ -38,12 +38,15 @@ public struct SampleCopies: Sendable {
     public func files(in folder: Int) -> Int { filesByFolder[folder] ?? 0 }
     public func bytes(in folder: Int) -> Int64 { bytesByFolder[folder] ?? 0 }
 
-    public static func find(in index: SampleIndex) -> SampleCopies {
+    /// `isCancelled` is polled every few thousand files and groups; once it is true the partial
+    /// result is returned at once, for the caller to discard.
+    public static func find(in index: SampleIndex, isCancelled: () -> Bool = { false }) -> SampleCopies {
         var c = SampleCopies()
         guard !index.files.isEmpty else { return c }
 
         var byKey: [String: [Int]] = [:]
         for (i, f) in index.files.enumerated() where f.print != 0 {
+            if i % 4096 == 0, isCancelled() { return c }
             byKey["\(f.size)|\(f.print)|\(f.name.lowercased())", default: []].append(i)
         }
 
@@ -57,7 +60,10 @@ public struct SampleCopies: Sendable {
             return r == .orderedSame ? a[0] < b[0] : r == .orderedAscending
         }
 
+        var done = 0
         for var g in found {
+            done += 1
+            if done % 1024 == 0, isCancelled() { return c }
             c.extraBytes += waste(g)
             g.sort { a, b in
                 let pa = index.folders[index.files[a].folder].path, pb = index.folders[index.files[b].folder].path

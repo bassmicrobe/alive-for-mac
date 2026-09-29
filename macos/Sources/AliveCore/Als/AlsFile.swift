@@ -99,30 +99,42 @@ public struct AlsInfo: Sendable {
 /// inflated bytes): a typical set is 100 KB on disk and close to 3 MB of XML.
 public enum AlsFile {
     /// How much inflated XML the scan's parallel workers may hold at once. Typical sets inflate
-    /// to a few MB, the largest seen to ~180 MB: the workers still run side by side on ordinary
+    /// to a few MB, the largest seen to ~92 MB: the workers still run side by side on ordinary
     /// sets, and a giant one waits for the others to finish instead of adding up to gigabytes.
     static let inflateBudget = ByteBudget(limit: 256 * 1024 * 1024)
 
     /// Never throws: failures land in `AlsInfo.error`, with whatever was parsed before them.
-    public static func read(path: String) -> AlsInfo {
+    /// `isCancelled` ends a wait for the inflate budget (the info then says "Cancelled").
+    public static func read(path: String, isCancelled: () -> Bool = { false }) -> AlsInfo {
+        read(path: path, budget: inflateBudget, isCancelled: isCancelled)
+    }
+
+    static func read(path: String, budget: ByteBudget, limit: Int = Gzip.maxInflatedBytes,
+                     isCancelled: () -> Bool = { false }) -> AlsInfo {
         var info = AlsInfo()
         info.path = path
         do {
             let raw = try Data(contentsOf: URL(fileURLWithPath: path))
             // Hold the budget for the whole life of the inflated XML: inflate + parse.
-            let granted = inflateBudget.acquire(Gzip.inflatedSizeHint(raw) ?? raw.count)
-            defer { inflateBudget.release(granted) }
+            // The lease grows with what is really mapped, so a trailer that lies low cannot
+            // exceed the budget; the wait for room gives up when the scan is cancelled.
+            let hint = min(Gzip.inflatedSizeHint(raw) ?? raw.count, limit)
+            guard let lease = budget.lease(hint, isCancelled: isCancelled) else {
+                info.error = "Cancelled"
+                return info
+            }
+            defer { lease.release() }
             let xml: Data
             if Gzip.isGzip(raw) {
-                xml = try Gzip.decompress(raw)
-            } else if raw.count > Gzip.maxInflatedBytes {
+                xml = try Gzip.decompress(raw, limit: limit, lease: lease)
+            } else if raw.count > limit {
                 throw GzipError.tooLarge
             } else {
                 xml = raw
             }
             return parse(xml: xml, path: path)
         } catch GzipError.tooLarge {
-            Diag.warn("set is larger than \(Gzip.maxInflatedBytes >> 20) MB inflated, skipped: \(path)")
+            Diag.warn("set is larger than \(limit >> 20) MB inflated, skipped: \(path)")
             info.error = "Too large to be a set (decompression limit)"
             return info
         } catch {
