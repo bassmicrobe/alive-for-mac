@@ -8,14 +8,6 @@ import AliveCore
 import Foundation
 import Observation
 
-/// A thread-safe "stop" switch handed to the background copy.
-final class CancelFlag: @unchecked Sendable {
-    private let lock = NSLock()
-    private var value = false
-    var isSet: Bool { lock.lock(); defer { lock.unlock() }; return value }
-    func set() { lock.lock(); value = true; lock.unlock() }
-}
-
 /// What went wrong, typed so the sheet localizes it (one inline message, never one per file).
 enum ExportFailure: Equatable {
     case destinationExists(String)
@@ -57,10 +49,13 @@ final class ExportModel {
     private(set) var failure: ExportFailure?
     private(set) var result: CollectResult?
     private(set) var cancelling = false
+    /// The destination is taken already. Kept, not computed: it used to hit the disk on every
+    /// render of the sheet; now it is refreshed when the plan changes.
+    private(set) var destinationExists = false
 
     @ObservationIgnored private var info: AlsInfo?
     @ObservationIgnored private var deps: [CollectDependency] = []
-    @ObservationIgnored private var flag = CancelFlag()
+    @ObservationIgnored private var runTask: Task<Result<CollectResult, Error>, Never>?
     @ObservationIgnored private var generation = 0
 
     init(app: AppModel) {
@@ -74,10 +69,15 @@ final class ExportModel {
     var fits: Bool { plan?.fits ?? false }
     var outputPath: String { plan?.outputPath ?? targetDir }
 
-    /// The destination is taken already — nothing is ever merged into or replaced.
-    var destinationExists: Bool {
+    var refused: [CollectDependency] { plan?.refused ?? [] }
+    var elsewhereFolders: [String] { plan?.elsewhereFolders ?? [] }
+
+    /// Nothing is ever merged into or replaced: whether the folder (or archive) exists is
+    /// looked at when the plan is made, not on every render.
+    private func refreshDestinationExists() {
         let fm = FileManager.default
-        return !targetDir.isEmpty && (fm.fileExists(atPath: targetDir) || (options.toZip && fm.fileExists(atPath: targetDir + ".zip")))
+        destinationExists = !targetDir.isEmpty
+            && (fm.fileExists(atPath: targetDir) || (options.toZip && fm.fileExists(atPath: targetDir + ".zip")))
     }
 
     var canExport: Bool { phase == .ready && plan != nil && fits && !destinationExists }
@@ -101,11 +101,12 @@ final class ExportModel {
         targetDir = CollectAll.freeTarget(for: entry)
 
         let env = app.catalog.env
-        let (read, found): (AlsInfo, [CollectDependency]) = await Task.detached(priority: .userInitiated) {
+        let (read, found): (AlsInfo, [CollectDependency]) = await BlockingWork.run { isCancelled in
             let info = AlsFile.read(path: path)
             guard info.error == nil else { return (info, []) }
-            return (info, CollectScan.of(info, setDir: (path as NSString).deletingLastPathComponent, env: env))
-        }.value
+            return (info, CollectScan.of(info, setDir: (path as NSString).deletingLastPathComponent, env: env,
+                                         isCancelled: isCancelled))
+        }
         guard mine == generation else { return }
 
         info = read
@@ -121,7 +122,8 @@ final class ExportModel {
     /// Closing while a copy runs stops it (and whatever it created is removed).
     func close() {
         generation += 1
-        flag.set()
+        runTask?.cancel()
+        runTask = nil
         phase = .idle
         plan = nil
         info = nil
@@ -131,6 +133,7 @@ final class ExportModel {
         failure = nil
         result = nil
         cancelling = false
+        destinationExists = false
     }
 
     // MARK: choices
@@ -173,6 +176,7 @@ final class ExportModel {
 
     private func replan() {
         plan = CollectAll.plan(set: set, deps: deps, options: options, targetDir: targetDir)
+        refreshDestinationExists()
     }
 
     // MARK: exporting
@@ -187,17 +191,21 @@ final class ExportModel {
         progress = CollectProgress(phase: .copying, done: 0, total: plan.copy.count, current: "")
         let entry = set
         let mine = generation
-        let stop = CancelFlag()
-        flag = stop
-
-        let outcome: Result<CollectResult, Error> = await Task.detached(priority: .userInitiated) { [weak self] in
-            Result {
-                try CollectAll.run(plan: plan, set: entry, info: info,
-                                   progress: { p in Task { @MainActor in self?.report(p, generation: mine) } },
-                                   isCancelled: { stop.isSet })
-            }
-        }.value
+        // On a queue of its own (copying gigabytes must not hold the cooperative pool);
+        // cancelling this task is what stops the copy.
+        let task = Task { [weak self] () -> Result<CollectResult, Error> in
+            do {
+                return .success(try await BlockingWork.run { isCancelled in
+                    try CollectAll.run(plan: plan, set: entry, info: info,
+                                       progress: { p in Task { @MainActor in self?.report(p, generation: mine) } },
+                                       isCancelled: isCancelled)
+                })
+            } catch { return .failure(error) }
+        }
+        runTask = task
+        let outcome = await task.value
         guard mine == generation else { return }
+        runTask = nil
 
         switch outcome {
         case .success(let r):
@@ -223,7 +231,7 @@ final class ExportModel {
     func cancel() {
         guard phase == .running else { return }
         cancelling = true
-        flag.set()
+        runTask?.cancel()
     }
 
     func revealResult() {

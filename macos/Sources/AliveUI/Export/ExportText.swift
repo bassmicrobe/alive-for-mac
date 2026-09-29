@@ -69,6 +69,22 @@ enum ExportText {
         count == 0 ? nil : ExportStrings.notFoundSummary.f(ExportStrings.files(count))
     }
 
+    /// ONE line for the files that were left out for safety; nil when there is none.
+    static func refusedSummary(_ count: Int) -> String? {
+        count == 0 ? nil : ExportStrings.refusedSummary.f(ExportStrings.files(count))
+    }
+
+    /// The folders "from elsewhere" reaches into, first few by name ("~" for the home folder).
+    static func elsewhereFolders(_ folders: [String], home: String = NSHomeDirectory(), shown: Int = 3) -> String? {
+        guard !folders.isEmpty else { return nil }
+        let names = folders.prefix(shown).map { path -> String in
+            path.hasPrefix(home + "/") ? "~" + path.dropFirst(home.count) : path
+        }
+        let list = names.joined(separator: ", ")
+        let line = folders.count > shown ? ExportStrings.andMore.f(list, folders.count - shown) : list
+        return ExportStrings.elsewhereFrom.f(line)
+    }
+
     static func failedSummary(_ count: Int) -> String? {
         count == 0 ? nil : ExportStrings.failedSummary.f(ExportStrings.files(count))
     }

@@ -11,25 +11,37 @@ extension ProjectIndex {
     /// missing at all — `missingPlugins` stays 0 for every set.
     public func refreshInstalled() {
         let inv = inventoryLoader(settings)
-        lock.lock()
-        _inventory = inv
-        var updated = _sets
+        // The matching is CPU-heavy on a big catalog, so it runs on a snapshot outside the lock
+        // (readers on the main thread must not wait for it); the result is swapped in under the
+        // lock only if no scan has published in the meantime, else it is redone on the new list.
         var missingNames = Set<String>(), affected = 0
-        for i in updated.indices {
-            let e = updated[i]
-            var missing = 0
-            if inv.isAvailable {
-                for (k, name) in e.plugins.enumerated() {
-                    let uid = k < e.pluginUids.count ? e.pluginUids[k] : ""
-                    if inv.match(uid: uid, name: name).kind == .missing { missing += 1; missingNames.insert(name.lowercased()) }
-                }
+        for attempt in 0..<4 {
+            lock.lock()
+            let generation = _generation, snapshot = _sets
+            lock.unlock()
+            let counts = attempt < 3 ? Self.missingCounts(snapshot, inv) : nil
+            lock.lock()
+            if let counts, generation == _generation {
+                var updated = snapshot
+                for i in updated.indices { updated[i].missingPlugins = counts.perSet[i] }
+                _inventory = inv
+                _sets = updated
+                _generation += 1    // the vendor list and the plugin summary depend on what is installed
+                lock.unlock()
+                missingNames = counts.names; affected = counts.affected
+                break
             }
-            if missing > 0 { affected += 1 }
-            updated[i].missingPlugins = missing
+            if counts == nil {      // the catalog keeps changing: settle it under the lock, once
+                let last = Self.missingCounts(_sets, inv)
+                for i in _sets.indices { _sets[i].missingPlugins = last.perSet[i] }
+                _inventory = inv
+                _generation += 1
+                lock.unlock()
+                missingNames = last.names; affected = last.affected
+                break
+            }
+            lock.unlock()
         }
-        _sets = updated
-        _generation += 1        // the vendor list and the plugin summary depend on what is installed
-        lock.unlock()
 
         if inv.isAvailable {
             Diag.info("plugins: \(inv.all.count) installed (\(inv.sources.joined(separator: ", "))); "
@@ -37,6 +49,25 @@ extension ProjectIndex {
         } else {
             Diag.info("plugins: inventory unavailable (\(inv.error ?? "nothing found")); missing plugins not reported")
         }
+    }
+
+    private struct MissingCounts { var perSet: [Int] = []; var names = Set<String>(); var affected = 0 }
+
+    private static func missingCounts(_ sets: [SetEntry], _ inv: PluginInventory) -> MissingCounts {
+        var out = MissingCounts()
+        out.perSet.reserveCapacity(sets.count)
+        for e in sets {
+            var missing = 0
+            if inv.isAvailable {
+                for (k, name) in e.plugins.enumerated() {
+                    let uid = k < e.pluginUids.count ? e.pluginUids[k] : ""
+                    if inv.match(uid: uid, name: name).kind == .missing { missing += 1; out.names.insert(name.lowercased()) }
+                }
+            }
+            if missing > 0 { out.affected += 1 }
+            out.perSet.append(missing)
+        }
+        return out
     }
 
     public func health(_ usage: [PluginStat]) -> PluginHealth {

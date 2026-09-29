@@ -113,6 +113,7 @@ public enum CollectAll {
 
         for d in deps {
             if d.origin == .missing { plan.notFound.append(d); continue }
+            if d.refusal != nil { plan.refused.append(d); continue }
             guard options.wants(d.origin) else { plan.skipped.append(d); continue }
 
             let rel: String
@@ -136,6 +137,12 @@ public enum CollectAll {
             plan.totalBytes += d.size
         }
         plan.freeBytes = freeSpace(near: plan.targetDir)
+        plan.elsewhereFolders = Set(plan.copy.filter { $0.origin == .elsewhere }
+            .map { ($0.realPath as NSString).deletingLastPathComponent }).sorted()
+        if !plan.refused.isEmpty {
+            let names = plan.refused.prefix(5).map(\.name).joined(separator: ", ")
+            Diag.info("collect: \(plan.refused.count) file(s) refused (not media, hidden or private): \(names)")
+        }
         return plan
     }
 
@@ -210,6 +217,7 @@ public enum CollectAll {
                 if isCancelled() { throw CollectError.cancelled }
                 guard let rel = plan.dest[d.id] else { continue }
                 do {
+                    try recheck(d)
                     try put(d.path, to: (root as NSString).appendingPathComponent(rel))
                     result.copiedFiles += 1
                     result.copiedBytes += d.size
@@ -290,17 +298,35 @@ public enum CollectAll {
         try fm.createDirectory(atPath: dst, withIntermediateDirectories: true)
         do {
             for n in names where !n.hasPrefix(".") {
-                try put((src as NSString).appendingPathComponent(n), to: (dst as NSString).appendingPathComponent(n))
+                try put((src as NSString).appendingPathComponent(n), to: (dst as NSString).appendingPathComponent(n), anyFolder: true)
             }
         } catch { Diag.info("collect: project info: \(error.localizedDescription)") }
     }
 
+    /// The plan was made a moment ago; the file system may have moved since. What is copied
+    /// must still be the file that was vetted: a link retargeted in between (to a private file)
+    /// is refused rather than followed.
+    static func recheck(_ d: CollectDependency) throws {
+        guard !d.realPath.isEmpty, CollectSafety.realPath(d.path) == d.realPath else {
+            throw CollectError.io("the file changed after it was checked")
+        }
+    }
+
     /// Copies a file or a bundle folder (.adg/.amxd) with everything inside. A symlink source is
-    /// followed: a link in the export would dangle. Never overwrites.
-    static func put(_ src: String, to dst: String) throws {
+    /// followed: a link in the export would dangle — but only to a plain file or a known
+    /// bundle, never to a device node or a folder of something else. Never overwrites.
+    static func put(_ src: String, to dst: String, anyFolder: Bool = false) throws {
         let fm = FileManager.default
+        let real = CollectSafety.realPath(src) ?? URL(fileURLWithPath: src).resolvingSymlinksInPath().path
+        var st = stat()
+        guard stat(real, &st) == 0 else { throw CocoaError(.fileNoSuchFile, userInfo: [NSFilePathErrorKey: src]) }
+        let ext = (real as NSString).pathExtension.lowercased()
+        switch st.st_mode & S_IFMT {
+        case S_IFREG: break
+        case S_IFDIR where anyFolder || CollectSafety.bundleExtensions.contains(ext): break
+        default: throw CocoaError(.fileReadUnsupportedScheme, userInfo: [NSFilePathErrorKey: src])
+        }
         try fm.createDirectory(atPath: (dst as NSString).deletingLastPathComponent, withIntermediateDirectories: true)
-        let real = URL(fileURLWithPath: src).resolvingSymlinksInPath().path
         try fm.copyItem(atPath: real, toPath: dst)
     }
 
@@ -308,7 +334,8 @@ public enum CollectAll {
     static func pack(folder: String, into zip: String, isCancelled: () -> Bool) throws {
         let p = Process()
         p.executableURL = URL(fileURLWithPath: "/usr/bin/ditto")
-        p.arguments = ["-c", "-k", "--sequesterRsrc", "--keepParent", folder, zip]
+        // `--` ends the options: a folder named "-x…" must not be read as a flag.
+        p.arguments = ["-c", "-k", "--sequesterRsrc", "--keepParent", "--", folder, zip]
         let err = Pipe()
         p.standardError = err
         p.standardOutput = FileHandle.nullDevice
