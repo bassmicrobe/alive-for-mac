@@ -55,6 +55,14 @@ final class ChangeFlag: @unchecked Sendable {
     func bump() { value += 1 }
 }
 
+/// A counter that background queues may bump.
+final class LockedCounter: @unchecked Sendable {
+    private let lock = NSLock()
+    private var n = 0
+    var value: Int { lock.lock(); defer { lock.unlock() }; return n }
+    func bump() { lock.lock(); n += 1; lock.unlock() }
+}
+
 final class RescueTextTests: XCTestCase {
     private var saved: LanguagePreference = .system
 
@@ -280,6 +288,56 @@ final class RescueModelTests: XCTestCase {
         XCTAssertEqual(name, "Song (rescued).als")
         XCTAssertEqual(disabled, [culprit.name])
         XCTAssertEqual(RescueProbe.journal(dir: app.dataDir), [])
+    }
+
+    func testLiveComingAndGoingIsLearntFromWorkspaceNotifications() async throws {
+        let centre = NotificationCenter()
+        model.workspaceCenter = centre
+        model.pollInterval = .milliseconds(5)            // would show any idle polling at once
+        await model.open(path: try makeSet(devices: threePlugins))
+        XCTAssertFalse(model.liveRunning)
+
+        liveRunning = true                               // nothing announces it yet
+        try await Task.sleep(nanoseconds: 120_000_000)
+        XCTAssertFalse(model.liveRunning, "an idle sheet does not poll the process list")
+
+        centre.post(name: NSWorkspace.didLaunchApplicationNotification, object: nil)
+        for _ in 0..<100 where !model.liveRunning { try await Task.sleep(nanoseconds: 20_000_000) }
+        XCTAssertTrue(model.liveRunning)
+
+        liveRunning = false
+        centre.post(name: NSWorkspace.didTerminateApplicationNotification, object: nil)
+        for _ in 0..<100 where model.liveRunning { try await Task.sleep(nanoseconds: 20_000_000) }
+        XCTAssertFalse(model.liveRunning)
+
+        model.close()                                    // observers are gone with the sheet
+        liveRunning = true
+        centre.post(name: NSWorkspace.didLaunchApplicationNotification, object: nil)
+        try await Task.sleep(nanoseconds: 80_000_000)
+        XCTAssertFalse(model.liveRunning)
+    }
+
+    func testLiveLogsAreReadOnlyWhileAProbeIsOut() async throws {
+        let reads = LockedCounter()
+        model.logFiles = { reads.bump(); return [] }
+        model.pollInterval = .milliseconds(5)
+        await model.open(path: try makeSet(devices: threePlugins))
+        let afterOpen = reads.value
+        try await Task.sleep(nanoseconds: 120_000_000)
+        XCTAssertEqual(reads.value, afterOpen, "no polling while nothing is out")
+
+        model.setAll(enabled: false)
+        await model.runProbe()
+        XCTAssertEqual(model.phase, .waiting)
+        for _ in 0..<100 where reads.value == afterOpen { try await Task.sleep(nanoseconds: 20_000_000) }
+        XCTAssertGreaterThan(reads.value, afterOpen, "the log is watched while waiting")
+
+        model.answer(opened: true)
+        XCTAssertEqual(model.phase, .ready)
+        try await Task.sleep(nanoseconds: 60_000_000)          // let a tick in flight finish
+        let settled = reads.value
+        try await Task.sleep(nanoseconds: 120_000_000)
+        XCTAssertEqual(reads.value, settled, "and not any more once the answer is in")
     }
 
     func testRunningLiveBlocksTheProbeUntilItIsClosed() async throws {

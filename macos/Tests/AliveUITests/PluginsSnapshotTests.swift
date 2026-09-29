@@ -34,11 +34,12 @@ final class PluginsSnapshotTests: XCTestCase {
         try data.write(to: URL(fileURLWithPath: path))
     }
 
-    func testRenderPluginsTabAndFiltersSheet() throws {
+    func testRenderPluginsTabAndFiltersSheet() async throws {
         guard let out = env["ALIVE_TEST_SNAPSHOT"] else { throw XCTSkip("ALIVE_TEST_SNAPSHOT not set") }
         try FileManager.default.createDirectory(atPath: out, withIntermediateDirectories: true)
         let app = try app()
         app.tab = .plugins
+        await app.plugins.settle()
         app.plugins.show(pluginNamed: env["ALIVE_TEST_PLUGIN"] ?? "Serum")
         try png(PluginsView().environment(app), width: 1180, height: 640, to: out + "/plugins.png")
 

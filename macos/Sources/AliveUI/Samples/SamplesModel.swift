@@ -63,12 +63,23 @@ final class SamplesModel {
     @ObservationIgnored var scrollSerial = 0
     @ObservationIgnored var infoTask: Task<Void, Never>?
 
-    // MARK: memos
-    @ObservationIgnored private var usageMemo: (key: String, value: SampleUsage)?
-    @ObservationIgnored private var copiesMemo: (gen: Int, value: SampleCopies)?
-    @ObservationIgnored private var keysMemo: (gen: Int, value: SampleNameKeys)?
+    // MARK: derived data (see SamplesSnapshot)
+    /// The last finished build. Published once per build; the getters below read it.
+    private(set) var snapshot: SamplesSnapshot?
+    /// Per-folder summaries for the panel, valid for one (index, catalog revision).
+    @ObservationIgnored private var folderSummaries: [Int: SampleFolderSummary] = [:]
+    /// Bumped when a summary arrives, so the panel reads again.
+    private(set) var summaryRevision = 0
+    @ObservationIgnored private var summaryStamp = ""
+    @ObservationIgnored private var summaryTasks: [Int: Task<Void, Never>] = [:]
+    @ObservationIgnored var snapshotTask: Task<Void, Never>?
+    @ObservationIgnored private var building: SamplesSnapshotKey?
+    @ObservationIgnored private var buildSerial = 0
+    /// Index generation for which a panel has asked for the copies.
+    @ObservationIgnored private var copiesDemandedGeneration = -1
+    /// A scroll asked for before the rows it points at have been built; done when they arrive.
+    @ObservationIgnored private var deferredScroll: String?
     @ObservationIgnored private var lookupMemo: (gen: Int, folders: [String: Int], files: [String: Int])?
-    @ObservationIgnored private var listingMemo: (key: String, value: SampleListing)?
 
     init(app: AppModel) {
         self.app = app
@@ -116,45 +127,121 @@ final class SamplesModel {
     /// after an update the whole catalog is parsed anew, and for that half a minute everything
     /// would look unused.
     var usageUnknown: Bool {
-        app.catalog.sets.isEmpty && (app.catalog.isScanning || !app.catalog.isLoaded)
+        (app.catalog.sets.isEmpty && (app.catalog.isScanning || !app.catalog.isLoaded))
+            || snapshot?.key.indexGeneration != indexGeneration
     }
 
-    /// What the sets use of the library — worked out anew only when the sets or the index changed
-    /// (74 ms on 184 thousand samples upstream).
-    var usage: SampleUsage {
-        let key = "\(indexGeneration)|\(app.catalog.revision)"
-        if let m = usageMemo, m.key == key { return m.value }
-        let value = SampleUsage.compute(index: index, sets: app.catalog.sets)
-        usageMemo = (key, value)
-        return value
+    /// What the sets use of the library. Empty until the snapshot for the current index has been
+    /// published (`usageUnknown` says so); between two catalog revisions the previous one stays.
+    var usage: SampleUsage { readSnapshot()?.usage ?? .empty }
+
+    /// The same sample in several places. Only there when something shows it: the Duplicates lens,
+    /// a Copies column or a sort by it, or the panel (`copiesForPanel`).
+    var copies: SampleCopies { readSnapshot()?.copies ?? .empty }
+
+    /// The copies for the panel of a folder or sample: asks for them to be found when they are not.
+    var copiesForPanel: SampleCopies {
+        if copiesDemandedGeneration != indexGeneration {
+            copiesDemandedGeneration = indexGeneration
+            scheduleSnapshot()
+        }
+        return copies
     }
 
-    /// The same sample in several places — found anew only for a new index.
-    var copies: SampleCopies {
-        if let m = copiesMemo, m.gen == indexGeneration { return m.value }
-        let value = SampleCopies.find(in: index)
-        copiesMemo = (indexGeneration, value)
-        return value
+    /// The rows of the list for the lens, order, open folders and the search box; the previous
+    /// ones (of the same library) while the new ones are being built.
+    var listing: SampleListing { readSnapshot()?.listing ?? Self.emptyListing }
+
+    private static let emptyListing = SampleLister.listing(index: .empty, usage: .empty, copies: .empty, lens: .all,
+                                                           sort: SampleSort(), open: [], query: "")
+
+    /// The rows for the current inputs have not been published yet.
+    var isPreparing: Bool { snapshot?.key != snapshotKey }
+
+    /// Waits until the snapshot matches the current inputs. For tests and for callers that must act
+    /// on the finished rows.
+    func settle() async {
+        scheduleSnapshot()
+        while let task = snapshotTask {
+            await task.value
+            scheduleSnapshot()
+        }
     }
 
-    private var nameKeys: SampleNameKeys {
-        if let m = keysMemo, m.gen == indexGeneration { return m.value }
-        let value = SampleNameKeys(index)
-        keysMemo = (indexGeneration, value)
-        return value
+    private var snapshotKey: SamplesSnapshotKey {
+        let wantsCopies = lens == .duplicates || sort.column == .copies || visibleColumns.contains(.copies)
+            || copiesDemandedGeneration == indexGeneration
+        return SamplesSnapshotKey(indexGeneration: indexGeneration, catalogRevision: app.catalog.revision, lens: lens,
+                                  sort: sort, openRevision: openRevision, query: app.searchText, wantsCopies: wantsCopies)
     }
 
-    /// The rows of the list for the lens, order, open folders and the search box.
-    var listing: SampleListing {
-        let query = app.searchText
-        let key = "\(indexGeneration)|\(app.catalog.revision)|\(lens.rawValue)|\(sort.column?.rawValue ?? "-")"
-            + "\(sort.descending)|\(openRevision)|\(query)"
-        if let m = listingMemo, m.key == key { return m.value }
-        let value = SampleLister.listing(index: index, usage: usage, copies: copies, lens: lens, sort: sort,
-                                         open: openFolders, query: query, keys: nameKeys)
-        listingMemo = (key, value)
-        return value
+    /// The published snapshot when it belongs to the current library (its row numbers point into
+    /// `index`); a build is started when the inputs have moved on.
+    private func readSnapshot() -> SamplesSnapshot? {
+        scheduleSnapshot()
+        guard let s = snapshot, s.key.indexGeneration == indexGeneration else { return nil }
+        return s
     }
+
+    private func scheduleSnapshot() {
+        let key = snapshotKey
+        if snapshot?.key == key || building == key { return }
+        snapshotTask?.cancel()
+        buildSerial += 1
+        let serial = buildSerial
+        building = key
+        let input = SamplesSnapshotInput(key: key, index: index, sets: app.catalog.sets, open: openFolders,
+                                         previous: snapshot)
+        snapshotTask = Task { [weak self] in
+            let built = await BlockingWork.run { isCancelled in
+                SamplesSnapshotBuilder.build(input, isCancelled: isCancelled)
+            }
+            self?.publish(built, serial: serial)
+        }
+    }
+
+    private func publish(_ built: SamplesSnapshot?, serial: Int) {
+        guard serial == buildSerial else { return }              // a newer request has taken over
+        building = nil
+        snapshotTask = nil
+        guard let built else { return }
+        snapshot = built
+        if let id = deferredScroll, built.key == snapshotKey {
+            deferredScroll = nil
+            publishScroll(to: id)
+        }
+    }
+
+    // MARK: - Folder panel
+
+    /// What the folder panel needs beyond the snapshot, or nil while it is being worked out.
+    func folderSummary(_ folder: Int) -> SampleFolderSummary? {
+        _ = summaryRevision
+        guard let usage = readSnapshot()?.usage, !usageUnknown else { return nil }
+        let stamp = "\(indexGeneration)|\(app.catalog.revision)"
+        if stamp != summaryStamp {
+            summaryStamp = stamp
+            summaryTasks.values.forEach { $0.cancel() }
+            summaryTasks = [:]
+            folderSummaries = [:]
+        }
+        if let ready = folderSummaries[folder] { return ready }
+        guard summaryTasks[folder] == nil else { return nil }
+        let index = self.index
+        summaryTasks[folder] = Task { [weak self] in
+            let made = await BlockingWork.run { isCancelled in
+                isCancelled() ? nil : SampleFolderSummary.make(folder: folder, index: index, usage: usage)
+            }
+            guard let self, let made, self.summaryStamp == stamp else { return }
+            self.summaryTasks[folder] = nil
+            if self.folderSummaries.count >= Self.summaryCapacity { self.folderSummaries = [:] }
+            self.folderSummaries[folder] = made
+            self.summaryRevision &+= 1
+        }
+        return nil
+    }
+
+    private static let summaryCapacity = 24
 
     var columnSpec: SampleColumnSpec { SampleColumnSpec(spec: app.settings.sampleColumns) }
 
@@ -205,15 +292,23 @@ final class SamplesModel {
         if info?.path == path { return }
         info = SampleInfo(path: path)
         infoTask = Task { [weak self] in
-            let loaded = await Task.detached(priority: .userInitiated) {
-                SampleInfoLoader.load(path: path, canPreview: file.canPreview, size: file.size, buckets: 300)
-            }.value
+            // Cancelling the task (another sample selected) reaches the decoder through the flag.
+            let loaded = await BlockingWork.run { isCancelled in
+                SampleInfoLoader.load(path: path, canPreview: file.canPreview, size: file.size, buckets: 300,
+                                      isCancelled: isCancelled)
+            }
             guard let self, !Task.isCancelled, self.selection == path else { return }
             self.info = loaded
         }
     }
 
     func requestScroll(to id: String) {
+        // The row may not be in the list yet: the list is built off the main actor.
+        if isPreparing { deferredScroll = id; scheduleSnapshot(); return }
+        publishScroll(to: id)
+    }
+
+    private func publishScroll(to id: String) {
         scrollSerial += 1
         scrollTarget = SampleScrollTarget(id: id, serial: scrollSerial)
     }

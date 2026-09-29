@@ -22,10 +22,7 @@ final class PluginsModelTests: XCTestCase {
         return p
     }
 
-    /// An app whose catalog holds three sets and whose machine has Serum, Pro-Q and an idle plugin.
-    private func makeApp(inventory: [InstalledPlugin]?) throws -> AppModel {
-        let app = try makeModel()
-        let index = app.catalog.index
+    private func seedSets(_ index: ProjectIndex) {
         index.lock.lock()
         index._sets = [
             set("a", [("Serum", "vst3:s"), ("Pro-Q", "vst3:q")], modified: 300),
@@ -34,12 +31,20 @@ final class PluginsModelTests: XCTestCase {
         ]
         index._generation += 1
         index.lock.unlock()
+    }
+
+    /// An app whose catalog holds three sets and whose machine has Serum, Pro-Q and an idle plugin.
+    private func makeApp(inventory: [InstalledPlugin]?) async throws -> AppModel {
+        let app = try makeModel()
+        let index = app.catalog.index
+        seedSets(index)
         var inv = PluginInventory()
         for p in inventory ?? [] { inv.add(p) }
         let frozen = inv
         index.inventoryLoader = { _ in frozen }
         index.refreshInstalled()
         app.catalog.settingsDidChange()                     // bumps `revision`: the model re-reads
+        await app.plugins.settle()                          // the table is built off the main actor
         return app
     }
 
@@ -49,8 +54,8 @@ final class PluginsModelTests: XCTestCase {
          installed("vst3:idle", "Idle One", vendor: "Nobody", category: "Fx|Reverb")]
     }
 
-    func testRowsAreTheCatalogsPluginsAndShownCountFollowsSearch() throws {
-        let app = try makeApp(inventory: standardMachine)
+    func testRowsAreTheCatalogsPluginsAndShownCountFollowsSearch() async throws {
+        let app = try await makeApp(inventory: standardMachine)
         XCTAssertEqual(app.plugins.rows.map(\.name), ["Pro-Q", "Serum", "Ghost", "Idle One"])   // most used first, then name
         XCTAssertEqual(app.plugins.shownCount, 4)
         XCTAssertEqual(app.shownCount, 0, "the toolbar follows the active tab")
@@ -62,8 +67,8 @@ final class PluginsModelTests: XCTestCase {
         app.searchText = ""
     }
 
-    func testSortingToggles() throws {
-        let app = try makeApp(inventory: standardMachine)
+    func testSortingToggles() async throws {
+        let app = try await makeApp(inventory: standardMachine)
         let m = app.plugins
         m.toggleSort(.name)
         XCTAssertEqual(m.rows.map(\.name), ["Ghost", "Idle One", "Pro-Q", "Serum"])
@@ -78,8 +83,8 @@ final class PluginsModelTests: XCTestCase {
         XCTAssertTrue(m.sortAscending)
     }
 
-    func testCardsAndFiltersNarrowTheRows() throws {
-        let app = try makeApp(inventory: standardMachine)
+    func testCardsAndFiltersNarrowTheRows() async throws {
+        let app = try await makeApp(inventory: standardMachine)
         let m = app.plugins
         m.toggleCard(.missing)
         XCTAssertEqual(m.rows.map(\.name), ["Ghost"])
@@ -93,8 +98,8 @@ final class PluginsModelTests: XCTestCase {
         XCTAssertEqual(m.rows.count, 4)
     }
 
-    func testSelectionAndTheSetsThatUseThePlugin() throws {
-        let app = try makeApp(inventory: standardMachine)
+    func testSelectionAndTheSetsThatUseThePlugin() async throws {
+        let app = try await makeApp(inventory: standardMachine)
         let m = app.plugins
         XCTAssertNil(m.selectedRow)
         m.moveSelection(by: 1)
@@ -113,8 +118,8 @@ final class PluginsModelTests: XCTestCase {
         XCTAssertEqual(m.selectedRow?.name, "Pro-Q", "clamped at the start")
     }
 
-    func testShowPluginNamedSelectsItAndClearsWhatWouldHideIt() throws {
-        let app = try makeApp(inventory: standardMachine)
+    func testShowPluginNamedSelectsItAndClearsWhatWouldHideIt() async throws {
+        let app = try await makeApp(inventory: standardMachine)
         let m = app.plugins
         app.tab = .sets
         app.searchText = "zzz"
@@ -135,16 +140,16 @@ final class PluginsModelTests: XCTestCase {
         XCTAssertEqual(app.tab, .plugins)
     }
 
-    func testShowPluginKeepsAFilterThatStillMatches() throws {
-        let app = try makeApp(inventory: standardMachine)
+    func testShowPluginKeepsAFilterThatStillMatches() async throws {
+        let app = try await makeApp(inventory: standardMachine)
         let m = app.plugins
         m.filter.vendors = ["Xfer"]
         m.show(pluginNamed: "Serum")
         XCTAssertEqual(m.filter.vendors, ["Xfer"])
     }
 
-    func testOpeningASetGoesToTheSetsTab() throws {
-        let app = try makeApp(inventory: standardMachine)
+    func testOpeningASetGoesToTheSetsTab() async throws {
+        let app = try await makeApp(inventory: standardMachine)
         app.tab = .plugins
         app.searchText = "serum"
         app.plugins.openSet(path: "/music/a.als")
@@ -153,12 +158,12 @@ final class PluginsModelTests: XCTestCase {
         XCTAssertEqual(app.searchText, "")
     }
 
-    func testMissingIsOneNumberAndAnUnavailableInventoryIsCalm() throws {
-        let app = try makeApp(inventory: standardMachine)
+    func testMissingIsOneNumberAndAnUnavailableInventoryIsCalm() async throws {
+        let app = try await makeApp(inventory: standardMachine)
         XCTAssertTrue(app.plugins.inventoryAvailable)
         XCTAssertEqual(app.plugins.missingUsedCount, 1)
 
-        let blind = try makeApp(inventory: nil)
+        let blind = try await makeApp(inventory: nil)
         XCTAssertFalse(blind.plugins.inventoryAvailable)
         XCTAssertEqual(blind.plugins.missingUsedCount, 0)
         XCTAssertEqual(blind.plugins.rows.count, 3)
@@ -166,8 +171,8 @@ final class PluginsModelTests: XCTestCase {
         XCTAssertTrue(blind.toasts.isEmpty, "no toast for an unreadable inventory")
     }
 
-    func testRevealOfAMissingFileToastsOnceAndDoesNothingWithoutAPath() throws {
-        let app = try makeApp(inventory: standardMachine)
+    func testRevealOfAMissingFileToastsOnceAndDoesNothingWithoutAPath() async throws {
+        let app = try await makeApp(inventory: standardMachine)
         let m = app.plugins
         let ghost = try XCTUnwrap(m.table.row(named: "Ghost"))
         m.reveal(ghost)                                       // no path: silent
@@ -177,12 +182,51 @@ final class PluginsModelTests: XCTestCase {
         XCTAssertEqual(app.toasts.count, 1)
     }
 
-    func testFacetsFollowTheFilter() throws {
-        let app = try makeApp(inventory: standardMachine)
+    func testFacetsFollowTheFilter() async throws {
+        let app = try await makeApp(inventory: standardMachine)
         let m = app.plugins
         XCTAssertEqual(m.facets.matches, 4)
         m.filter.statusMissing = true
         XCTAssertEqual(m.facets.matches, 1)
         XCTAssertEqual(m.facets.installed, 3)
+    }
+
+    func testTheTableIsBuiltOffTheMainActorAndPublishedOnce() async throws {
+        let app = try await makeApp(inventory: standardMachine)
+        let m = app.plugins
+        let before = m.snapshot
+        XCTAssertEqual(before?.revision, app.catalog.revision)
+
+        app.catalog.settingsDidChange()                      // a new revision
+        XCTAssertEqual(m.snapshot?.revision, before?.revision, "the getters do not compute: the last one stays")
+        XCTAssertEqual(m.rows.count, 4)
+        await m.settle()
+        XCTAssertEqual(m.snapshot?.revision, app.catalog.revision)
+        XCTAssertNotEqual(m.snapshot?.revision, before?.revision)
+    }
+
+    func testAnEarlyRequestToShowAPluginWaitsForTheTable() async throws {
+        let app = try makeModel()
+        let m = app.plugins
+        m.show(pluginNamed: "Serum")                         // the table is not there yet
+        XCTAssertNil(m.selectedID)
+        XCTAssertEqual(app.tab, .plugins)
+        await m.settle()
+        XCTAssertNil(m.selectedID, "an empty catalog has no such plugin")
+
+        let ready = try await makeApp(inventory: standardMachine)
+        ready.plugins.show(pluginNamed: "Serum")
+        XCTAssertNotNil(ready.plugins.selectedID)
+    }
+
+    func testABuildForAnOldRevisionIsNotPublished() async throws {
+        let app = try await makeApp(inventory: standardMachine)
+        let m = app.plugins
+        app.catalog.settingsDidChange()
+        _ = m.rows                                           // starts a build for revision N+1
+        app.catalog.settingsDidChange()
+        _ = m.rows                                           // replaced by N+2
+        await m.settle()
+        XCTAssertEqual(m.snapshot?.revision, app.catalog.revision)
     }
 }

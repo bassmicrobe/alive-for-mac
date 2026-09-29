@@ -44,8 +44,8 @@ private struct FolderPanel: View {
     var body: some View {
         let d = model.index.folders[folder]
         let use = model.usageUnknown ? nil : model.usage.of(folder: folder)
-        let used = model.usage.usedUnder(folder, in: model.index)
-        let sets = used.flatMap { model.usage.of(file: $0)?.sets ?? [] }
+        // Worked out once per folder off the main actor, not on every evaluation of this body.
+        let summary = use == nil ? nil : model.folderSummary(folder)
         VStack(alignment: .leading, spacing: 16) {
             PanelHeader(title: d.parent == nil ? rootTitle(d) : d.name, trailing: SampleFormat.megabytes(d.totalBytes))
             PathLink(model: model, path: d.path)
@@ -61,10 +61,10 @@ private struct FolderPanel: View {
                 if let created = d.created { PanelRow(label: SamplesStrings.panelCreated.s, value: SampleFormat.day(created)) }
                 copiesRow(d)
             }
-            if use != nil {
-                UsageChart(months: SampleMonths.count(sets))
-                MostUsedList(model: model, files: used, total: use?.used ?? 0)
-                ProjectsList(model: model, sets: SampleUsage.newest(sets))
+            if let summary {
+                UsageChart(months: summary.months)
+                MostUsedList(model: model, files: summary.used, total: use?.used ?? 0)
+                ProjectsList(model: model, sets: summary.projects)
             }
         }
     }
@@ -77,10 +77,11 @@ private struct FolderPanel: View {
     }
 
     @ViewBuilder private func copiesRow(_ d: SampleFolder) -> some View {
-        let n = model.copies.files(in: folder)
+        let copies = model.copiesForPanel
+        let n = copies.files(in: folder)
         if n > 0 {
             PanelRow(label: SamplesStrings.panelCopies.s,
-                     value: SamplesStrings.panelCopiesValue.f(SampleFormat.number(n), SampleFormat.sampleSize(model.copies.bytes(in: folder))))
+                     value: SamplesStrings.panelCopiesValue.f(SampleFormat.number(n), SampleFormat.sampleSize(copies.bytes(in: folder))))
         }
     }
 }
@@ -116,7 +117,7 @@ private struct SamplePanel: View {
         let s = model.index.files[file]
         let path = model.index.path(of: file)
         let use = model.usageUnknown ? nil : model.usage.of(file: file)
-        let others = model.copies.others(of: file)
+        let others = model.copiesForPanel.others(of: file)
         VStack(alignment: .leading, spacing: 16) {
             PanelHeader(title: s.name, trailing: SampleFormat.sampleSize(s.size))
             WaveView(model: model, file: s, path: path)

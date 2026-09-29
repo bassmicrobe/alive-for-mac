@@ -35,7 +35,9 @@ final class RescueModel {
     private(set) var produced = ""
 
     @ObservationIgnored private(set) var session: RescueSession?
+    /// Reads Live's log while a probe is out; nil the rest of the time.
     @ObservationIgnored private var poller: Task<Void, Never>?
+    @ObservationIgnored private var workspaceObservers: [NSObjectProtocol] = []
     @ObservationIgnored private var waitingSince = Date()
     @ObservationIgnored private var generation = 0
     /// The probe being written on the blocking queue; `close()` cancels it.
@@ -46,6 +48,9 @@ final class RescueModel {
     @ObservationIgnored var isLiveRunning: () -> Bool = { RescueModel.liveIsRunning() }
     @ObservationIgnored var logFiles: () -> [LiveLogFile] = { LiveLog.files() }
     @ObservationIgnored lazy var openProbe: (String) -> Void = { [unowned self] in self.app.openInLive(path: $0) }
+    /// Where application launches and quits are announced (tests post to their own centre).
+    @ObservationIgnored var workspaceCenter: NotificationCenter = NSWorkspace.shared.notificationCenter
+    /// How often Live's log is read while a probe is out.
     @ObservationIgnored var pollInterval: Duration = .seconds(1)
     /// How long a probe may stay unopened before we stop waiting (upstream: five minutes).
     @ObservationIgnored var giveUpAfter: TimeInterval = 5 * 60
@@ -120,15 +125,15 @@ final class RescueModel {
         liveRunning = isLiveRunning()
         phase = .ready
         revision += 1
-        startPolling()
+        startWatchingLive()
     }
 
     /// Stops watching and removes any probe: it is an .als inside a project folder, and left
     /// there for good it would one day be opened instead of the real set.
     func close() {
         generation += 1
-        poller?.cancel()
-        poller = nil
+        stopWatchingLive()
+        stopLogPolling()
         // A probe still being written is stopped, and removed when the write returns (see
         // `runProbe`): it lands in the user's project folder and must not outlive the sheet.
         probeTask?.cancel()
@@ -208,6 +213,7 @@ final class RescueModel {
             phase = .waiting
             waitingSince = Date()
             status = .started(round: s.round, disabled: off.map(\.name))
+            startLogPolling()
         }
         revision += 1
     }
@@ -218,17 +224,49 @@ final class RescueModel {
         finishProbe(opened: opened, attempt: nil)
     }
 
-    // MARK: polling
+    // MARK: watching
 
-    private func startPolling() {
+    /// Whether Live runs is learnt from the workspace's launch and quit notifications, not by
+    /// listing every process each second.
+    private func startWatchingLive() {
+        stopWatchingLive()
+        let names = [NSWorkspace.didLaunchApplicationNotification, NSWorkspace.didTerminateApplicationNotification]
+        workspaceObservers = names.map { name in
+            workspaceCenter.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+                Task { @MainActor in await self?.refreshLiveRunning() }
+            }
+        }
+    }
+
+    private func stopWatchingLive() {
+        workspaceObservers.forEach { workspaceCenter.removeObserver($0) }
+        workspaceObservers = []
+    }
+
+    /// One look at the process list, off the main actor, after an application came or went.
+    func refreshLiveRunning() async {
+        let mine = generation
+        let check = isLiveRunning
+        let live = await BlockingWork.run { _ in check() }
+        guard mine == generation, live != liveRunning else { return }
+        liveRunning = live
+    }
+
+    /// Live's log is read only while a probe is out; it stops when the verdict is in.
+    private func startLogPolling() {
         poller?.cancel()
         poller = Task { [weak self] in
             while !Task.isCancelled {
                 try? await Task.sleep(for: self?.pollInterval ?? .seconds(1))
-                guard !Task.isCancelled else { return }
-                await self?.tick()
+                guard !Task.isCancelled, let self, self.phase == .waiting else { return }
+                await self.tick()
             }
         }
+    }
+
+    private func stopLogPolling() {
+        poller?.cancel()
+        poller = nil
     }
 
     /// One second of the sheet's life: is Live running, and — while a probe is out — has Live
@@ -255,6 +293,7 @@ final class RescueModel {
             // The probe was never opened: the person changed their mind, or Live did not start.
             if Date().timeIntervalSince(waitingSince) > giveUpAfter, !live {
                 s.cancel()
+                stopLogPolling()
                 phase = .ready
                 status = .neverOpened
                 revision += 1
@@ -270,6 +309,7 @@ final class RescueModel {
 
     private func finishProbe(opened: Bool, attempt: LoadAttempt?) {
         guard let s = session else { return }
+        stopLogPolling()
         s.apply(off: nil, opened: opened, attempt: attempt)
         phase = .ready
 

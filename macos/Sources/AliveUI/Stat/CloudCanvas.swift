@@ -7,6 +7,12 @@ struct CloudCanvas: View {
     let model: StatModel
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
+    /// While the cloud spins or settles it is redrawn at most 30 times a second: slow drift and
+    /// twinkle read the same at half the frame rate, and a Canvas of thousands of dots is not cheap.
+    /// (A stationary cloud pauses the timeline altogether; a drag redraws on its own events.)
+    static let maxFrameRate = 30.0
+    static let frameInterval: TimeInterval = 1 / maxFrameRate
+
     var body: some View {
         // Read here so the body (and with it the paused state of the timeline) is evaluated again
         // whenever the model asks for a redraw.
@@ -14,7 +20,7 @@ struct CloudCanvas: View {
         let scene = model.scene
         let animating = scene.isAnimating
         let titles = axisTitles()
-        TimelineView(.animation(minimumInterval: nil, paused: !animating)) { timeline in
+        TimelineView(.animation(minimumInterval: Self.frameInterval, paused: !animating)) { timeline in
             Canvas { context, size in
                 _ = token
                 let wasAnimating = scene.isAnimating

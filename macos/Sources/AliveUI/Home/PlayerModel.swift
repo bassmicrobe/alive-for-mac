@@ -158,9 +158,11 @@ final class PlayerModel {
         waveform = nil
         let path = file.path
         waveformTask = Task { [weak self] in
-            let peaks = await Task.detached(priority: .userInitiated) {
-                WaveformReader.read(path: path, buckets: PlayerModel.waveformBuckets)
-            }.value
+            // On the blocking queue, with the task's cancellation handed to the decoder: a render
+            // stepped past stops reading at its next chunk instead of decoding to the end.
+            let peaks = await BlockingWork.run { isCancelled in
+                WaveformReader.read(path: path, buckets: PlayerModel.waveformBuckets, isCancelled: isCancelled)
+            }
             guard !Task.isCancelled, let self, self.currentFile?.path == path else { return }
             self.waveform = peaks
         }

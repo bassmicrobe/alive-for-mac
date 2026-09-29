@@ -289,4 +289,9 @@ final class StatModelTests: XCTestCase {
         XCTAssertTrue(m.hover(x: nil, y: nil))
         XCTAssertEqual(m.hoveredName, "")
     }
+
+    func testTheCloudIsRedrawnAtMostThirtyTimesASecondWhileItMoves() {
+        XCTAssertLessThanOrEqual(CloudCanvas.maxFrameRate, 30)
+        XCTAssertGreaterThanOrEqual(CloudCanvas.frameInterval, 1.0 / 30 - 1e-9)
+    }
 }
