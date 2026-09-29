@@ -25,6 +25,7 @@ struct StatWindow: View {
         .padding(.bottom, 14)
         .frame(minWidth: 1040, idealWidth: 1320, minHeight: 640, idealHeight: 820)
         .background(Theme.bg)
+        .background(WindowSizer(size: CGSize(width: 1320, height: 820)))
         .preferredColorScheme(.dark)
         .sheet(item: $folderSheet) { SheetHost(sheet: $0).environment(app) }
         .onAppear {
@@ -119,4 +120,29 @@ private struct SpinToggle: View {
         .accessibilityAddTraits(.isToggle)
         .accessibilityValue(isOn ? "1" : "0")
     }
+}
+
+/// Gives the window a comfortable first size: a `Window` scene opens at the content's minimum, which
+/// leaves the cloud a narrow strip between the panels (upstream opens at 1360 × 860). Once, and never
+/// larger than the screen.
+private struct WindowSizer: NSViewRepresentable {
+    let size: CGSize
+
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView()
+        DispatchQueue.main.async { [weak view] in
+            guard let window = view?.window, !context.coordinator.done else { return }
+            context.coordinator.done = true
+            let screen = window.screen?.visibleFrame ?? NSScreen.main?.visibleFrame ?? CGRect(x: 0, y: 0, width: 1440, height: 900)
+            let target = CGSize(width: min(size.width, screen.width), height: min(size.height, screen.height))
+            window.setContentSize(target)
+            window.center()
+        }
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {}
+    func makeCoordinator() -> Coordinator { Coordinator() }
+
+    final class Coordinator { var done = false }
 }

@@ -1,6 +1,6 @@
 // Port of the drawing of CloudView in nebula/Cloud.cs. Upstream splats every dot into a pixel buffer
-// of its own to get an additive glow; here SwiftUI's Canvas draws them with the `plusLighter`
-// blend mode, which adds light the same way and needs no depth sort.
+// of its own to get a soft glow; here SwiftUI's Canvas fills an antialiased disc per dot (upstream's
+// default softness is 0.04: almost a solid disc with a thin rim).
 import SwiftUI
 
 struct CloudCanvas: View {
@@ -87,8 +87,6 @@ enum CloudRenderer {
     // MARK: dots
 
     private static func drawDots(_ context: inout GraphicsContext, scene: CloudScene, time: Double) {
-        // Light adds up where dots overlap, as in upstream's buffer.
-        context.blendMode = .plusLighter
         let hovered = scene.hovered, selected = scene.selected
         for (i, n) in scene.nodes.enumerated() {
             let r = n.sr
@@ -101,7 +99,6 @@ enum CloudRenderer {
                               blue: Double(n.rgb & 255) / 255, opacity: a)
             context.fill(Path(ellipseIn: CGRect(x: n.sx - r, y: n.sy - r, width: r * 2, height: r * 2)), with: .color(color))
         }
-        context.blendMode = .normal
     }
 
     // MARK: marks
