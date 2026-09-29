@@ -1,0 +1,171 @@
+// Mac-only: the cells of the sets table (upstream draws them in RowListView.cs).
+import SwiftUI
+import AliveCore
+
+private enum CellStyle {
+    static let vPad: CGFloat = 7
+}
+
+/// Text cell with the table's vertical rhythm.
+struct SetTextCell: View {
+    let text: String
+    var right = false
+    var dim = false
+
+    var body: some View {
+        Text(text)
+            .font(Theme.fBody)
+            .foregroundStyle(dim ? Theme.textDim : Theme.text)
+            .lineLimit(1)
+            .truncationMode(.tail)
+            .frame(maxWidth: .infinity, alignment: right ? .trailing : .leading)
+            .padding(.vertical, CellStyle.vPad)
+    }
+}
+
+/// Star + name + "+N" badge + play button.
+struct SetNameCell: View {
+    @Environment(AppModel.self) private var app
+    let set: SetEntry
+    let isVersionRow: Bool
+
+    var body: some View {
+        HStack(spacing: 8) {
+            PinStar(path: set.path)
+            Text(set.name)
+                .font(Theme.fTitle)
+                .foregroundStyle(isVersionRow ? Theme.textDim : Theme.text)
+                .lineLimit(1)
+                .truncationMode(.middle)
+            if set.collapsedCount > 0 {
+                TagPill(text: SetsStrings.moreVersions.f(set.collapsedCount))
+                    .help(SetsStrings.moreVersionsHelp.f(set.collapsedCount))
+            }
+            if !set.error.isEmpty {
+                IconView(icon: .warning, size: 11)
+                    .foregroundStyle(Theme.red)
+                    .help(set.error)
+            }
+            Spacer(minLength: 4)
+            // What plays is always the render of the project's principal version, so a version
+            // row gets no button (upstream: CanPlay = HasRenders && !childRow).
+            if set.hasRenders, !isVersionRow {
+                PlayGlyph(path: set.path)
+            }
+        }
+        .padding(.vertical, CellStyle.vPad - 2)
+    }
+}
+
+/// The pin indicator; a click toggles the pin in home.cfg.
+struct PinStar: View {
+    @Environment(AppModel.self) private var app
+    let path: String
+    @State private var hovering = false
+
+    var body: some View {
+        let pinned = app.home.isPinned(path)
+        Button {
+            app.home.togglePin(path: path)
+        } label: {
+            IconView(icon: pinned ? .starFill : .star, size: 11)
+                .foregroundStyle(pinned ? Theme.light : hovering ? Theme.text : Theme.textDim.opacity(0.4))
+                .frame(width: 18, height: 22)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+        .animation(Theme.hoverAnimation, value: hovering)
+        .help(pinned ? SetsStrings.unpinHelp.s : SetsStrings.pinHelp.s)
+        .accessibilityLabel(pinned ? SetsStrings.unpinHelp.s : SetsStrings.pinHelp.s)
+    }
+}
+
+private struct PlayGlyph: View {
+    @Environment(AppModel.self) private var app
+    let path: String
+    @State private var hovering = false
+
+    var body: some View {
+        Button {
+            app.sets.playRender(of: path)
+        } label: {
+            IconView(icon: .play, size: 9)
+                .foregroundStyle(hovering ? Theme.onLight : Theme.textDim)
+                .frame(width: 22, height: 22)
+                .background(hovering ? Theme.light : Theme.surface, in: Circle())
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+        .animation(Theme.hoverAnimation, value: hovering)
+        .help(SetsStrings.playRenderHelp.s)
+        .accessibilityLabel(SetsStrings.playRenderHelp.s)
+    }
+}
+
+/// Coloured dot + number: green when all is there, red with the count of what is lost.
+struct MissingMark: View {
+    let total: Int
+    let missing: Int
+    var unreadable = false
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Spacer(minLength: 0)
+            if unreadable {
+                Text(SetsStrings.unreadable.s).foregroundStyle(Theme.red)
+            } else if total > 0 || missing > 0 {
+                if missing > 0 {
+                    Text(String(missing)).foregroundStyle(Theme.red).monospacedDigit()
+                }
+                Circle().fill(missing > 0 ? Theme.red : Theme.green).frame(width: 7, height: 7)
+            }
+        }
+        .font(Theme.fBody)
+        .padding(.vertical, CellStyle.vPad)
+    }
+}
+
+/// One aggregated mark per set for its plugins. When the installed-plugin list could not be read
+/// nothing is known, so nothing is marked (no green dots either: they would promise a check that
+/// did not happen).
+struct PluginsMissedCell: View {
+    @Environment(AppModel.self) private var app
+    let set: SetEntry
+
+    var body: some View {
+        if app.sets.pluginsKnown {
+            MissingMark(total: set.plugins.count, missing: set.missingPlugins)
+        } else {
+            Color.clear.frame(height: 30)
+        }
+    }
+}
+
+/// Tags as pills; what does not fit collapses into "+n".
+struct SetTagsCell: View {
+    @Environment(AppModel.self) private var app
+    let set: SetEntry
+
+    var body: some View {
+        _ = app.sets.metaRevision      // refresh when tags are edited
+        let tags = app.sets.tags(of: set)
+        return ViewThatFits(in: .horizontal) {
+            pills(tags)
+            if tags.count > 2 { pills(Array(tags.prefix(2)), more: tags.count - 2) }
+            if tags.count > 1 { pills(Array(tags.prefix(1)), more: tags.count - 1) }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.vertical, CellStyle.vPad + 1)
+        .clipped()
+    }
+
+    private func pills(_ tags: [String], more: Int = 0) -> some View {
+        HStack(spacing: 4) {
+            ForEach(tags, id: \.self) { TagPill(text: $0) }
+            if more > 0 { TagPill(text: SetsStrings.moreVersions.f(more)) }
+            Spacer(minLength: 0)
+        }
+        .fixedSize(horizontal: true, vertical: false)
+    }
+}
