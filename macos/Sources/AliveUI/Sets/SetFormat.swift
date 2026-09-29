@@ -21,6 +21,12 @@ enum SetFormat {
         return date.formatted(.dateTime.year().month().day().hour().minute().locale(locale))
     }
 
+    /// "2025-03-07" in local time (upstream's date columns); empty when unknown.
+    static func day(_ date: Date, calendar: Calendar = .current) -> String {
+        guard date > .distantPast else { return "" }
+        return SetFilter.formatDate(date, calendar: calendar)
+    }
+
     /// Plugin and file counts: nothing rather than "0".
     static func count(_ n: Int) -> String { n > 0 ? String(n) : "" }
 }

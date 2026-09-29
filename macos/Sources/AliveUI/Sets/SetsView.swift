@@ -1,12 +1,11 @@
-// Mac-only: Sets tab, minimal list (wave 1.5). The Sets implementer replaces the table with the
-// full one (configurable columns, inspector, filters). Keeps the contract: selection lives in
-// `app.selectedSetPath`; Return / double-click opens in Live.
+// Mac-only: the Sets tab — list on the left, inspector on the right (upstream: MainForm's Sets
+// mode + DetailPanel). Selection lives in `app.selectedSetPath`; Return / double-click opens in
+// Live, Space plays the render.
 import SwiftUI
 import AliveCore
 
 struct SetsView: View {
     @Environment(AppModel.self) private var app
-    @State private var sortOrder = [KeyPathComparator(\SetEntry.modified, order: .reverse)]
 
     var body: some View {
         if !app.catalog.hasEnabledRoots {
@@ -14,7 +13,27 @@ struct SetsView: View {
         } else if app.catalog.sets.isEmpty {
             emptyCatalog
         } else {
-            SetsTable(rows: app.sets.rows.sorted(using: sortOrder), sortOrder: $sortOrder)
+            HStack(alignment: .top, spacing: Theme.iconGap + 4) {
+                listColumn
+                DetailPanel()
+                    .frame(width: Theme.panelW)
+            }
+            .padding(.leading, Theme.pad)
+            .padding(.trailing, Theme.pad)
+            .padding(.bottom, Theme.pad)
+        }
+    }
+
+    @ViewBuilder private var listColumn: some View {
+        let pipeline = app.sets.pipeline
+        VStack(spacing: 8) {
+            SetsListStrip()
+            if pipeline.heads.isEmpty {
+                noMatches
+            } else {
+                SetsTable(pipeline: pipeline)
+                    .clipShape(RoundedRectangle(cornerRadius: Theme.cardR, style: .continuous))
+            }
         }
     }
 
@@ -25,75 +44,86 @@ struct SetsView: View {
             EmptyState(icon: .folder, title: CommonStrings.noSetsTitle.s, message: CommonStrings.noSetsBody.s)
         }
     }
-}
 
-private struct SetsTable: View {
-    @Environment(AppModel.self) private var app
-    let rows: [SetEntry]
-    @Binding var sortOrder: [KeyPathComparator<SetEntry>]
-
-    var body: some View {
-        @Bindable var app = app
-        Table(rows, selection: $app.selectedSetPath, sortOrder: $sortOrder) {
-            TableColumn(SetsStrings.colName.s, value: \.name) { set in
-                NameCell(set: set)
+    /// Everything was filtered or searched away: say so, and offer the way back.
+    private var noMatches: some View {
+        VStack(spacing: 14) {
+            EmptyState(icon: .magnifier, title: SetsStrings.noMatchesTitle.s, message: SetsStrings.noMatchesBody.s)
+            if !app.sets.filter.isEmpty {
+                PillButton(title: SetsStrings.clearFilters.s, icon: .filters) { app.sets.filter.clear() }
             }
-            .width(min: 180, ideal: 320)
-            TableColumn(SetsStrings.colModified.s, value: \.modified) { set in
-                Text(SetFormat.modified(set.modified))
-            }
-            .width(min: 120, ideal: 150)
-            TableColumn(SetsStrings.colBPM.s, value: \.tempo) { set in
-                Text(SetFormat.tempo(set.tempo))
-            }
-            .width(min: 50, ideal: 70)
-            TableColumn(SetsStrings.colPlugins.s, value: \.plugins.count) { set in
-                Text(SetFormat.count(set.plugins.count))
-            }
-            .width(min: 60, ideal: 80)
-            TableColumn(SetsStrings.colFiles.s, value: \.projectFiles) { set in
-                Text(SetFormat.count(set.projectFiles))
-            }
-            .width(min: 60, ideal: 80)
-            TableColumn(SetsStrings.colProjectSize.s, value: \.projectSize) { set in
-                Text(SetFormat.size(set.projectSize))
-            }
-            .width(min: 80, ideal: 110)
         }
-        .monospacedDigit()
-        .foregroundStyle(Theme.text)
-        .scrollContentBackground(.hidden)
-        .contextMenu(forSelectionType: String.self) { ids in
-            if let path = ids.first {
-                Button(CommonStrings.openInLive.s) { app.openInLive(path: path) }
-                Button(CommonStrings.showInFinder.s) { app.revealInFinder(path: path) }
-            }
-        } primaryAction: { ids in
-            if let path = ids.first { app.openInLive(path: path) }
-        }
-        .onKeyPress(.return) {
-            guard app.hasSelectedSet else { return .ignored }
-            app.openSelectedInLive()
-            return .handled
-        }
+        .frame(maxHeight: .infinity)
     }
 }
 
-private struct NameCell: View {
-    let set: SetEntry
+/// The thin bar above the table: "pinned first" and the column reset.
+private struct SetsListStrip: View {
+    @Environment(AppModel.self) private var app
 
     var body: some View {
         HStack(spacing: 8) {
-            Text(set.name)
-                .lineLimit(1)
-            if set.collapsedCount > 0 {
-                TagPill(text: SetsStrings.moreVersions.f(set.collapsedCount))
+            PinnedFirstToggle(isOn: app.settings.pinnedFirst) { app.sets.setPinnedFirst($0) }
+            Spacer(minLength: 8)
+            if app.sets.activeFilterCount > 0 {
+                StripButton(title: SetsStrings.clearFilters.s, icon: .close) { app.sets.filter.clear() }
             }
-            if !set.projectName.isEmpty, set.projectName != set.name {
-                Text(set.projectName)
-                    .foregroundStyle(Theme.textDim)
-                    .lineLimit(1)
+            StripButton(title: SetsStrings.resetColumns.s, help: SetsStrings.resetColumnsHelp.s) {
+                app.sets.resetColumns()
             }
         }
+        .frame(height: 26)
+    }
+}
+
+private struct PinnedFirstToggle: View {
+    let isOn: Bool
+    let set: (Bool) -> Void
+    @State private var hovering = false
+
+    var body: some View {
+        Button { set(!isOn) } label: {
+            HStack(spacing: 6) {
+                IconView(icon: isOn ? .starFill : .star, size: 10)
+                Text(SetsStrings.pinnedFirst.s)
+            }
+            .font(Theme.fSmall)
+            .foregroundStyle(isOn ? Theme.onLight : hovering ? Theme.text : Theme.textDim)
+            .padding(.horizontal, 12)
+            .frame(height: 24)
+            .background(isOn ? AnyShapeStyle(Theme.light)
+                        : AnyShapeStyle(hovering ? Theme.surfaceHover : Theme.surface), in: Capsule())
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+        .animation(Theme.hoverAnimation, value: hovering)
+        .help(SetsStrings.pinnedFirstHelp.s)
+        .accessibilityAddTraits(isOn ? .isSelected : [])
+    }
+}
+
+private struct StripButton: View {
+    let title: String
+    var icon: AppIcon?
+    var help: String?
+    let action: () -> Void
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 5) {
+                if let icon { IconView(icon: icon, size: 9) }
+                Text(title)
+            }
+            .font(Theme.fSmall)
+            .foregroundStyle(hovering ? Theme.text : Theme.textDim)
+            .padding(.horizontal, 8)
+            .frame(height: 24)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+        .animation(Theme.hoverAnimation, value: hovering)
+        .help(help ?? title)
     }
 }
