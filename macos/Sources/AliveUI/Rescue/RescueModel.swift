@@ -363,6 +363,7 @@ final class RescueModel {
         switch error as? RescueError {
         case .notFoundInSet?: return RescueStrings.errNotFoundInSet.s
         case .nothingToDisable?, .noProbePrepared?: return RescueStrings.errNothingToDisable.s
+        case .noFreeIdentifier?: return RescueStrings.errNoFreeIdentifier.s
         case nil: return error.localizedDescription
         }
     }

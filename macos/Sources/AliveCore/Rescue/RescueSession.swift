@@ -34,6 +34,7 @@ public enum RescueError: Error, Equatable {
     case nothingToDisable
     case notFoundInSet
     case noProbePrepared
+    case noFreeIdentifier
 }
 
 /// The investigation of one set that will not open.
@@ -362,7 +363,12 @@ public final class RescueSession: @unchecked Sendable {
     public func writeRescued(disable: [AlsPluginSlot]) throws -> String {
         guard !disable.isEmpty else { throw RescueError.nothingToDisable }
         let dst = Self.unique(rescuedPath)
-        try AlsPatch.neutralize(src: set.path, dst: dst, uids: disable.map(\.uid), inventory: inventory)
+        let patched = try AlsPatch.neutralize(src: set.path, dst: dst,
+                                              uids: disable.map(\.uid), inventory: inventory)
+        if patched == 0 {
+            try FileManager.default.removeItem(atPath: dst)
+            throw RescueError.notFoundInSet
+        }
         return dst
     }
 

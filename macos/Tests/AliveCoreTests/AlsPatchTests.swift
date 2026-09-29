@@ -144,6 +144,51 @@ final class AlsPatchTests: XCTestCase {
         XCTAssertTrue(changed.allSatisfy { $0.hasPrefix("<ComponentSubType ") || $0.hasPrefix("<ComponentManufacturer ") })
     }
 
+    func testAudioUnitPreservesIndependentSignedDecimalConventions() throws {
+        let t = makeTemp()
+        let manufacturer: UInt32 = 0xF000_0001
+        let device = RescueFx.au("Mixed Codes", sub: 909_342_512, mfr: manufacturer)
+        let mixed = device.replacingOccurrences(of: String(manufacturer),
+                                                with: String(Int32(bitPattern: manufacturer)))
+        let src = makeSet(t, devices: [mixed])
+        let uid = try XCTUnwrap(AlsPatch.targets(AlsFile.read(path: src)).first?.uid)
+        let dst = t.sub("out.als")
+        XCTAssertEqual(try neutralize(src, dst, uids: [uid]), 1)
+        let xml = try RescueFx.lines(of: dst).joined(separator: "\n")
+        let sub = try XCTUnwrap(AlsPatch.firstLong(xml, "<ComponentSubType Value=\""))
+        let man = try XCTUnwrap(AlsPatch.firstLong(xml, "<ComponentManufacturer Value=\""))
+        XCTAssertEqual(sub, Int64(909_342_512 ^ UInt32(bitPattern: AlsPatch.marker)))
+        XCTAssertEqual(man, Int64(Int32(bitPattern: manufacturer ^ UInt32(bitPattern: AlsPatch.marker))))
+        XCTAssertNotEqual(AlsPatch.targets(AlsFile.read(path: dst)).first?.uid, uid)
+    }
+
+    func testAudioUnitRefusesAllOccupiedIdentifiersAndRemovesPartialCopy() throws {
+        let t = makeTemp()
+        let src = makeSet(t, devices: [RescueFx.rmx])
+        let uid = try XCTUnwrap(AlsPatch.targets(AlsFile.read(path: src)).first?.uid)
+        let before = RescueFx.sha(src)
+        let type: UInt32 = 1_635_085_670, sub: UInt32 = 909_342_512, manufacturer: UInt32 = 1_349_087_086
+        let mark = UInt32(bitPattern: AlsPatch.marker)
+        var inv = PluginInventory()
+        for bump in UInt32(0)..<64 {
+            var ref = PluginRef(kind: .audioUnit)
+            ref.auType = type
+            ref.auSubType = sub ^ (mark &+ bump)
+            ref.auManufacturer = manufacturer ^ (mark &+ bump)
+            ref.finishUid()
+            var plugin = InstalledPlugin()
+            plugin.uid = ref.uid
+            plugin.name = "Occupied \(bump)"
+            inv.add(plugin)
+        }
+        let dst = t.sub("out.als")
+        XCTAssertThrowsError(try neutralize(src, dst, uids: [uid], inv: inv)) {
+            XCTAssertEqual($0 as? RescueError, .noFreeIdentifier)
+        }
+        XCTAssertFalse(FileManager.default.fileExists(atPath: dst))
+        XCTAssertEqual(RescueFx.sha(src), before)
+    }
+
     func testSeveralPluginsAtOnceAndDuplicatesAreAllPatched() throws {
         let t = makeTemp()
         let src = makeSet(t, devices: [RescueFx.serum, RescueFx.serum, RescueFx.rmx, RescueFx.ssl, RescueFx.pumper])
