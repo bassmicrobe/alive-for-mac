@@ -109,4 +109,12 @@ final class HomeTileNavigationTests: XCTestCase {
         XCTAssertEqual(HomeContentColumns.count(for: 1150), 4)
         XCTAssertEqual(HomeContentColumns.count(for: 9000), 8)
     }
+
+    func testKeyCodesMapToGridKeys() {
+        XCTAssertEqual(HomeKeyMonitor.key(forCode: 36), .return)
+        XCTAssertEqual(HomeKeyMonitor.key(forCode: 49), .space)
+        XCTAssertEqual(HomeKeyMonitor.key(forCode: 123), .move(.left))
+        XCTAssertEqual(HomeKeyMonitor.key(forCode: 126), .move(.up))
+        XCTAssertNil(HomeKeyMonitor.key(forCode: 0), "letters are not ours")
+    }
 }

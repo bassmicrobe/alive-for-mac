@@ -29,7 +29,9 @@ enum HomeContentColumns {
 
 private struct HomeContent: View {
     @Environment(AppModel.self) private var app
-    @FocusState private var gridFocused: Bool
+    /// True while the person is using the keyboard on the grid (the selection ring turns blue).
+    @State private var keyboardActive = false
+    @State private var keys = HomeKeyMonitor()
 
     private static let gap = HomeContentColumns.gap
 
@@ -47,12 +49,18 @@ private struct HomeContent: View {
                         .padding(.top, 4)
                         .padding(.bottom, app.player.isStripVisible ? 96 : Theme.pad)
                     }
-                    .focusable()
-                    .focused($gridFocused)
-                    .focusEffectDisabled()
-                    .onKeyPress(keys: [.leftArrow, .rightArrow, .upArrow, .downArrow, .return, .space, .escape]) { press in
-                        handle(press.key, columns: columns, scroller: scroller)
+                    // Not `.focusable()`: a focusable scroll view inside the hidden-title-bar window
+                    // made AppKit's drag-region pass raise. Keys come from a local event monitor.
+                    .onChange(of: app.selectedSetPath) { _, path in
+                        if let path { scroller.scrollTo(path) }
                     }
+                    .onAppear {
+                        keys.start { key in handle(key, columns: columns) }
+                    }
+                    .onChange(of: columns) { _, _ in
+                        keys.start { key in handle(key, columns: HomeContentColumns.count(for: proxy.size.width - Theme.pad * 2)) }
+                    }
+                    .onDisappear { keys.stop() }
                 }
             }
             if app.player.isStripVisible {
@@ -103,10 +111,10 @@ private struct HomeContent: View {
         return ProjectTile(
             set: set,
             isSelected: app.selectedSetPath == path,
-            isKeyboardFocused: gridFocused,
+            isKeyboardFocused: keyboardActive,
             isPinned: app.home.isPinned(path),
             isPlaying: app.player.isPlaying(setPath: path),
-            onSelect: { app.selectedSetPath = path; gridFocused = true },
+            onSelect: { app.selectedSetPath = path; keyboardActive = false },
             onOpen: { app.openInLive(path: path) },
             onPlay: { app.selectedSetPath = path; app.player.playRender(forSetAt: path) },
             onTogglePin: { app.togglePin(path: path) }
@@ -140,39 +148,25 @@ private struct HomeContent: View {
 
     // MARK: - Keyboard
 
-    private func handle(_ key: KeyEquivalent, columns: Int, scroller: ScrollViewProxy) -> KeyPress.Result {
+    /// Returns true when the key was ours.
+    private func handle(_ key: HomeKeyMonitor.Key, columns: Int) -> Bool {
+        guard app.sheet == nil, app.tab == .home else { return false }
         let rows = app.home.rows
         let current = app.selectedSetPath.flatMap { path in rows.firstIndex { $0.path == path } }
         switch key {
         case .return:
-            guard let path = app.selectedSetPath else { return .ignored }
+            guard let path = app.selectedSetPath else { return false }
             app.openInLive(path: path)
         case .space:
             guard let path = app.selectedSetPath,
-                  rows.first(where: { $0.path == path })?.hasRenders == true else { return .ignored }
+                  rows.first(where: { $0.path == path })?.hasRenders == true else { return false }
             app.player.playRender(forSetAt: path)
-        case .escape:
-            guard app.selectedSetPath != nil else { return .ignored }
-            app.selectedSetPath = nil
-        default:
-            guard let direction = Self.direction(of: key),
-                  let next = TileNavigation.move(from: current, direction, columns: columns, count: rows.count)
-            else { return .handled }
-            let path = rows[next].path
-            app.selectedSetPath = path
-            withAnimation(Theme.selectAnimation) { scroller.scrollTo(path) }
+        case .move(let direction):
+            keyboardActive = true
+            guard let next = TileNavigation.move(from: current, direction, columns: columns, count: rows.count) else { return true }
+            app.selectedSetPath = rows[next].path
         }
-        return .handled
-    }
-
-    private static func direction(of key: KeyEquivalent) -> TileNavigation.Direction? {
-        switch key {
-        case .leftArrow: return .left
-        case .rightArrow: return .right
-        case .upArrow: return .up
-        case .downArrow: return .down
-        default: return nil
-        }
+        return true
     }
 }
 
