@@ -33,7 +33,7 @@ final class StatCameraTests: XCTestCase {
         let scale = 400 * 0.33
         let y = p.project(0, 1, 0), z = p.project(0, 0, 1)
         XCTAssertEqual(y.sx, 300, accuracy: 1e-9); XCTAssertEqual(y.sy, 200, accuracy: 1e-9)
-        XCTAssertEqual(z.sy, 200 - scale, accuracy: 1e-9)
+        XCTAssertEqual(z.sy, 200 + scale, accuracy: 1e-9, "top view: the near side (+z) is at the bottom, as upstream projects it")
     }
 
     func testOrthographicIgnoresDepthPerspectiveDoesNot() {
