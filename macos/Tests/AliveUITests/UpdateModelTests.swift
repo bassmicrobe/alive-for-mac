@@ -50,7 +50,7 @@ final class UpdateModelTests: XCTestCase {
         let (model, _) = make(body: releaseJSON("v0.1.0-mac1"))
         let a = try app()
         await model.checkNow(app: a)
-        XCTAssertEqual(model.state, .finished(.upToDate(latest: UpdateCheck.Release(version: "0.1.0-mac1", name: "Alive 0.1.0-mac1",
+        XCTAssertEqual(model.state, .finished(.upToDate(latest: UpdateCheck.Release(version: "0.1.0-mac1", name: "Alive v0.1.0-mac1",
                                                                                      url: "https://github.com/bassmicrobe/alive-for-mac/releases/tag/x"))))
         XCTAssertNil(model.releaseURL)
         XCTAssertEqual(a.settings.seenUpdate, "")

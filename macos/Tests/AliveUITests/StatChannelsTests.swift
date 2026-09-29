@@ -38,6 +38,7 @@ final class StatChannelsTests: XCTestCase {
         s.projectSize = 0
         s.size = 0
         s.created = .distantPast
+        s.modified = .distantPast
         for id in ["tracks", "bpm", "key", "scale", "projsize", "setsize", "created", "modified", "live"] {
             XCTAssertTrue(metrics.byId(id).value(s).isNaN, id)
         }
