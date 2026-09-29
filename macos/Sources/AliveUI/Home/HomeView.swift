@@ -75,7 +75,7 @@ private struct HomeContent: View {
                 ForEach(rows) { set in tile(for: set) }
             }
             if rows.isEmpty, !app.catalog.sets.isEmpty {
-                Text(HomeStrings.noMatches.s).font(Theme.fBody).foregroundStyle(Theme.textDim)
+                Text(HomeStrings.noMatches.s).font(Theme.fBody).foregroundStyle(Theme.secondaryText)
             }
         }
     }
@@ -94,7 +94,7 @@ private struct HomeContent: View {
             Text(HomeStrings.projects.s).font(Theme.fHead).foregroundStyle(Theme.text)
             PinnedFirstToggle(isOn: app.home.pinnedFirst) { app.home.togglePinnedFirst() }
             if app.catalog.sets.isEmpty, app.catalog.isReady {
-                Text(HomeStrings.nothingIndexed.s).font(Theme.fLabel).foregroundStyle(Theme.textDim)
+                Text(HomeStrings.nothingIndexed.s).font(Theme.fLabel).foregroundStyle(Theme.secondaryText)
             }
         }
     }
@@ -187,7 +187,7 @@ private struct PinnedFirstToggle: View {
     var body: some View {
         Button(action: action) {
             IconView(icon: isOn ? .starFill : .star, size: 13)
-                .foregroundStyle(isOn ? Theme.light : hovering ? Theme.text : Theme.textDim)
+                .foregroundStyle(isOn ? Theme.light : hovering ? Theme.text : Theme.secondaryText)
                 .frame(width: 26, height: 26)
                 .background(hovering ? Theme.surface : Color.clear, in: Circle())
                 .contentShape(Circle())

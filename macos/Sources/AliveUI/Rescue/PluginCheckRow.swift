@@ -19,25 +19,25 @@ struct PluginCheckRow: View {
             CheckMark(isOn: isOn, isEnabled: isEnabled)
             Text(slot.format)
                 .font(Theme.fBadge)
-                .foregroundStyle(Theme.textDim)
+                .foregroundStyle(Theme.secondaryText)
                 .frame(width: 40, alignment: .leading)
             Text(label)
                 .font(Theme.fBody)
-                .foregroundStyle(isOn ? Theme.text : Theme.textDim)
+                .foregroundStyle(isOn ? Theme.text : Theme.secondaryText)
                 .lineLimit(1)
                 .truncationMode(.tail)
             Spacer(minLength: 8)
             if !slot.vendor.isEmpty {
                 Text(slot.vendor)
                     .font(Theme.fSmall)
-                    .foregroundStyle(Theme.textDim)
+                    .foregroundStyle(Theme.secondaryText)
                     .lineLimit(1)
                     .frame(maxWidth: 150, alignment: .trailing)
             }
             if let note {
                 Text(note == .breaksTheSet ? RescueStrings.noteBreaks.s : RescueStrings.noteSuspect.s)
                     .font(Theme.fBadge)
-                    .foregroundStyle(note == .breaksTheSet ? Theme.red : Theme.textDim)
+                    .foregroundStyle(note == .breaksTheSet ? Theme.errorText : Theme.secondaryText)
                     .frame(minWidth: 70, alignment: .trailing)
             }
         }
@@ -58,7 +58,7 @@ struct PluginCheckRow: View {
         .onKeyPress(.return) { isEnabled ? { toggle(); return .handled }() : .ignored }
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isButton)
-        .accessibilityValue(isOn ? "on" : "off")
+        .accessibilityValue(isOn ? CommonStrings.stateOn.s : CommonStrings.stateOff.s)
     }
 
     /// "Pro-Q 4 ×23"

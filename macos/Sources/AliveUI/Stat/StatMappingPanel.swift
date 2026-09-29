@@ -63,7 +63,7 @@ struct StatMappingPanel: View {
         Text(text)
             .font(Theme.fBadge)
             .kerning(0.6)
-            .foregroundStyle(Theme.textDim)
+            .foregroundStyle(Theme.secondaryText)
             .textCase(Localizer.shared.lang == .en ? .uppercase : nil)
             .padding(.leading, 4)
     }
@@ -92,7 +92,7 @@ struct StatMappingPanel: View {
                     Text(lo); Spacer(minLength: 8); Text(hi)
                 }
                 .font(Theme.fBadge)
-                .foregroundStyle(Theme.textDim)
+                .foregroundStyle(Theme.secondaryText)
                 .padding(.horizontal, 4)
             case .classes(let chips):
                 LazyVGrid(columns: [GridItem(.flexible(), alignment: .leading), GridItem(.flexible(), alignment: .leading)],
@@ -100,7 +100,7 @@ struct StatMappingPanel: View {
                     ForEach(Array(chips.enumerated()), id: \.offset) { _, chip in
                         HStack(spacing: 6) {
                             Circle().fill(Color(rgb: chip.rgb)).frame(width: 8, height: 8)
-                            Text(chip.name).font(Theme.fBadge).foregroundStyle(Theme.textDim).lineLimit(1)
+                            Text(chip.name).font(Theme.fBadge).foregroundStyle(Theme.secondaryText).lineLimit(1)
                         }
                     }
                 }

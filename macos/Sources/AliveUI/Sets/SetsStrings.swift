@@ -8,19 +8,19 @@ enum SetsStrings: LocalizedStrings {
     // List
     case moreVersions, moreVersionsHelp, pin, unpin, pinHelp, unpinHelp, playRender, playRenderHelp
     case pinnedFirst, pinnedFirstHelp, resetColumns, resetColumnsHelp, clearFilters, unreadable
-    case noMatchesTitle, noMatchesBody
+    case noMatchesTitle, noMatchesBody, shownSummary
     // Inspector
     case detailEmptyTitle, detailEmptyBody, moreActions, projectSizeHelp, addTagsOrNote, noteHeading
     case versionsHeading, filesHeading, fileCount, missingCount, notInstalledCount, sampleFoldersHeading
     case pluginsHeading, onlyLiveDevices, otherFormat, showPluginHelp, pluginStatusUnknown
     case rendersHeading, moreItems
     // Filters
-    case filtersTitle, fltModified, fltFrom, fltTo, fltVersion, fltKeyRoot, fltScale, fltTags, fltTracks
+    case filtersTitle, fltModified, fltFrom, fltTo, fltDateHint, fltVersion, fltKeyRoot, fltScale, fltTags, fltTracks
     case fltPluginCount, fltPlugins, fltFiles, fltRenders, fltMin, fltMax, fltNone, fltNoTags
     case fltAnyKey, fltNoKey, fltSomeMissing, fltAllInstalled, fltComplete, fltMissingFiles
-    case fltHasRenders, fltNoRenders, fltMatches, fltReset, pickDate
+    case fltHasRenders, fltNoRenders, fltMatches, fltReset, pickDate, fltShowAll, fltShowFewer
     // Tags and notes
-    case tagsTitle, tagsLabel, noteLabel, tagCue, removeTag, addTag, save, appliesToProject, setGone
+    case tagsTitle, tagsLabel, noteLabel, notePlaceholder, tagCue, removeTag, addTag, save, appliesToProject, setGone
     // Folders
     case rootsTitle, rootsProjectsTab, rootsSamplesTab, rootsHint, rootsSamplesHint
     case rootsEmpty, rootsSamplesEmpty, rootsDropHint, rootsDropRelease, rootsFromLive, rootsProjectsMark
@@ -63,6 +63,7 @@ enum SetsStrings: LocalizedStrings {
         case .clearFilters: return ("Clear filters", "フィルターを解除")
         case .unreadable: return ("unreadable", "読み込めません")
         case .noMatchesTitle: return ("No sets match", "一致するセットがありません")
+        case .shownSummary: return ("%1$lld projects · %2$lld sets", "%1$lld プロジェクト・%2$lld セット")
         case .noMatchesBody: return ("Nothing passes the search and the filters.", "検索とフィルターに一致するセットはありません。")
 
         case .detailEmptyTitle: return ("No set selected", "セットが選択されていません")
@@ -88,8 +89,10 @@ enum SetsStrings: LocalizedStrings {
 
         case .filtersTitle: return ("Filters", "フィルター")
         case .fltModified: return ("Modified", "更新日")
-        case .fltFrom: return ("from  2026-01", "開始  2026-01")
-        case .fltTo: return ("to  2026-08-07", "終了  2026-08-07")
+        case .fltFrom: return ("From", "開始")
+        case .fltTo: return ("To", "終了")
+        case .fltDateHint: return ("Year, month or day: YYYY / YYYY-MM / YYYY-MM-DD",
+                                   "年・年月・年月日のいずれかで入力: YYYY / YYYY-MM / YYYY-MM-DD")
         case .fltVersion: return ("Live version", "Live バージョン")
         case .fltKeyRoot: return ("Key root", "キーのルート")
         case .fltScale: return ("Scale", "スケール")
@@ -111,13 +114,17 @@ enum SetsStrings: LocalizedStrings {
         case .fltMissingFiles: return ("missing files", "見つからないファイル")
         case .fltHasRenders: return ("has renders", "レンダーあり")
         case .fltNoRenders: return ("no renders", "レンダーなし")
-        case .fltMatches: return ("%1$lld of %2$lld sets match", "%2$lld 件中 %1$lld 件が一致")
+        case .fltMatches: return ("%1$lld of %2$lld sets match (every saved version counts)",
+                                  "%2$lld 個のセット中 %1$lld 個が一致（保存されたすべてのバージョンを数えます）")
         case .fltReset: return ("Reset", "リセット")
+        case .fltShowAll: return ("Show all %lld", "すべて表示（%lld）")
+        case .fltShowFewer: return ("Show fewer", "折りたたむ")
         case .pickDate: return ("Pick a date", "日付を選択")
 
         case .tagsTitle: return ("Tags and Notes", "タグとメモ")
         case .tagsLabel: return ("Tags", "タグ")
         case .noteLabel: return ("Note", "メモ")
+        case .notePlaceholder: return ("Add a note…", "メモを入力…")
         case .tagCue: return ("type a tag, then comma", "タグを入力してカンマ")
         case .removeTag: return ("Remove tag %@", "タグ %@ を削除")
         case .addTag: return ("Add tag %@", "タグ %@ を追加")

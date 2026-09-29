@@ -94,7 +94,7 @@ struct SetsTable: View {
 
 enum SetsStyle {
     /// The row highlight: a raised grey rather than the system accent (upstream: a light pill).
-    static let selection = Color(hex: 0x4A4A52)
+    static let selection = Theme.tableSelection
 }
 
 /// The right-click menu: works on the clicked row (which becomes the selection first, so the

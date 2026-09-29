@@ -18,7 +18,9 @@ enum CloudAxisLabels {
     /// A new edge has to beat the current one by this much (points) before the label moves:
     /// that rules out chatter and flicker while spinning.
     static let hysteresis = 16.0
-    private static let gap = 6.0
+    /// Between the cube's edge and a caption: room for the dots that sit right on the edge (they
+    /// reach `maxRadius` past it), so a caption never lies over the data.
+    private static let gap = 18.0
 
     /// `titles` are the three "X · Tracks" captions. `measure(text, isTitle)` sizes a text in the
     /// font the caller draws it with.

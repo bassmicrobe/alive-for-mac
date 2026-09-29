@@ -55,9 +55,11 @@ struct StatWindow: View {
     private var cloudArea: some View {
         VStack(spacing: 6) {
             ZStack {
+                // The picture is drawn for the eyes; the input view over it is what VoiceOver reads.
                 CloudCanvas(model: model)
+                    .accessibilityHidden(true)
                 CloudInputView(model: model, onKey: handle, onDoubleClick: { model.revealSelected() })
-                if let hint { Text(hint).font(Theme.fBody).foregroundStyle(Theme.textDim).allowsHitTesting(false) }
+                if let hint { Text(hint).font(Theme.fBody).foregroundStyle(Theme.secondaryText).allowsHitTesting(false) }
             }
             .clipShape(RoundedRectangle(cornerRadius: Theme.cardR, style: .continuous))
             statusLine
@@ -71,18 +73,28 @@ struct StatWindow: View {
     }
 
     private var statusLine: some View {
-        let hints = [StatStrings.hintRotate, .hintZoom, .hintPan, .hintOpen].map(\.s).joined(separator: "   ·   ")
+        let hintList = [StatStrings.hintRotate, .hintZoom, .hintPan, .hintOpen].map(\.s)
         let progress = app.catalog.progress
         let lead = app.catalog.isScanning
             ? (progress.total > 0 ? CommonStrings.scanProgress.f(progress.done, progress.total) : CommonStrings.scanning.s)
             : StatStrings.projectsCount.f(model.visibleCount)
-        return Text("\(lead)   ·   \(hints)")
-            .font(Theme.fLabel)
-            .foregroundStyle(Theme.textDim)
-            .lineLimit(1)
-            .truncationMode(.tail)
-            .frame(maxWidth: .infinity, alignment: .center)
-            .frame(height: 20)
+        // The hints are dropped from the end as the width shrinks (Japanese is longer), never cut
+        // mid-word; the full line is the tooltip.
+        let line: (Int) -> String = { count in
+            ([lead] + hintList.prefix(count)).joined(separator: "   ·   ")
+        }
+        return ViewThatFits(in: .horizontal) {
+            ForEach((0...hintList.count).reversed(), id: \.self) { count in
+                Text(line(count)).lineLimit(1).fixedSize()
+            }
+        }
+        .font(Theme.fLabel)
+        .foregroundStyle(Theme.secondaryText)
+        .frame(maxWidth: .infinity, alignment: .center)
+        .frame(height: 20)
+        .help(line(hintList.count))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(line(hintList.count))
     }
 
     // MARK: actions
@@ -118,7 +130,7 @@ private struct SpinToggle: View {
         }
         .buttonStyle(PillButtonStyle(kind: isOn ? .primary : .quiet))
         .accessibilityAddTraits(.isToggle)
-        .accessibilityValue(isOn ? "1" : "0")
+        .accessibilityValue(isOn ? CommonStrings.stateOn.s : CommonStrings.stateOff.s)
     }
 }
 

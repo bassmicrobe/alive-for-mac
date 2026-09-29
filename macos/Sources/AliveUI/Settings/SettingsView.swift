@@ -35,9 +35,12 @@ private struct GeneralSettingsView: View {
                         Text(option.nativeName ?? SettingsStrings.languageSystem.s).tag(option)
                     }
                 }
+                Text(SettingsStrings.languageNote.s)
+                    .font(Theme.fSmall).foregroundStyle(Theme.secondaryText)
+                    .fixedSize(horizontal: false, vertical: true)
                 Toggle(SettingsStrings.transparency.s, isOn: $prefs.transparency)
                 Text(SettingsStrings.transparencyHelp.s)
-                    .font(Theme.fSmall).foregroundStyle(Theme.textDim)
+                    .font(Theme.fSmall).foregroundStyle(Theme.secondaryText)
             }
             Section {
                 Picker(SettingsStrings.pluginSource.s, selection: $prefs.pluginSource) {
@@ -45,14 +48,14 @@ private struct GeneralSettingsView: View {
                     Text(SettingsStrings.pluginSourceFolders.s).tag(PluginSource.pluginFolders)
                 }
                 Text(SettingsStrings.pluginSourceHelp.s)
-                    .font(Theme.fSmall).foregroundStyle(Theme.textDim)
+                    .font(Theme.fSmall).foregroundStyle(Theme.secondaryText)
             }
             Section(SettingsStrings.dataFolder.s) {
                 LabeledContent {
-                    Button(SettingsStrings.openDataFolder.s, action: openDataFolder)
+                    PillButton(title: SettingsStrings.openDataFolder.s, action: openDataFolder)
                 } label: {
                     Text(AppHome.path)
-                        .font(Theme.fSmall).foregroundStyle(Theme.textDim)
+                        .font(Theme.fSmall).foregroundStyle(Theme.secondaryText)
                         .lineLimit(2).truncationMode(.middle)
                         .textSelection(.enabled)
                 }

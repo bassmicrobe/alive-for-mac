@@ -92,7 +92,7 @@ struct HelpSheet: View {
     private func tabLine(_ name: String, _ text: String) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 10) {
             Text(name).font(Theme.fBody).foregroundStyle(Theme.text).frame(width: 80, alignment: .leading)
-            Text(text).font(Theme.fBody).foregroundStyle(Theme.textDim)
+            Text(text).font(Theme.fBody).foregroundStyle(Theme.secondaryText)
         }
     }
 }
@@ -106,7 +106,7 @@ private struct GroupCard: View {
                 Text(group.title.s).font(Theme.fTitle).foregroundStyle(Theme.text)
                 ForEach(group.rows) { row in
                     HStack(spacing: 8) {
-                        Text(row.action.s).font(Theme.fBody).foregroundStyle(Theme.textDim)
+                        Text(row.action.s).font(Theme.fBody).foregroundStyle(Theme.secondaryText)
                             .lineLimit(2)
                         Spacer(minLength: 6)
                         HStack(spacing: 3) {

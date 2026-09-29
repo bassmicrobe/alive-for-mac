@@ -16,7 +16,7 @@ struct UpdatesSection: View {
                     Text(versionLine).font(Theme.fBody).foregroundStyle(Theme.text)
                     Text(statusLine)
                         .font(Theme.fSmall)
-                        .foregroundStyle(statusIsProblem ? Theme.red : Theme.textDim)
+                        .foregroundStyle(statusIsProblem ? Theme.errorText : Theme.secondaryText)
                         .fixedSize(horizontal: false, vertical: true)
                         .accessibilityLabel(statusLine)
                 }
@@ -29,7 +29,7 @@ struct UpdatesSection: View {
             }
             Toggle(UpdateStrings.dailyToggle.s, isOn: $prefs.dailyUpdateCheck)
             Text(UpdateStrings.dailyHelp.s)
-                .font(Theme.fSmall).foregroundStyle(Theme.textDim)
+                .font(Theme.fSmall).foregroundStyle(Theme.secondaryText)
         }
         // The dot on the gear has done its job the moment the settings are open (upstream: ShowSettings).
         .onAppear { updates.markSeen(app: app) }

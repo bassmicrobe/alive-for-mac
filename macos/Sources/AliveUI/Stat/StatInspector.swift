@@ -35,7 +35,7 @@ struct StatInspector: View {
                         Spacer(minLength: 6)
                         Text(Metrics.bytes(set.projectSize))
                             .font(Theme.fBody)
-                            .foregroundStyle(Theme.textDim)
+                            .foregroundStyle(Theme.secondaryText)
                             .monospacedDigit()
                     }
                     ArrangementThumbnailView(path: set.path)
@@ -43,7 +43,7 @@ struct StatInspector: View {
                         .clipShape(RoundedRectangle(cornerRadius: Theme.thumbR, style: .continuous))
                     Text(set.path)
                         .font(Theme.fSmall)
-                        .foregroundStyle(Theme.textDim)
+                        .foregroundStyle(Theme.secondaryText)
                         .lineLimit(4)
                         .truncationMode(.middle)
                         .textSelection(.enabled)
@@ -62,16 +62,16 @@ struct StatInspector: View {
 
     private func field(_ title: String, _ value: String) -> some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text(title).font(Theme.fSmall).foregroundStyle(Theme.textDim)
+            Text(title).font(Theme.fSmall).foregroundStyle(Theme.secondaryText)
             Text(value).font(Theme.fBody).foregroundStyle(Theme.text).textSelection(.enabled)
         }
     }
 
     private func plugins(_ set: SetEntry) -> some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text(StatStrings.plugins.f(set.plugins.count)).font(Theme.fSmall).foregroundStyle(Theme.textDim)
+            Text(StatStrings.plugins.f(set.plugins.count)).font(Theme.fSmall).foregroundStyle(Theme.secondaryText)
             if set.plugins.isEmpty {
-                Text(StatStrings.noPlugins.s).font(Theme.fBody).foregroundStyle(Theme.textDim)
+                Text(StatStrings.noPlugins.s).font(Theme.fBody).foregroundStyle(Theme.secondaryText)
             } else {
                 ForEach(Array(set.plugins.enumerated()), id: \.offset) { _, name in
                     Text(name).font(Theme.fBody).foregroundStyle(Theme.text).lineLimit(1)

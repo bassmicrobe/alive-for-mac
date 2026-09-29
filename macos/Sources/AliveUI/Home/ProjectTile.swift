@@ -15,6 +15,7 @@ struct ProjectTile: View {
     let onTogglePin: () -> Void
 
     @State private var hovering = false
+    @FocusState private var isFocused: Bool
 
     private static let corner = Theme.cardR
 
@@ -28,14 +29,16 @@ struct ProjectTile: View {
                 .padding(8)
             VStack(alignment: .leading, spacing: 2) {
                 Text(set.name)
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(Theme.fCardTitle)
                     .foregroundStyle(Theme.text)
                     .lineLimit(1)
+                    .help(set.name)
                 Text(HomeModel.subtitle(for: set))
                     .font(Theme.fBody)
-                    .foregroundStyle(Theme.textDim)
+                    .foregroundStyle(Theme.secondaryText)
                     .lineLimit(1)
                     .monospacedDigit()
+                    .help(HomeModel.subtitle(for: set))
             }
             .padding(.horizontal, 12)
             .padding(.top, 2)
@@ -45,16 +48,24 @@ struct ProjectTile: View {
         .background(fill, in: RoundedRectangle(cornerRadius: Self.corner, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: Self.corner, style: .continuous)
-                .strokeBorder(border, lineWidth: isSelected ? 2 : 1)
+                .strokeBorder(border, lineWidth: isSelected || isFocused ? 2 : 1)
         )
         .contentShape(RoundedRectangle(cornerRadius: Self.corner, style: .continuous))
         .onHover { inside in withAnimation(Theme.hoverAnimation) { hovering = inside } }
         .onTapGesture(count: 2, perform: onOpen)
         .simultaneousGesture(TapGesture().onEnded(onSelect))
-        .accessibilityElement(children: .combine)
-        .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
+        // Reachable with Tab (the arrow keys come from HomeKeyMonitor); focusing selects, so the
+        // two never disagree about which tile is current.
+        .focusable()
+        .focused($isFocused)
+        .focusEffectDisabled()
+        .onChange(of: isFocused) { _, focused in if focused { onSelect() } }
+        // The pin and play buttons stay their own elements inside the tile instead of being
+        // folded into one; the tile itself carries the name and the Open action.
+        .accessibilityElement(children: .contain)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
         .accessibilityLabel(set.name)
-        .accessibilityHint(HomeModel.subtitle(for: set))
+        .accessibilityValue(HomeModel.subtitle(for: set))
         .accessibilityAction(named: CommonStrings.openInLive.s, onOpen)
     }
 
@@ -64,7 +75,7 @@ struct ProjectTile: View {
     }
 
     private var border: Color {
-        if isSelected { return isKeyboardFocused ? Theme.focus : Theme.light.opacity(0.85) }
+        if isSelected || isFocused { return isKeyboardFocused || isFocused ? Theme.focus : Theme.light.opacity(0.85) }
         return hovering ? Color.white.opacity(0.10) : Theme.cardBorder
     }
 
@@ -77,7 +88,7 @@ struct ProjectTile: View {
                 .contentShape(Circle())
         }
         .buttonStyle(.plain)
-        .opacity(isPinned || hovering || isSelected ? 1 : 0)
+        .opacity(isPinned || hovering || isSelected || isFocused ? 1 : 0)
         .help(isPinned ? HomeStrings.unpin.s : HomeStrings.pinProject.s)
         .accessibilityLabel(isPinned ? HomeStrings.unpin.s : HomeStrings.pinProject.s)
     }
@@ -129,19 +140,19 @@ struct NewSetTile: View {
         Button(action: action) {
             VStack(spacing: 10) {
                 IconView(icon: .plus, size: 15, weight: .semibold)
-                    .foregroundStyle(hovering ? Theme.onLight : Theme.textDim)
+                    .foregroundStyle(hovering ? Theme.onLight : Theme.secondaryText)
                     .frame(width: 34, height: 34)
                     .background(hovering ? Theme.light : Theme.surface, in: Circle())
                 Text(HomeStrings.newLiveSet.s)
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(hovering ? Theme.text : Theme.textDim)
+                    .font(Theme.fCardTitle)
+                    .foregroundStyle(hovering ? Theme.text : Theme.secondaryText)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(hovering ? Theme.surface.opacity(0.6) : Color.clear,
                         in: RoundedRectangle(cornerRadius: Theme.cardR, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: Theme.cardR, style: .continuous)
-                    .strokeBorder(hovering ? Theme.textDim : Theme.hairline,
+                    .strokeBorder(hovering ? Theme.secondaryText : Theme.hairline,
                                   style: StrokeStyle(lineWidth: 1.5, dash: [5, 4]))
             )
             .contentShape(RoundedRectangle(cornerRadius: Theme.cardR, style: .continuous))
@@ -170,7 +181,7 @@ struct NowPlayingStrip: View {
             .accessibilityLabel(player.isPlaying ? HomeStrings.pauseRender.s : HomeStrings.playRender.s)
             VStack(alignment: .leading, spacing: 1) {
                 Text(player.currentFile?.name ?? "").font(Theme.fTitle).foregroundStyle(Theme.text).lineLimit(1)
-                Text(player.setName).font(Theme.fSmall).foregroundStyle(Theme.textDim).lineLimit(1)
+                Text(player.setName).font(Theme.fSmall).foregroundStyle(Theme.secondaryText).lineLimit(1)
             }
             .frame(width: 180, alignment: .leading)
             Text(PlayerFormat.time(player.position)).monospacedDigit()
@@ -180,7 +191,7 @@ struct NowPlayingStrip: View {
             CircleIconButton(icon: .close, help: HomeStrings.stopPlayback.s) { player.unload() }
         }
         .font(Theme.fSmall)
-        .foregroundStyle(Theme.textDim)
+        .foregroundStyle(Theme.secondaryText)
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
         .frame(maxWidth: 760)

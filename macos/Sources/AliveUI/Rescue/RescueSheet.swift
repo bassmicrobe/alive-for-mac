@@ -43,7 +43,7 @@ struct RescueSheet: View {
     private var loading: some View {
         HStack(spacing: 10) {
             ProgressView().controlSize(.small)
-            Text(RescueStrings.loading.s).font(Theme.fBody).foregroundStyle(Theme.textDim)
+            Text(RescueStrings.loading.s).font(Theme.fBody).foregroundStyle(Theme.secondaryText)
         }
         .frame(maxWidth: .infinity, minHeight: 120)
     }
@@ -77,7 +77,7 @@ struct RescueSheet: View {
     private func checklist(_ model: RescueModel) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 4) {
-                Text(listLabel(model)).font(Theme.fLabel).foregroundStyle(Theme.textDim)
+                Text(listLabel(model)).font(Theme.fLabel).foregroundStyle(Theme.secondaryText)
                 Spacer(minLength: 8)
                 if model.canEditList {
                     QuietTextButton(title: RescueStrings.allOff.s) { model.setAll(enabled: false) }
@@ -115,7 +115,7 @@ struct RescueSheet: View {
                              liveRunning: model.liveRunning, disabledCount: model.disabled.count,
                              probeFileName: model.probeFileName))
             .font(Theme.fSmall)
-            .foregroundStyle(Theme.textDim)
+            .foregroundStyle(Theme.secondaryText)
             .fixedSize(horizontal: false, vertical: true)
             .frame(maxWidth: .infinity, minHeight: 32, alignment: .topLeading)
     }
@@ -141,7 +141,10 @@ struct RescueSheet: View {
     private func runTitle(_ model: RescueModel) -> String {
         switch model.runTitle {
         case .close: return RescueStrings.close.s
-        case .open: return RescueStrings.openProbe.s
+        // Disabled only because nothing is unticked yet: name what is missing instead of
+        // showing a primary button that looks broken.
+        case .open: return model.runEnabled || model.liveRunning || !model.disabled.isEmpty
+            ? RescueStrings.openProbe.s : RescueStrings.deselectFirst.s
         case .next: return RescueStrings.nextProbe.s
         case .again: return RescueStrings.probeAgain.s
         case .waiting: return RescueStrings.waiting.s
@@ -168,10 +171,10 @@ private struct RefusedSummary: View {
                 withAnimation(Theme.hoverAnimation) { expanded.toggle() }
             } label: {
                 HStack(spacing: 8) {
-                    IconView(icon: .warning, size: 12).foregroundStyle(Theme.textDim)
+                    IconView(icon: .warning, size: 12).foregroundStyle(Theme.secondaryText)
                     Text(summary).font(Theme.fLabel)
                     Text(expanded ? RescueStrings.refusedHide.s : RescueStrings.refusedShow.s)
-                        .font(Theme.fLabel).foregroundStyle(Theme.textDim).underline()
+                        .font(Theme.fLabel).foregroundStyle(Theme.secondaryText).underline()
                     Spacer(minLength: 0)
                 }
                 .foregroundStyle(hovering ? Color.white : Theme.text)
@@ -179,12 +182,12 @@ private struct RefusedSummary: View {
             }
             .buttonStyle(.plain)
             .onHover { hovering = $0 }
-            .accessibilityValue(expanded ? "expanded" : "collapsed")
+            .accessibilityValue(expanded ? CommonStrings.stateExpanded.s : CommonStrings.stateCollapsed.s)
 
             if expanded {
                 VStack(alignment: .leading, spacing: 2) {
                     ForEach(groups) { g in
-                        Text(RescueText.refusedLine(g)).font(Theme.fSmall).foregroundStyle(Theme.textDim)
+                        Text(RescueText.refusedLine(g)).font(Theme.fSmall).foregroundStyle(Theme.secondaryText)
                     }
                 }
                 .padding(.leading, 20)
@@ -209,7 +212,7 @@ struct QuietTextButton: View {
         Button(action: action) {
             Text(title)
                 .font(Theme.fLabel)
-                .foregroundStyle(hovering ? Color.white : Theme.textDim)
+                .foregroundStyle(hovering ? Color.white : Theme.secondaryText)
                 .padding(.horizontal, 10)
                 .frame(height: 26)
                 .background(hovering ? Theme.rowHover : .clear, in: Capsule())

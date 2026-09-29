@@ -28,15 +28,15 @@ struct StatDropField: View {
             HStack(spacing: 10) {
                 Text(label)
                     .font(Theme.fBody)
-                    .foregroundStyle(Theme.textDim)
+                    .foregroundStyle(Theme.secondaryText)
                     .frame(minWidth: 30, alignment: .leading)
                 Text(items.first { $0.id == selection }?.title ?? "")
                     .font(Theme.fBody)
-                    .foregroundStyle(isDimmed ? Theme.textDim : Theme.text)
+                    .foregroundStyle(isDimmed ? Theme.secondaryText : Theme.text)
                     .lineLimit(1)
                 Spacer(minLength: 4)
                 IconView(icon: .chevronDown, size: 9)
-                    .foregroundStyle(Theme.textDim)
+                    .foregroundStyle(Theme.secondaryText)
             }
             .padding(.horizontal, 14)
             .frame(height: Theme.controlH)
@@ -76,7 +76,7 @@ struct StatChannelSwitch: View {
                     IconView(icon: .check, size: 10, weight: .bold).foregroundStyle(Theme.onLight)
                 } else {
                     RoundedRectangle(cornerRadius: 5.6, style: .continuous)
-                        .strokeBorder(hovering ? Theme.text : Theme.textDim, lineWidth: 1.3)
+                        .strokeBorder(hovering ? Theme.text : Theme.secondaryText, lineWidth: 1.3)
                 }
             }
             .frame(width: 18, height: 18)

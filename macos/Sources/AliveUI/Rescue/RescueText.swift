@@ -33,7 +33,10 @@ enum RescueText {
 
     /// The paragraph on top when nothing more specific is going on: what is known about the set.
     static func header(_ s: RescueSession) -> String {
-        if let e = s.error { return RescueStrings.readError.f(e) }
+        if let e = s.error {
+            ReadErrorLog.note(e, of: s.set.path)
+            return RescueStrings.readError.s
+        }
         if s.targets.isEmpty { return RescueStrings.noPlugins.s }
         if s.isFinished { return verdict(s) }
         guard let h = s.history else { return RescueStrings.logNone.s }

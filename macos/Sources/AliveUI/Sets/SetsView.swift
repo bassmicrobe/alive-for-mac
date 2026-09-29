@@ -13,7 +13,7 @@ struct SetsView: View {
         } else if app.catalog.sets.isEmpty {
             emptyCatalog
         } else {
-            HStack(alignment: .top, spacing: Theme.iconGap + 4) {
+            HStack(alignment: .top, spacing: Theme.panelGap) {
                 listColumn
                 DetailPanel()
                     .frame(width: Theme.panelW)
@@ -88,7 +88,7 @@ private struct PinnedFirstToggle: View {
                 Text(SetsStrings.pinnedFirst.s)
             }
             .font(Theme.fSmall)
-            .foregroundStyle(isOn ? Theme.onLight : hovering ? Theme.text : Theme.textDim)
+            .foregroundStyle(isOn ? Theme.onLight : hovering ? Theme.text : Theme.secondaryText)
             .padding(.horizontal, 12)
             .frame(height: 24)
             .background(isOn ? AnyShapeStyle(Theme.light)
@@ -116,7 +116,7 @@ private struct StripButton: View {
                 Text(title)
             }
             .font(Theme.fSmall)
-            .foregroundStyle(hovering ? Theme.text : Theme.textDim)
+            .foregroundStyle(hovering ? Theme.text : Theme.secondaryText)
             .padding(.horizontal, 8)
             .frame(height: 24)
             .contentShape(Rectangle())

@@ -26,13 +26,14 @@ private struct RootsEditor: View {
     }
 
     var body: some View {
-        SheetFrame(title: SetsStrings.rootsTitle.s, width: 620, height: 560) {
+        // No fixed height: the sheet is as tall as its list needs (see `listHeight`).
+        SheetFrame(title: SetsStrings.rootsTitle.s, width: 620) {
             VStack(alignment: .leading, spacing: 12) {
                 PillTabs(items: [PillTabItem(value: RootsKind.projects, title: SetsStrings.rootsProjectsTab.s),
                                  PillTabItem(value: RootsKind.samples, title: SetsStrings.rootsSamplesTab.s)],
                          selection: $draft.kind)
                     .fixedSize()
-                Text(hint).font(Theme.fSmall).foregroundStyle(Theme.textDim)
+                Text(hint).font(Theme.fSmall).foregroundStyle(Theme.secondaryText)
                 list
                 dropZone
                 suggestions
@@ -58,8 +59,8 @@ private struct RootsEditor: View {
         if roots.isEmpty {
             Text(draft.kind == .projects ? SetsStrings.rootsEmpty.s : SetsStrings.rootsSamplesEmpty.s)
                 .font(Theme.fBody)
-                .foregroundStyle(Theme.textDim)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .foregroundStyle(Theme.secondaryText)
+                .frame(maxWidth: .infinity, minHeight: Self.rowPitch * 1.5)
         } else {
             ScrollView {
                 VStack(spacing: 6) {
@@ -73,7 +74,17 @@ private struct RootsEditor: View {
                     }
                 }
             }
+            .frame(height: listHeight(rows: roots.count))
         }
+    }
+
+    private static let rowPitch = Theme.rowPillH + 6
+    private static let maxListHeight: CGFloat = 264
+
+    /// The list is as tall as its rows, up to a bound; past it, it scrolls. (A list that always
+    /// filled the sheet left a wide empty band between a few rows and the drop zone.)
+    private func listHeight(rows: Int) -> CGFloat {
+        min(max(Self.rowPitch, CGFloat(rows) * Self.rowPitch - 6), Self.maxListHeight)
     }
 
     // MARK: - Adding
@@ -85,7 +96,7 @@ private struct RootsEditor: View {
                 Text(dropTargeted ? SetsStrings.rootsDropRelease.s : SetsStrings.rootsDropHint.s)
             }
             .font(Theme.fSmall)
-            .foregroundStyle(dropTargeted ? Theme.text : Theme.textDim)
+            .foregroundStyle(dropTargeted ? Theme.text : Theme.secondaryText)
             .frame(maxWidth: .infinity)
             .frame(height: 44)
             .background(dropTargeted ? Theme.surfaceHover : Color.clear,
@@ -217,12 +228,13 @@ private struct RootRow: View {
             .accessibilityLabel(SetsStrings.rootOffHelp.s)
             .accessibilityAddTraits(isOn ? .isSelected : [])
 
-            Text(root)
+            Text(SetFormat.homeAbbreviated(root))
                 .font(Theme.fBody)
-                .foregroundStyle(isOn ? Theme.text : Theme.textDim)
+                .foregroundStyle(isOn ? Theme.text : Theme.secondaryText)
                 .lineLimit(1)
                 .truncationMode(.middle)
                 .help(root)
+                .accessibilityValue(root)
             Spacer(minLength: 8)
             countLabel
             CircleIconButton(icon: .close, help: SetsStrings.rootRemoveHelp.s, action: remove)
@@ -235,12 +247,12 @@ private struct RootRow: View {
 
     @ViewBuilder private var countLabel: some View {
         if isNested && isOn {
-            Text(SetsStrings.rootNested.s).font(Theme.fSmall).foregroundStyle(Theme.textDim)
+            Text(SetsStrings.rootNested.s).font(Theme.fSmall).foregroundStyle(Theme.secondaryText)
         } else if let count {
             Text(count < 0 ? SetsStrings.rootNoAccess.s
                  : (kind == .projects ? SetsStrings.rootSetCount : SetsStrings.rootSampleCount).f(count))
                 .font(Theme.fSmall)
-                .foregroundStyle(count < 0 ? Theme.red : Theme.textDim)
+                .foregroundStyle(count < 0 ? Theme.errorText : Theme.secondaryText)
                 .monospacedDigit()
         } else {
             ProgressView().controlSize(.small).scaleEffect(0.7)

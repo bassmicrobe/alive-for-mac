@@ -108,7 +108,7 @@ struct OverviewPanel: View {
                     .frame(width: 14)
                 Text(HomeStrings.overview.s).font(Theme.fHead)
             }
-            .foregroundStyle(headerHover ? Theme.text : (open ? Theme.text : Theme.textDim))
+            .foregroundStyle(headerHover ? Theme.text : (open ? Theme.text : Theme.secondaryText))
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -119,7 +119,8 @@ struct OverviewPanel: View {
     private func cards(_ s: OverviewStats) -> some View {
         HStack(spacing: 8) {
             StatCard(label: HomeStrings.activeDays.s, value: OverviewFormat.number(s.activeDays))
-            StatCard(label: HomeStrings.streak.s, value: OverviewFormat.days(s.streak))
+            StatCard(label: HomeStrings.streak.s,
+                     value: s.streak > 0 ? OverviewFormat.days(s.streak) : HomeStrings.noStreak.s)
             StatCard(label: HomeStrings.record.s, value: OverviewFormat.days(s.record))
             StatCard(label: HomeStrings.peakHour.s, value: OverviewFormat.hour(s.peakHour))
         }
@@ -129,7 +130,7 @@ struct OverviewPanel: View {
         Text(hovered.map { OverviewFormat.hover(day: $0.day, saves: $0.saves) }
              ?? OverviewFormat.footer(diskBytes: s.diskBytes))
             .font(Theme.fLabel)
-            .foregroundStyle(Theme.textDim)
+            .foregroundStyle(Theme.secondaryText)
             .frame(minHeight: 16, alignment: .leading)
             .lineLimit(1)
     }
@@ -156,12 +157,13 @@ private struct StatCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text(label).font(Theme.fBadge).foregroundStyle(Theme.textDim).lineLimit(1)
+            Text(label).font(Theme.fBadge).foregroundStyle(Theme.secondaryText).lineLimit(1)
             Text(value)
                 .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(Theme.text)
                 .monospacedDigit()
                 .lineLimit(1)
+                .minimumScaleFactor(0.8)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 7)

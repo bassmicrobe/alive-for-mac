@@ -1,4 +1,5 @@
 // Mac-only: shell, menu, toolbar and shared words (en + ja).
+import AliveCore
 import Foundation
 
 enum CommonStrings: LocalizedStrings {
@@ -7,7 +8,10 @@ enum CommonStrings: LocalizedStrings {
     case tabHome, tabSets, tabPlugins, tabSamples, tabStat
     case windowStat, windowPlayer
     // Toolbar
-    case filters, searchIn, shownCount, scanFolders, settings, help
+    case filters, searchIn, shownCount, shownProjects, scanFolders, foldersLabel, clearSearch, settings, help
+    // Accessibility state values (VoiceOver)
+    case setReadFailed
+    case stateExpanded, stateCollapsed, stateOn, stateOff, dismiss
     // Menus
     case menuSet
     case openInLive, showInFinder, pin, tagsAndNotes, rescue, exportSet
@@ -40,6 +44,16 @@ enum CommonStrings: LocalizedStrings {
         case .filters: return ("Filters", "フィルター")
         case .searchIn: return ("Search in %@…", "%@を検索…")
         case .shownCount: return ("%lld shown", "%lld 件を表示")
+        case .shownProjects: return ("%lld projects shown", "%lld 件のプロジェクトを表示")
+        case .foldersLabel: return ("Folders", "フォルダ")
+        case .clearSearch: return ("Clear search", "検索をクリア")
+        case .setReadFailed: return ("This set could not be read. See alive.log for details.",
+                                     "このセットを読み込めませんでした。詳細は alive.log を確認してください。")
+        case .stateExpanded: return ("Expanded", "展開済み")
+        case .stateCollapsed: return ("Collapsed", "折りたたみ")
+        case .stateOn: return ("On", "オン")
+        case .stateOff: return ("Off", "オフ")
+        case .dismiss: return ("Dismiss", "閉じる")
         case .scanFolders: return ("Scan Folders…", "スキャンするフォルダ…")
         case .settings: return ("Settings", "設定")
         case .help: return ("Help", "ヘルプ")
@@ -96,5 +110,22 @@ enum CommonStrings: LocalizedStrings {
         case .noSetsBody: return ("There are no .als files in the folders being scanned. Check them with Scan Folders (⇧⌘O).",
                                   "スキャン対象のフォルダに .als ファイルがありません。スキャンするフォルダ（⇧⌘O）を確認してください。")
         }
+    }
+}
+
+/// A set that could not be read shows the same plain sentence everywhere; the parser's own
+/// wording (English, technical) goes to alive.log once per set and message instead.
+enum ReadErrorLog {
+    private static let lock = NSLock()
+    private static var seen = Set<String>()
+
+    /// Logs `raw` for `path` the first time it is seen and returns the sentence to show.
+    @discardableResult
+    static func note(_ raw: String, of path: String) -> String {
+        lock.lock()
+        let isNew = seen.insert(path + "|" + raw).inserted
+        lock.unlock()
+        if isNew { Diag.warn("could not read \(path): \(raw)") }
+        return CommonStrings.setReadFailed.s
     }
 }

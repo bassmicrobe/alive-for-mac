@@ -59,17 +59,32 @@ private struct TopBar: View {
     private let trafficLightInset: CGFloat = 70
 
     var body: some View {
+        // Wide windows get a labelled "Folders" pill; when it does not fit (Japanese at the minimum
+        // width, with the scan pill up) the same bar is used with the icon-only button.
+        ViewThatFits(in: .horizontal) {
+            bar(foldersLabelled: true)
+            bar(foldersLabelled: false)
+        }
+        .animation(Theme.selectAnimation, value: app.catalog.isScanning)
+        .padding(.leading, trafficLightInset)
+        .padding(.trailing, Theme.pad)
+        .padding(.top, 12)
+        .padding(.bottom, 14)
+    }
+
+    private func bar(foldersLabelled: Bool) -> some View {
         @Bindable var app = app
-        HStack(spacing: Theme.iconGap + 4) {
+        return HStack(spacing: Theme.iconGap + 4) {
             PillTabs(items: MainTab.allCases.map { PillTabItem(value: $0, title: $0.title) },
                      selection: $app.tab)
                 .fixedSize()
             PillButton(title: filtersTitle, icon: .filters) { app.presentFilters() }
                 .disabled(!app.canPresentFilters)
+                .fixedSize()
             SearchField()
             Text(app.shownLabel ?? CommonStrings.shownCount.f(app.shownCount))
                 .font(Theme.fBody)
-                .foregroundStyle(Theme.textDim)
+                .foregroundStyle(Theme.secondaryText)
                 .monospacedDigit()
                 .lineLimit(1)
                 .fixedSize()
@@ -80,19 +95,21 @@ private struct TopBar: View {
             Spacer(minLength: 8)
             HStack(spacing: Theme.iconGap) {
                 CircleIconButton(icon: .stat, help: CommonStrings.tabStat.s) { openWindow(id: "stat") }
-                CircleIconButton(icon: .folder, help: CommonStrings.scanFolders.s) { app.presentScanFolders() }
+                if foldersLabelled {
+                    PillButton(title: CommonStrings.foldersLabel.s, icon: .folder) { app.presentScanFolders() }
+                        .help(CommonStrings.scanFolders.s)
+                        .fixedSize()
+                } else {
+                    CircleIconButton(icon: .folder, help: CommonStrings.scanFolders.s) { app.presentScanFolders() }
+                }
                 SettingsLink { IconView(icon: .settings) }
                     .buttonStyle(CircleIconButtonStyle())
                     .overlay(alignment: .topTrailing) { updateDot }
                     .help(CommonStrings.settings.s)
+                    .accessibilityLabel(CommonStrings.settings.s)
                 CircleIconButton(icon: .help, help: CommonStrings.help.s) { app.presentHelp() }
             }
         }
-        .animation(Theme.selectAnimation, value: app.catalog.isScanning)
-        .padding(.leading, trafficLightInset)
-        .padding(.trailing, Theme.pad)
-        .padding(.top, 12)
-        .padding(.bottom, 14)
     }
 }
 
@@ -114,7 +131,8 @@ extension TopBar {
     }
 }
 
-/// The sunken pill search field of the upstream toolbar.
+/// The sunken pill search field of the upstream toolbar. It takes focus only on a click or ⌘F:
+/// not at launch, and it lets go while a sheet is up (the ring would show through behind it).
 private struct SearchField: View {
     @Environment(AppModel.self) private var app
     @FocusState private var isFocused: Bool
@@ -123,26 +141,52 @@ private struct SearchField: View {
         @Bindable var app = app
         HStack(spacing: 8) {
             IconView(icon: .magnifier, size: 12)
-                .foregroundStyle(Theme.textDim)
+                .foregroundStyle(Theme.secondaryText)
             TextField("", text: $app.searchText,
-                      prompt: Text(CommonStrings.searchIn.f(app.tab.title)).foregroundStyle(Theme.textDim))
+                      prompt: Text(CommonStrings.searchIn.f(app.tab.title)).foregroundStyle(Theme.secondaryText))
                 .textFieldStyle(.plain)
                 .font(Theme.fBody)
                 .foregroundStyle(Theme.text)
                 .focused($isFocused)
                 .onExitCommand { app.searchText = ""; isFocused = false }
+                .accessibilityLabel(CommonStrings.focusSearch.s)
             if !app.searchText.isEmpty {
                 Button { app.searchText = "" } label: { IconView(icon: .close, size: 10) }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(Theme.textDim)
+                    .buttonStyle(ClearFieldButtonStyle())
+                    .help(CommonStrings.clearSearch.s)
+                    .accessibilityLabel(CommonStrings.clearSearch.s)
             }
         }
         .padding(.horizontal, 14)
-        .frame(minWidth: 80, maxWidth: 320, minHeight: Theme.controlH, maxHeight: Theme.controlH)
+        .frame(minWidth: 80, idealWidth: 160, maxWidth: 320, minHeight: Theme.controlH, maxHeight: Theme.controlH)
         .background(Theme.sunken, in: Capsule())
         .focusRing(isFocused, cornerRadius: Theme.controlH / 2)
+        .onAppear { releaseInitialFocus() }
         .onChange(of: app.searchFocusRequest) { _, _ in isFocused = true }
-        .accessibilityLabel(CommonStrings.focusSearch.s)
+        .onChange(of: app.sheet == nil) { _, noSheet in if !noSheet { isFocused = false } }
+    }
+
+    /// AppKit hands the first text field of a window the initial focus; give it back.
+    private func releaseInitialFocus() {
+        DispatchQueue.main.async {
+            if app.searchFocusRequest == 0 { isFocused = false }
+        }
+    }
+}
+
+/// The "×" inside the search field: dim, brighter on hover, dips when pressed, focus ring.
+private struct ClearFieldButtonStyle: ButtonStyle {
+    @State private var hovering = false
+    @Environment(\.isFocused) private var isFocused
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .foregroundStyle(hovering ? Theme.text : Theme.secondaryText)
+            .frame(width: 18, height: 18)
+            .contentShape(Circle())
+            .focusRing(isFocused, cornerRadius: 9)
+            .opacity(configuration.isPressed ? 0.6 : 1)
+            .onHover { hovering = $0 }
     }
 }
 
@@ -157,7 +201,7 @@ private struct ScanStatusPill: View {
                 .frame(width: 13, height: 13)
             Text(label)
                 .font(Theme.fSmall)
-                .foregroundStyle(Theme.textDim)
+                .foregroundStyle(Theme.secondaryText)
                 .monospacedDigit()
                 .lineLimit(1)
                 .contentTransition(.numericText())

@@ -6,23 +6,26 @@ import SwiftUI
 import AliveCore
 
 private enum CellStyle {
-    static let vPad: CGFloat = 7
+    /// Every cell is at least this tall, so the row pitch is the shared `Theme.rowH` rhythm of
+    /// Plugins and Samples whatever a cell holds (the table adds its own row padding).
+    static let height: CGFloat = Theme.rowH - 8
 }
 
-/// Text cell with the table's vertical rhythm.
+/// Text cell with the table's vertical rhythm. Metadata is `secondaryText` (AA on hover and
+/// pressed fills); on the selected row's fill it turns to the full text colour.
 struct SetTextCell: View {
     let text: String
     var right = false
     var dim = false
+    @Environment(\.backgroundProminence) private var prominence
 
     var body: some View {
         Text(text)
             .font(Theme.fBody)
-            .foregroundStyle(dim ? Theme.textDim : Theme.text)
+            .foregroundStyle(dim && prominence != .increased ? Theme.secondaryText : Theme.text)
             .lineLimit(1)
             .truncationMode(.tail)
-            .frame(maxWidth: .infinity, alignment: right ? .trailing : .leading)
-            .padding(.vertical, CellStyle.vPad)
+            .frame(maxWidth: .infinity, minHeight: CellStyle.height, alignment: right ? .trailing : .leading)
     }
 }
 
@@ -35,19 +38,20 @@ struct SetNameCell: View {
     var body: some View {
         HStack(spacing: 8) {
             PinStar(app: app, path: set.path)
-            Text(set.name)
+            Text(SetFormat.displayName(set.name))
                 .font(Theme.fTitle)
-                .foregroundStyle(isVersionRow ? Theme.textDim : Theme.text)
+                .foregroundStyle(isVersionRow ? Theme.secondaryText : Theme.text)
                 .lineLimit(1)
                 .truncationMode(.middle)
+                .help(set.name)
             if set.collapsedCount > 0 {
                 TagPill(text: SetsStrings.moreVersions.f(set.collapsedCount))
                     .help(SetsStrings.moreVersionsHelp.f(set.collapsedCount))
             }
             if !set.error.isEmpty {
                 IconView(icon: .warning, size: 11)
-                    .foregroundStyle(Theme.red)
-                    .help(set.error)
+                    .foregroundStyle(Theme.errorText)
+                    .help(ReadErrorLog.note(set.error, of: set.path))
             }
             Spacer(minLength: 4)
             // What plays is always the render of the project's principal version, so a version
@@ -56,7 +60,7 @@ struct SetNameCell: View {
                 PlayGlyph(app: app, path: set.path)
             }
         }
-        .padding(.vertical, CellStyle.vPad - 2)
+        .frame(minHeight: CellStyle.height)
     }
 }
 
@@ -72,7 +76,7 @@ struct PinStar: View {
             app.home.togglePin(path: path)
         } label: {
             IconView(icon: pinned ? .starFill : .star, size: 11)
-                .foregroundStyle(pinned ? Theme.light : hovering ? Theme.text : Theme.textDim.opacity(0.4))
+                .foregroundStyle(pinned ? Theme.light : hovering ? Theme.text : Theme.secondaryText.opacity(0.5))
                 .frame(width: 18, height: 22)
                 .contentShape(Rectangle())
         }
@@ -94,7 +98,7 @@ private struct PlayGlyph: View {
             app.sets.playRender(of: path)
         } label: {
             IconView(icon: .play, size: 9)
-                .foregroundStyle(hovering ? Theme.onLight : Theme.textDim)
+                .foregroundStyle(hovering ? Theme.onLight : Theme.secondaryText)
                 .frame(width: 22, height: 22)
                 .background(hovering ? Theme.light : Theme.surface, in: Circle())
         }
@@ -116,16 +120,16 @@ struct MissingMark: View {
         HStack(spacing: 6) {
             Spacer(minLength: 0)
             if unreadable {
-                Text(SetsStrings.unreadable.s).foregroundStyle(Theme.red)
+                Text(SetsStrings.unreadable.s).foregroundStyle(Theme.errorText)
             } else if total > 0 || missing > 0 {
                 if missing > 0 {
-                    Text(String(missing)).foregroundStyle(Theme.red).monospacedDigit()
+                    Text(String(missing)).foregroundStyle(Theme.errorText).monospacedDigit()
                 }
                 Circle().fill(missing > 0 ? Theme.red : Theme.green).frame(width: 7, height: 7)
             }
         }
         .font(Theme.fBody)
-        .padding(.vertical, CellStyle.vPad)
+        .frame(minHeight: CellStyle.height)
     }
 }
 
@@ -140,7 +144,7 @@ struct PluginsMissedCell: View {
         if app.sets.pluginsKnown {
             MissingMark(total: set.plugins.count, missing: set.missingPlugins)
         } else {
-            Color.clear.frame(height: 30)
+            Color.clear.frame(height: CellStyle.height)
         }
     }
 }
@@ -158,9 +162,9 @@ struct SetTagsCell: View {
             if tags.count > 2 { pills(Array(tags.prefix(2)), more: tags.count - 2) }
             if tags.count > 1 { pills(Array(tags.prefix(1)), more: tags.count - 1) }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.vertical, CellStyle.vPad + 1)
+        .frame(maxWidth: .infinity, minHeight: CellStyle.height, alignment: .leading)
         .clipped()
+        .help(tags.joined(separator: ", "))
     }
 
     private func pills(_ tags: [String], more: Int = 0) -> some View {

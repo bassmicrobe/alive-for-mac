@@ -97,6 +97,15 @@ final class SetsModel {
     /// The toolbar's "N shown".
     var shownCount: Int { rows.count }
 
+    /// The toolbar label with its units spelled out: "553 projects · 754 sets". A row is a project
+    /// when versions are folded; the sets counted are every version that passed the search/filters.
+    var shownLabel: String {
+        let p = pipeline
+        let setCount = p.heads.count + p.hidden.values.reduce(0) { $0 + $1.count }
+        let projectCount = Set(p.heads.map { SetsPipeline.key(forDirectory: $0.directory) }).count
+        return SetsStrings.shownSummary.f(projectCount, setCount)
+    }
+
     /// How many condition groups of the filter are on — the number for the Filters button.
     var activeFilterCount: Int { SetsPipeline.effectiveFilter(filter, pluginsKnown: pluginsKnown).activeCount }
 

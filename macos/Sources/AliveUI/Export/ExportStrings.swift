@@ -4,7 +4,7 @@ import Foundation
 
 enum ExportStrings: LocalizedStrings {
     case title, titleFor
-    case counting, cannotRead
+    case counting, nothingToCopy
     // The four questions of "Collect All and Save" and the always-copied line
     case rowElsewhere, rowOtherProjects, rowUserLibrary, rowFactoryPacks, inProject
     case filesOne, filesMany
@@ -36,7 +36,8 @@ enum ExportStrings: LocalizedStrings {
         case .title: return ("Export", "エクスポート")
         case .titleFor: return ("Export: %@", "エクスポート: %@")
         case .counting: return ("Counting…", "集計中…")
-        case .cannotRead: return ("Cannot read this set: %@", "このセットを読み込めません: %@")
+        case .nothingToCopy: return ("No external files to copy; the set will still be exported.",
+                                     "コピーする外部ファイルはありません。セット自体はエクスポートされます。")
         case .rowElsewhere: return ("Files from elsewhere", "その他の場所のファイル")
         case .rowOtherProjects: return ("Files from other Projects", "他のプロジェクトのファイル")
         case .rowUserLibrary: return ("Files from User Library", "ユーザーライブラリのファイル")
