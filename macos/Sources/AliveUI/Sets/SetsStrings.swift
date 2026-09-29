@@ -45,7 +45,7 @@ enum SetsStrings: LocalizedStrings {
         case .colPluginsMissed: return ("Plugins missed", "見つからないプラグイン")
         case .colFilesMissed: return ("Files missed", "見つからないファイル")
         case .colTags: return ("Tags", "タグ")
-        case .colProjectSize: return ("Project size", "プロジェクトサイズ")
+        case .colProjectSize: return ("Project size", "サイズ")
 
         case .moreVersions: return ("+%lld", "+%lld")
         case .moreVersionsHelp: return ("%lld more versions of this project", "このプロジェクトの他のバージョン %lld 件")

@@ -6,7 +6,7 @@
 //   ALIVE_DEBUG_SHEET   help | filters | pluginFilters | roots-projects | roots-samples |
 //                       tags | preview | rescue | export   (the last four act on the selected set)
 //   ALIVE_DEBUG_PLUGIN  <plugin name>  (selects it on the Plugins tab, once the catalog is ready)
-//   ALIVE_DEBUG_WINDOW  stat | player | settings
+//   ALIVE_DEBUG_WINDOW  stat | player | settings   (ALIVE_DEBUG_SETTINGS_TAB=about: the About pane)
 import AliveCore
 import Foundation
 

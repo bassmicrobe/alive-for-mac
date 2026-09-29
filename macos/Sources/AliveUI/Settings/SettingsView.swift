@@ -4,12 +4,20 @@ import SwiftUI
 import AliveCore
 
 struct SettingsView: View {
+    private enum Pane { case general, about }
+
+    /// ALIVE_DEBUG_SETTINGS_TAB=about opens the About pane (automated screenshots, see DebugLaunch).
+    @State private var pane: Pane = ProcessInfo.processInfo.environment["ALIVE_DEBUG_SETTINGS_TAB"] == "about"
+        ? .about : .general
+
     var body: some View {
-        TabView {
+        TabView(selection: $pane) {
             GeneralSettingsView()
                 .tabItem { Label(SettingsStrings.tabGeneral.s, systemImage: "gearshape") }
+                .tag(Pane.general)
             AboutView()
                 .tabItem { Label(SettingsStrings.tabAbout.s, systemImage: "info.circle") }
+                .tag(Pane.about)
         }
         .frame(width: 540, height: 560)
     }

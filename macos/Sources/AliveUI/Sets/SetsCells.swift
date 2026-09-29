@@ -1,4 +1,7 @@
 // Mac-only: the cells of the sets table (upstream draws them in RowListView.cs).
+// The cells take `app` as a plain parameter instead of @Environment(AppModel.self): when the row set
+// shrinks (a root removed, a filter applied) NSTableView keeps cells alive outside the environment
+// for a moment, and reading the environment there aborts with "No Observable object ... found".
 import SwiftUI
 import AliveCore
 
@@ -25,13 +28,13 @@ struct SetTextCell: View {
 
 /// Star + name + "+N" badge + play button.
 struct SetNameCell: View {
-    @Environment(AppModel.self) private var app
+    let app: AppModel
     let set: SetEntry
     let isVersionRow: Bool
 
     var body: some View {
         HStack(spacing: 8) {
-            PinStar(path: set.path)
+            PinStar(app: app, path: set.path)
             Text(set.name)
                 .font(Theme.fTitle)
                 .foregroundStyle(isVersionRow ? Theme.textDim : Theme.text)
@@ -50,7 +53,7 @@ struct SetNameCell: View {
             // What plays is always the render of the project's principal version, so a version
             // row gets no button (upstream: CanPlay = HasRenders && !childRow).
             if set.hasRenders, !isVersionRow {
-                PlayGlyph(path: set.path)
+                PlayGlyph(app: app, path: set.path)
             }
         }
         .padding(.vertical, CellStyle.vPad - 2)
@@ -59,7 +62,7 @@ struct SetNameCell: View {
 
 /// The pin indicator; a click toggles the pin in home.cfg.
 struct PinStar: View {
-    @Environment(AppModel.self) private var app
+    let app: AppModel
     let path: String
     @State private var hovering = false
 
@@ -82,7 +85,7 @@ struct PinStar: View {
 }
 
 private struct PlayGlyph: View {
-    @Environment(AppModel.self) private var app
+    let app: AppModel
     let path: String
     @State private var hovering = false
 
@@ -130,7 +133,7 @@ struct MissingMark: View {
 /// nothing is known, so nothing is marked (no green dots either: they would promise a check that
 /// did not happen).
 struct PluginsMissedCell: View {
-    @Environment(AppModel.self) private var app
+    let app: AppModel
     let set: SetEntry
 
     var body: some View {
@@ -144,7 +147,7 @@ struct PluginsMissedCell: View {
 
 /// Tags as pills; what does not fit collapses into "+n".
 struct SetTagsCell: View {
-    @Environment(AppModel.self) private var app
+    let app: AppModel
     let set: SetEntry
 
     var body: some View {

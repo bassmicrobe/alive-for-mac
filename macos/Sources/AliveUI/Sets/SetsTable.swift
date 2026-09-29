@@ -15,9 +15,9 @@ struct SetsTable: View {
               sortOrder: $sets.sortOrder, columnCustomization: $sets.columnCustomization) {
             Group {
                 TableColumn(SetColumnID.set.title.s, sortUsing: SetSortComparator(.set)) { set in
-                    SetNameCell(set: set, isVersionRow: versionRows.contains(set.path))
+                    SetNameCell(app: self.app, set: set, isVersionRow: versionRows.contains(set.path))
                 }
-                .width(min: 160, ideal: 260)
+                .width(min: 150, ideal: 210)
                 .customizationID(SetColumnID.set.id)
                 .disabledCustomizationBehavior(.visibility)
 
@@ -32,13 +32,13 @@ struct SetsTable: View {
                 column(.tracks) { SetTextCell(text: SetFormat.count($0.tracks), right: true) }
                 column(.pluginCount) { SetTextCell(text: SetFormat.count($0.plugins.count), right: true, dim: true) }
                 column(.fileCount) { SetTextCell(text: SetFormat.count($0.totalRefs), right: true, dim: true) }
-                column(.pluginsMissed) { PluginsMissedCell(set: $0) }
+                column(.pluginsMissed) { PluginsMissedCell(app: self.app, set: $0) }
                 column(.filesMissed) {
                     MissingMark(total: $0.totalRefs, missing: $0.missingFiles, unreadable: !$0.error.isEmpty)
                 }
             }
             Group {
-                column(.tags) { SetTagsCell(set: $0) }
+                column(.tags) { SetTagsCell(app: self.app, set: $0) }
                 column(.size) { SetTextCell(text: SetFormat.size($0.projectSize), right: true) }
             }
         } rows: {

@@ -61,20 +61,10 @@ private struct SamplesBar: View {
         .padding(.bottom, 12)
     }
 
-    private var counter: some View {
-        HStack(spacing: 8) {
-            if model.isScanning && model.isManualScan { ProgressView().controlSize(.small).scaleEffect(0.7) }
-            Text(counterText)
-                .font(Theme.fBody)
-                .foregroundStyle(Theme.textDim)
-                .monospacedDigit()
-                .lineLimit(1)
-                .contentTransition(.numericText())
-        }
-        .animation(Theme.hoverAnimation, value: counterText)
+    /// The text itself lives in the toolbar (`SamplesModel.shownLabel`); only the progress spinner is here.
+    @ViewBuilder private var counter: some View {
+        if model.isScanning && model.isManualScan { ProgressView().controlSize(.small).scaleEffect(0.7) }
     }
-
-    private var counterText: String { model.shownLabel }
 
     private var columnsMenu: some View {
         Menu {

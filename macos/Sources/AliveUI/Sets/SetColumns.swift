@@ -45,15 +45,15 @@ enum SetColumnID: String, CaseIterable, Identifiable, Codable, Sendable {
         switch self {
         case .set: return nil
         case .place: return (80, 110)
-        case .modified, .created: return (76, 92)
+        case .modified, .created: return (76, 88)
         case .live: return (44, 56)
         case .bpm: return (44, 56)
         case .key: return (72, 96)
-        case .tracks, .pluginCount, .fileCount: return (50, 64)
+        case .tracks, .pluginCount, .fileCount: return (48, 60)
         case .pluginsMissed: return (80, 104)
         case .filesMissed: return (80, 96)
-        case .tags: return (90, 130)
-        case .size: return (60, 84)
+        case .tags: return (80, 110)
+        case .size: return (60, 80)
         }
     }
 
