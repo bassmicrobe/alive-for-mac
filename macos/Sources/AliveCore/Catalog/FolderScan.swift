@@ -113,25 +113,52 @@ public enum FolderScan {
     /// on disk. We take the bracket rather than the file time: a copy's time is the moment of
     /// the PREVIOUS save.
     public static func weigh(root: String, isCancelled: () -> Bool = { false }) -> Weight {
-        var w = Weight()
-        guard !root.isEmpty else { return w }
-        var todo = [URL(fileURLWithPath: root).standardized.path]
-        while let dir = todo.popLast() {
+        walkProject(root: root, weigh: true, renders: false, isCancelled: isCancelled).weight
+    }
+
+    /// What one walk of a project folder brought in.
+    public struct ProjectWalk: Sendable {
+        public var weight = Weight()
+        /// Unsorted, unpinned candidates; `RenderScan.finish` orders them.
+        public var renders: [RenderFile] = []
+    }
+
+    /// One traversal of a project folder for everything that lives in it: the weight (with the
+    /// Backup save history) and the render candidates. Each folder is listed once; asking only
+    /// for renders visits just the folders renders can live in.
+    public static func walkProject(root: String, weigh: Bool, renders: Bool,
+                                   isCancelled: () -> Bool = { false }) -> ProjectWalk {
+        var out = ProjectWalk()
+        guard !root.isEmpty, weigh || renders else { return out }
+        struct Item { var dir: String; var depth: Int; var inRenderZone: Bool }
+        var todo = [Item(dir: root, depth: 0, inRenderZone: renders)]
+        while let it = todo.popLast() {
             if isCancelled() { break }
             // Once per folder rather than once per file: inside Backup there can be hundreds.
-            let inBackup = (dir as NSString).lastPathComponent.caseInsensitiveCompare("Backup") == .orderedSame
-            guard let entries = list(dir) else { continue }
+            let inBackup = (it.dir as NSString).lastPathComponent.caseInsensitiveCompare("Backup") == .orderedSame
+            guard let entries = list(it.dir) else { continue }
+            var subs: [String] = []
             for e in entries {
-                if e.isDirectory { todo.append(combine(dir, e.name)); continue }
-                w.bytes += e.size
-                w.files += 1
+                if e.isDirectory { subs.append(e.name); continue }
+                guard weigh else { continue }
+                out.weight.bytes += e.size
+                out.weight.files += 1
                 if inBackup, let s = tryBackupStamp(e.name) {
-                    if w.saves == nil { w.saves = [] }
-                    w.saves?.append(s)
+                    if out.weight.saves == nil { out.weight.saves = [] }
+                    out.weight.saves?.append(s)
                 }
             }
+            if it.inRenderZone { RenderScan.collect(entries, in: it.dir, root: root, into: &out.renders) }
+            // Pushed in reverse so the sub-folders come off the stack in listing order: which
+            // renders make it under the cap depends on that order.
+            for name in subs.reversed() {
+                let zone = it.inRenderZone && it.depth < RenderScan.maxDepth
+                    && !RenderScan.skipDirs.contains(name.lowercased())
+                if !weigh && !zone { continue }
+                todo.append(Item(dir: combine(it.dir, name), depth: it.depth + 1, inRenderZone: zone))
+            }
         }
-        return w
+        return out
     }
 
     /// The moment of a save from a copy's name: "anything [2026-05-22 012035].als". Parsed by

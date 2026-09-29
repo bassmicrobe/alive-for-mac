@@ -50,9 +50,13 @@ public enum RenderScan {
         guard !root.isEmpty, FileManager.default.fileExists(atPath: root, isDirectory: &isDir),
               isDir.boolValue else { return [] }
 
-        var list: [RenderFile] = []
-        walk(dir: root, root: root, into: &list, depth: 0)
+        let list = FolderScan.walkProject(root: root, weigh: false, renders: true).renders
+        return finish(list, root: root, pins: pins)
+    }
 
+    /// Pins and orders the candidates of one project.
+    static func finish(_ found: [RenderFile], root: String, pins: PreviewPins) -> [RenderFile] {
+        var list = found
         let pinned = pins.get(root)
         if !pinned.isEmpty {
             for i in list.indices where list[i].path.caseInsensitiveCompare(pinned) == .orderedSame {
@@ -71,15 +75,14 @@ public enum RenderScan {
         return list
     }
 
-    private static func walk(dir: String, root: String, into list: inout [RenderFile], depth: Int) {
-        guard depth <= maxDepth, list.count < maxFiles, let entries = FolderScan.list(dir) else { return }
+    /// Adds the audio files of one folder listing (`dir` is `depth` levels under `root`) until
+    /// the cap is reached.
+    static func collect(_ entries: [FolderScan.Entry], in dir: String, root: String, into list: inout [RenderFile]) {
+        guard list.count < maxFiles else { return }
         var rel = dir.count > root.count ? String(dir.dropFirst(root.count)) : ""
         rel = rel.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
         let folderScore = self.folderScore(rel)
-
-        var subs: [String] = []
-        for e in entries {
-            if e.isDirectory { subs.append(e.name); continue }
+        for e in entries where !e.isDirectory {
             if list.count >= maxFiles { return }
             let ext = (e.name as NSString).pathExtension.lowercased()
             guard exts.contains(ext) else { continue }
@@ -91,9 +94,6 @@ public enum RenderScan {
             rf.size = e.size
             rf.score = folderScore
             list.append(rf)
-        }
-        for name in subs where !skipDirs.contains(name.lowercased()) {
-            walk(dir: FolderScan.combine(dir, name), root: root, into: &list, depth: depth + 1)
         }
     }
 
