@@ -21,31 +21,80 @@ final class PluginsModel {
     /// Set by `show(pluginNamed:)`; the list scrolls to it once it exists and clears it.
     var pendingScrollID: String?
 
-    @ObservationIgnored private var snapshot: Snapshot?
+    /// The last finished snapshot, published once per catalog revision (see `current`).
+    private(set) var snapshot: Snapshot?
     @ObservationIgnored private var rowsMemo: (key: String, rows: [PluginRow])?
+    @ObservationIgnored private var buildingRevision: Int?
+    @ObservationIgnored var snapshotTask: Task<Void, Never>?
+    /// `show(pluginNamed:)` arrived before the table it looks in was ready.
+    @ObservationIgnored private var pendingShow: String?
 
     init(app: AppModel) {
         self.app = app
     }
 
-    /// Everything derived from one catalog revision.
-    private struct Snapshot {
+    /// Everything derived from one catalog revision. Built off the main actor.
+    struct Snapshot: Sendable {
         let revision: Int
         let table: PluginTable
         let health: PluginHealth
         let available: Bool
         let stats: [PluginStat]
+
+        static let empty = Snapshot(revision: -1, table: PluginTable(usage: [], sets: []), health: PluginHealth(),
+                                    available: false, stats: [])
+
+        /// The catalog's plugin usage, cross-checks, health and table: the whole derivation.
+        static func make(revision: Int, index: ProjectIndex) -> Snapshot {
+            let usage = index.pluginUsage()
+            return Snapshot(revision: revision, table: PluginTable(usage: usage, sets: index.sets),
+                            health: index.health(usage), available: index.inventory.isAvailable, stats: usage)
+        }
     }
 
+    /// The published snapshot — the previous revision's while the new one is built (the lists
+    /// change once, when it arrives), an empty one before the first. A getter never computes.
     private var current: Snapshot {
+        ensureSnapshot()
+        return snapshot ?? .empty
+    }
+
+    private func ensureSnapshot() {
         let revision = app.catalog.revision
-        if let snapshot, snapshot.revision == revision { return snapshot }
+        if snapshot?.revision == revision || buildingRevision == revision { return }
+        snapshotTask?.cancel()
+        buildingRevision = revision
         let index = app.catalog.index
-        let usage = index.pluginUsage()
-        let made = Snapshot(revision: revision, table: PluginTable(usage: usage, sets: index.sets),
-                            health: index.health(usage), available: index.inventory.isAvailable, stats: usage)
+        snapshotTask = Task { [weak self] in
+            let made = await BlockingWork.run { isCancelled in
+                isCancelled() ? nil : Snapshot.make(revision: revision, index: index)
+            }
+            self?.publish(made, revision: revision)
+        }
+    }
+
+    private func publish(_ made: Snapshot?, revision: Int) {
+        guard buildingRevision == revision else { return }        // a newer revision took over
+        buildingRevision = nil
+        snapshotTask = nil
+        guard let made, made.revision == app.catalog.revision else {
+            if made != nil { ensureSnapshot() }                  // the catalog moved on while it was built
+            return
+        }
         snapshot = made
-        return made
+        if let name = pendingShow {
+            pendingShow = nil
+            show(pluginNamed: name)
+        }
+    }
+
+    /// Waits for the snapshot of the current catalog revision (tests; callers that must read it).
+    func settle() async {
+        ensureSnapshot()
+        while let task = snapshotTask {
+            await task.value
+            ensureSnapshot()
+        }
     }
 
     // MARK: - What the views read
@@ -65,7 +114,7 @@ final class PluginsModel {
     /// The rows the list shows: search, summary card and filters, then the chosen order.
     var rows: [PluginRow] {
         let words = SetSearch.words(in: app.searchText)
-        let key = "\(app.catalog.revision)|\(app.searchText)|\(card.map { "\($0.rawValue)" } ?? "-")|\(filter.hashValue)"
+        let key = "\(current.revision)|\(app.searchText)|\(card.map { "\($0.rawValue)" } ?? "-")|\(filter.hashValue)"
             + "|\(sortColumn?.rawValue ?? "-")|\(sortAscending)"
         if let rowsMemo, rowsMemo.key == key { return rowsMemo.rows }
         var list = current.table.rows.filter { row in
@@ -137,6 +186,8 @@ final class PluginsModel {
         guard !name.isEmpty else { return }
         app.searchText = ""
         card = nil
+        // The table is built off the main actor: when it is not there yet, the selection follows it.
+        guard snapshot?.revision == app.catalog.revision else { pendingShow = name; ensureSnapshot(); return }
         guard let row = current.table.row(named: name) else { return }
         // The plugin must be visible to be selected: drop filters that would hide it.
         if !filter.matches(row.stat) { filter.clear() }

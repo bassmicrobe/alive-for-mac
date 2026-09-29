@@ -1,5 +1,6 @@
 // Port of the wave and format reading of DetailPanel.LoadWave (src/DetailPanel.cs) — AVFoundation
 // instead of Media Foundation. Runs off the main thread.
+import Accelerate
 import Foundation
 import AVFoundation
 import AliveCore
@@ -25,8 +26,10 @@ enum SampleInfoLoader {
     private static let readChunk: AVAudioFrameCount = 1 << 16
 
     /// Header first (WAV and AIFF are read by hand and are quick); AVFoundation for the rest and
-    /// for the picture. Never throws: what could not be read is left out.
-    static func load(path: String, canPreview: Bool, size: Int64, buckets: Int) -> SampleInfo {
+    /// for the picture. Never throws: what could not be read is left out. `isCancelled` is polled
+    /// between chunks: a picture nobody waits for any more stops decoding (and reads `.unavailable`).
+    static func load(path: String, canPreview: Bool, size: Int64, buckets: Int,
+                     isCancelled: () -> Bool = { false }) -> SampleInfo {
         var info = SampleInfo(path: path)
         if let h = AudioFileInfo.header(path: path) {
             info.format = SampleFormat.format(h)
@@ -50,27 +53,38 @@ enum SampleInfoLoader {
         if info.durationMs == 0, fmt.sampleRate > 0 {
             info.durationMs = Int(Double(file.length) * 1000 / fmt.sampleRate)
         }
-        info.wave = peaks(of: file, buckets: buckets).map(SampleInfo.Wave.peaks) ?? .unavailable
+        info.wave = peaks(of: file, buckets: buckets, isCancelled: isCancelled).map(SampleInfo.Wave.peaks) ?? .unavailable
         return info
     }
 
-    private static func peaks(of file: AVAudioFile, buckets: Int) -> [Float]? {
-        guard file.length > 0,
+    /// Peak per column, 0...1: whole blocks are reduced with vector operations, one call per
+    /// column and channel that the block touches.
+    static func peaks(of file: AVAudioFile, buckets: Int, isCancelled: () -> Bool) -> [Float]? {
+        let total = file.length
+        guard total > 0, buckets > 0,
               let buffer = AVAudioPCMBuffer(pcmFormat: file.processingFormat, frameCapacity: readChunk) else { return nil }
-        var wave = WavePeaks(totalFrames: file.length, buckets: buckets)
+        var peaks = [Float](repeating: 0, count: buckets)
         let channels = Int(file.processingFormat.channelCount)
+        var frame: Int64 = 0
         do {
-            while file.framePosition < file.length {
+            while file.framePosition < total {
+                if isCancelled() { return nil }
                 try file.read(into: buffer, frameCount: readChunk)
                 let frames = Int(buffer.frameLength)
                 guard frames > 0, let data = buffer.floatChannelData else { break }
-                let views = (0..<channels).map { UnsafeBufferPointer(start: data[$0], count: frames) }
-                wave.add(channels: views, frames: frames)
+                BucketSegments.forEach(frame: frame, count: frames, total: total, buckets: buckets) { bucket, offset, length in
+                    for c in 0..<channels {
+                        var m: Float = 0
+                        vDSP_maxmgv(data[c] + offset, 1, &m, vDSP_Length(length))
+                        if m > peaks[bucket] { peaks[bucket] = Swift.min(1, m) }
+                    }
+                }
+                frame += Int64(frames)
             }
         } catch {
             Diag.info("samples: wave: \((file.url.path as NSString).lastPathComponent): \(error.localizedDescription)")
             return nil
         }
-        return wave.peaks
+        return peaks
     }
 }

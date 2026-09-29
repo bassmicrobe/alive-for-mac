@@ -155,6 +155,20 @@ final class ArrangementThumbnailPipelineTests: XCTestCase {
         guard case .empty? = pipeline.cached(other) else { return XCTFail("empty is remembered") }
     }
 
+    func testACancelledTaskNeitherDrawsNorWritesThePicture() async {
+        let t = makeHomeScratch()
+        let set = t.write("a.als")
+        let pipeline = ThumbnailPipeline(dataDir: t.sub("d"))
+        let task = Task { () -> ThumbResult in
+            while !Task.isCancelled { await Task.yield() }
+            return pipeline.finish(SyntheticArrangement.make(), setPath: set)
+        }
+        task.cancel()
+        guard case .cancelled = await task.value else { return XCTFail("cancelled expected") }
+        XCTAssertNil(pipeline.cached(set), "no PNG was encoded or written")
+        XCTAssertFalse(pipeline.cache.has(set))
+    }
+
     func testReadErrorsAreNotRemembered() {
         let t = makeHomeScratch()
         let set = t.write("a.als")

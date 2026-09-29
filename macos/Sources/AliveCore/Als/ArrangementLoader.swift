@@ -36,7 +36,14 @@ public final class ArrangementLoader: @unchecked Sendable {
     private var pending: [String] = []          // served from the end: the freshest request first
     private var working = Set<String>()
     private var busy = 0
-    private var waiters: [String: [CheckedContinuation<Arrangement, Never>]] = [:]
+    private struct Waiter {
+        let id: UUID
+        let continuation: CheckedContinuation<Arrangement, Never>
+    }
+    private var waiters: [String: [Waiter]] = [:]
+    /// Paths somebody asked for with `request` (not only through `load`): kept in the queue even
+    /// when every `load` waiter has left.
+    private var requestedDirectly = Set<String>()
     private let queue = DispatchQueue(label: "alive.arrangement-loader", qos: .utility,
                                       attributes: .concurrent)
 
@@ -66,6 +73,13 @@ public final class ArrangementLoader: @unchecked Sendable {
     public func request(_ path: String) {
         guard !path.isEmpty else { return }
         lock.lock()
+        requestedDirectly.insert(path)
+        lock.unlock()
+        enqueue(path)
+    }
+
+    private func enqueue(_ path: String) {
+        lock.lock()
         if working.contains(path) { lock.unlock(); return }
         pending.removeAll { $0 == path }
         pending.append(path)
@@ -75,7 +89,10 @@ public final class ArrangementLoader: @unchecked Sendable {
         if start { queue.async { self.work() } }
     }
 
-    /// Async variant: returns the cached arrangement, or waits for the background parse.
+    /// Async variant: returns the cached arrangement, or waits for the background parse. A task
+    /// that is cancelled while it waits leaves at once, with an arrangement whose `error` is
+    /// "cancelled" (the caller checks `Task.isCancelled` first); a parse nobody waits for any more
+    /// and that has not started is dropped from the queue.
     public func load(_ path: String) async -> Arrangement {
         // Nothing to parse (and nobody to ever resume a waiter): answer at once.
         guard !path.isEmpty else {
@@ -85,17 +102,51 @@ public final class ArrangementLoader: @unchecked Sendable {
         }
         let stamp = Stamp.of(path)
         if let a = lookup(path, stamp: stamp) { return a }
-        return await withCheckedContinuation { cont in
-            lock.lock()
-            if let entry = cache[path], entry.stamp == stamp {      // finished between the check above and now
+        let id = UUID()
+        return await withTaskCancellationHandler {
+            await withCheckedContinuation { (cont: CheckedContinuation<Arrangement, Never>) in
+                lock.lock()
+                if let entry = cache[path], entry.stamp == stamp {      // finished between the check above and now
+                    lock.unlock()
+                    cont.resume(returning: entry.arrangement)
+                    return
+                }
+                if Task.isCancelled {
+                    lock.unlock()
+                    cont.resume(returning: Self.cancelledArrangement)
+                    return
+                }
+                waiters[path, default: []].append(Waiter(id: id, continuation: cont))
                 lock.unlock()
-                cont.resume(returning: entry.arrangement)
-                return
+                enqueue(path)
             }
-            waiters[path, default: []].append(cont)
-            lock.unlock()
-            request(path)
+        } onCancel: {
+            self.abandon(path, waiter: id)
         }
+    }
+
+    static var cancelledArrangement: Arrangement {
+        var a = Arrangement()
+        a.error = "cancelled"
+        return a
+    }
+
+    /// Number of tasks waiting for a parse of `path`.
+    func waiterCount(_ path: String) -> Int {
+        lock.lock(); defer { lock.unlock() }
+        return waiters[path]?.count ?? 0
+    }
+
+    private func abandon(_ path: String, waiter id: UUID) {
+        lock.lock()
+        var left: Waiter?
+        if var list = waiters[path], let i = list.firstIndex(where: { $0.id == id }) {
+            left = list.remove(at: i)
+            waiters[path] = list.isEmpty ? nil : list
+            if list.isEmpty, !requestedDirectly.contains(path) { pending.removeAll { $0 == path } }
+        }
+        lock.unlock()
+        left?.continuation.resume(returning: Self.cancelledArrangement)
     }
 
     private func nextPath() -> String? {
@@ -125,7 +176,8 @@ public final class ArrangementLoader: @unchecked Sendable {
         // Clear the mark whatever happens: otherwise a set could never be requested again.
         working.remove(path)
         let toResume = waiters.removeValue(forKey: path) ?? []
+        requestedDirectly.remove(path)
         lock.unlock()
-        toResume.forEach { $0.resume(returning: a) }
+        toResume.forEach { $0.continuation.resume(returning: a) }
     }
 }

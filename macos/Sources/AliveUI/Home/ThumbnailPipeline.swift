@@ -105,6 +105,9 @@ final class ThumbnailPipeline: @unchecked Sendable {
         defer { gate.release() }
         if Task.isCancelled { return .cancelled }
         let arrangement = await loader.load(setPath)
+        // The tile may have scrolled away while the set was parsed: the parse stays in the
+        // loader's memory, but the picture is neither drawn nor written.
+        if Task.isCancelled { return .cancelled }
         return finish(arrangement, setPath: setPath)
     }
 
@@ -116,8 +119,11 @@ final class ThumbnailPipeline: @unchecked Sendable {
             cache.save(setPath, image: nil)
             return .empty
         }
+        if Task.isCancelled { return .cancelled }
         guard let image = ArrangementRender.makeImage(a, width: Self.pixelWidth, height: Self.pixelHeight,
                                                       options: .thumbnail) else { return .failed }
+        // Drawn, but nobody wants it: skip the PNG encoding and the disk write.
+        if Task.isCancelled { return .cancelled }
         cache.save(setPath, image: image)
         return .image(ThumbImage(cgImage: image))
     }

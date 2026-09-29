@@ -148,6 +148,40 @@ final class ArrangementLoaderTests: XCTestCase {
         XCTAssertEqual(again.clipCount, 1)
     }
 
+    func testCancelledWaitersLeaveAtOnceAndLeaveNothingBehind() async {
+        let t = makeTemp()
+        let loader = ArrangementLoader()
+        // Far more parses than workers: most of them are still queued when their tasks are cancelled.
+        let paths = (0..<12).map { makeSet(t, "c\($0).als") }
+        let tasks = paths.map { path in Task { await loader.load(path) } }
+        tasks.forEach { $0.cancel() }
+        var cancelled = 0
+        for task in tasks {
+            let a = await task.value
+            if a.error == "cancelled" { cancelled += 1 } else { XCTAssertEqual(a.clipCount, 1, "or it had already been parsed") }
+        }
+        XCTAssertGreaterThan(cancelled, 0, "at least the tasks cancelled before they ran gave up")
+        for path in paths { XCTAssertEqual(loader.waiterCount(path), 0) }
+        // The loader still works after the storm.
+        let fresh = await loader.load(paths[0])
+        XCTAssertEqual(fresh.clipCount, 1)
+    }
+
+    func testATaskCancelledBeforeItLoadsNeverQueuesAParse() async {
+        let t = makeTemp()
+        let path = makeSet(t, "a.als")
+        let loader = ArrangementLoader()
+        let task = Task { () -> Arrangement in
+            while !Task.isCancelled { await Task.yield() }
+            return await loader.load(path)
+        }
+        task.cancel()
+        let a = await task.value
+        XCTAssertEqual(a.error, "cancelled")
+        XCTAssertEqual(loader.waiterCount(path), 0)
+        XCTAssertNil(loader.cached(path), "nothing was parsed for a task nobody waited for")
+    }
+
     func testRequestFiresOnReadyAndCacheEvicts() {
         let t = makeTemp()
         let loader = ArrangementLoader()

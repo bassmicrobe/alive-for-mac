@@ -44,6 +44,7 @@ final class SamplesModelTests: XCTestCase {
         m.start()
         await m.loadTask?.value
         await m.scanTask?.value
+        await m.settle()
         return m
     }
 
@@ -83,19 +84,23 @@ final class SamplesModelTests: XCTestCase {
         XCTAssertFalse(m.isFlat)
 
         app.searchText = "kick"
+        await m.settle()
         XCTAssertTrue(m.isFlat)
         XCTAssertEqual(m.shownCount, 2)
         app.searchText = ""
 
         m.lens = .duplicates
+        await m.settle()
         XCTAssertEqual(m.shownCount, 2, "the two kicks")
         XCTAssertEqual(m.copies.copies(of: m.copies.files[0]), 1)
 
         m.lens = .neverUsed        // no sets at all: the whole root, once
+        await m.settle()
         XCTAssertEqual(m.listing.rows.count, 1)
         XCTAssertTrue(m.usageUnknown, "the catalog has not been read: usage says \"…\"")
 
         m.lens = .mostUsed
+        await m.settle()
         XCTAssertEqual(m.shownCount, 0)
     }
 
@@ -105,6 +110,7 @@ final class SamplesModelTests: XCTestCase {
         app.searchText = "zzz"
         app.tab = .home
         m.showFolder(root + "/Drums/Deep")
+        await m.settle()
         XCTAssertEqual(app.tab, .samples)
         XCTAssertEqual(app.searchText, "")
         XCTAssertEqual(m.selection, SampleIndex.norm(root + "/Drums/Deep"))
@@ -112,7 +118,7 @@ final class SamplesModelTests: XCTestCase {
         XCTAssertNotNil(rowID(m, "Deep"), "its parents are open, so the row is there")
         XCTAssertNotNil(rowID(m, "Drums"))
         XCTAssertNotNil(rowID(m, "kick.wav"), "and the open folder shows its own samples")
-        XCTAssertEqual(m.scrollTarget?.id, m.selection)
+        XCTAssertEqual(m.scrollTarget?.id, m.selection, "the scroll waits for the rows it points at")
         XCTAssertNotNil(m.selectedKind)
     }
 
@@ -198,6 +204,7 @@ final class SamplesModelTests: XCTestCase {
         m.select(rootID)
         XCTAssertTrue(m.treeKey(open: true))
         XCTAssertTrue(m.isOpen(rootID))
+        await m.settle()
         XCTAssertEqual(m.listing.rows.count, 3, "root, Drums, Pads")
         m.select(m.listing.rows[1].id)
         XCTAssertTrue(m.treeKey(open: true))
@@ -205,6 +212,7 @@ final class SamplesModelTests: XCTestCase {
         XCTAssertTrue(m.treeKey(open: false), "closed folder: step to the parent")
         XCTAssertEqual(m.selection, rootID)
         m.toggleFolder(rootID)
+        await m.settle()
         XCTAssertEqual(m.listing.rows.count, 1)
 
         app.searchText = "a"
@@ -215,6 +223,7 @@ final class SamplesModelTests: XCTestCase {
         let app = try makeApp()
         let m = await started(app)
         m.toggleFolder(SampleIndex.norm(root))
+        await m.settle()
         m.moveSelection(by: 1)
         XCTAssertEqual(m.selection, m.listing.rows[0].id)
         m.moveSelection(by: 1)
@@ -230,6 +239,7 @@ final class SamplesModelTests: XCTestCase {
         let app = try makeApp()
         let m = await started(app)
         m.lens = .duplicates
+        await m.settle()
         let row = try XCTUnwrap(m.listing.rows.first)
         guard case .file(let f) = row.kind else { return XCTFail("a sample row") }
         let path = m.index.path(of: f)
