@@ -30,6 +30,18 @@ private final class SampleProgressRelay: @unchecked Sendable {
     }
 }
 
+/// Runs blocking work on a dedicated queue instead of the cooperative pool, whose few threads a
+/// long folder walk would otherwise hold (starving every other async task).
+private enum SampleWalkQueue {
+    static let queue = DispatchQueue(label: "alive.samples.walk", qos: .utility)
+
+    static func run<T: Sendable>(_ work: @escaping @Sendable () -> T) async -> T {
+        await withCheckedContinuation { cont in
+            queue.async { cont.resume(returning: work()) }
+        }
+    }
+}
+
 extension SamplesModel {
     /// Loads `samples.cache` (off the main thread) and shows it at once, then walks the folders
     /// quietly. Idempotent; the view calls it when the tab appears.
@@ -114,13 +126,13 @@ extension SamplesModel {
 
         scanTask = Task { [weak self] in
             let began = Date()
-            let fresh = await Task.detached(priority: .utility) { () -> SampleIndex? in
+            let fresh = await SampleWalkQueue.run { () -> SampleIndex? in
                 let built = SampleIndex.build(roots: roots, disabled: off, previous: previous,
                                               progress: relay.report, isCancelled: { flag.isCancelled })
                 guard !flag.isCancelled else { return nil }
                 SampleCache.save(built, dir: dir)
                 return built
-            }.value
+            }
             guard let self else { return }
             self.isScanning = false
             if let fresh {

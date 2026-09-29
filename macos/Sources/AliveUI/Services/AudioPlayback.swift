@@ -21,11 +21,16 @@ final class AudioPlayback {
     /// Called with the underlying error when a file cannot be opened or played.
     @ObservationIgnored var onError: ((Error) -> Void)?
 
-    @ObservationIgnored private var player: AVAudioPlayer?
+    @ObservationIgnored private(set) var player: AVAudioPlayer?
     @ObservationIgnored private var timer: Timer?
     @ObservationIgnored private var delegate: Delegate?
 
-    deinit { timer?.invalidate() }
+    deinit {
+        // A timer must be invalidated on the thread that scheduled it (main); deinit can run anywhere.
+        guard let found = self.timer else { return }
+        nonisolated(unsafe) let timer = found
+        if Thread.isMainThread { timer.invalidate() } else { DispatchQueue.main.async { timer.invalidate() } }
+    }
 
     /// Starts playing `url` from the beginning. Returns false (after reporting via `onError`)
     /// when the file cannot be played.
@@ -34,7 +39,9 @@ final class AudioPlayback {
         stop()
         do {
             let player = try AVAudioPlayer(contentsOf: url)
-            let delegate = Delegate { [weak self] in self?.didFinish() }
+            let delegate = Delegate(
+                finished: { [weak self] player in self?.handleFinished(from: player) },
+                failed: { [weak self] player, error in self?.handleDecodeError(from: player, error: error) })
             player.delegate = delegate
             player.volume = volume
             guard player.play() else { throw PlaybackError.couldNotStart }
@@ -94,7 +101,20 @@ final class AudioPlayback {
 
     // MARK: - Internals
 
-    enum PlaybackError: Error { case couldNotStart }
+    enum PlaybackError: Error { case couldNotStart, decodeFailed }
+
+    /// The end of a file, as reported by a player. Ignored unless it is the current one: a late
+    /// callback of a track that was stopped or replaced must not end the new track.
+    func handleFinished(from source: AVAudioPlayer) {
+        guard source === player else { return }
+        didFinish()
+    }
+
+    func handleDecodeError(from source: AVAudioPlayer, error: Error?) {
+        guard source === player else { return }
+        stop()
+        onError?(error ?? PlaybackError.decodeFailed)
+    }
 
     private func didFinish() {
         stopTimer()
@@ -121,14 +141,23 @@ final class AudioPlayback {
     }
 
     private final class Delegate: NSObject, AVAudioPlayerDelegate {
-        private let finished: @MainActor () -> Void
+        private let finished: @MainActor (AVAudioPlayer) -> Void
+        private let failed: @MainActor (AVAudioPlayer, Error?) -> Void
 
-        init(finished: @escaping @MainActor () -> Void) {
+        init(finished: @escaping @MainActor (AVAudioPlayer) -> Void,
+             failed: @escaping @MainActor (AVAudioPlayer, Error?) -> Void) {
             self.finished = finished
+            self.failed = failed
         }
 
         func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
-            Task { @MainActor in finished() }
+            nonisolated(unsafe) let player = player
+            Task { @MainActor in finished(player) }
+        }
+
+        func audioPlayerDecodeErrorDidOccur(_ player: AVAudioPlayer, error: Error?) {
+            nonisolated(unsafe) let player = player
+            Task { @MainActor in failed(player, error) }
         }
     }
 }

@@ -11,6 +11,18 @@ final class CatalogWatcher {
     private let watch: FolderWatch
     private var started = false
     private var retry: Task<Void, Never>?
+    /// What the watch is pointed at now; unrelated settings changes must not re-arm it (that
+    /// would cancel a pending debounced rescan).
+    private var watched: WatchedRoots?
+    /// Arming looks at the disk (exists? real path?), which can be slow on network volumes.
+    private let armQueue = DispatchQueue(label: "alive.catalogwatcher.arm", qos: .utility)
+    /// How many times the watch was re-pointed (for tests).
+    private(set) var armCount = 0
+
+    private struct WatchedRoots: Equatable {
+        let roots: [String]
+        let disabled: [String]
+    }
     /// How long to wait before asking again while a scan is still running.
     private let retryDelay: Duration
 
@@ -34,13 +46,23 @@ final class CatalogWatcher {
     func stop() {
         started = false
         retry?.cancel()
-        watch.stop()
+        watched = nil
+        let watch = watch
+        armQueue.async { watch.stop() }
     }
+
+    /// Waits for pending arming work (for tests).
+    func waitUntilArmed() { armQueue.sync {} }
 
     // MARK: - Roots
 
     private func rewatch() {
-        watch.watch(roots: app.settings.roots, disabled: app.settings.disabledRoots)
+        let next = WatchedRoots(roots: app.settings.roots, disabled: app.settings.disabledRoots)
+        guard next != watched else { return }
+        watched = next
+        armCount += 1
+        let watch = watch
+        armQueue.async { watch.watch(roots: next.roots, disabled: next.disabled) }
     }
 
     /// Re-arms itself: `withObservationTracking` fires once per change.

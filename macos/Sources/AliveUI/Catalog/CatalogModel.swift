@@ -39,6 +39,9 @@ final class CatalogModel {
     @ObservationIgnored private var started = false
     @ObservationIgnored private var generation = 0
     @ObservationIgnored private var scanTask: Task<Void, Never>?
+    /// A rescan was asked for before the cache was read: it runs right after, so the cache can
+    /// neither be published over a fresh result nor be read while a scan writes the index.
+    @ObservationIgnored private var rescanAfterLoad = false
 
     init(app: AppModel) {
         self.app = app
@@ -69,7 +72,8 @@ final class CatalogModel {
             guard let self else { return }
             self.isLoaded = true
             self.publish(fallbackEnv: detected)
-            if self.hasEnabledRoots {
+            if self.hasEnabledRoots || self.rescanAfterLoad {
+                self.rescanAfterLoad = false
                 self.rescan()
             } else {
                 self.app.catalogDidBecomeReady()
@@ -82,6 +86,10 @@ final class CatalogModel {
     /// Cancels a running scan and starts a new one over the current roots.
     func rescan() {
         guard started else { return }
+        guard isLoaded else {
+            rescanAfterLoad = true
+            return
+        }
         generation += 1
         let gen = generation
         let previous = scanTask
