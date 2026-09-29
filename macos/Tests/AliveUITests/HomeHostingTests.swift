@@ -15,7 +15,10 @@ final class HomeHostingTests: XCTestCase {
         _ = try scratch.writeSet("lib/B Project/b.als", withClip: false)
         let app = AppModel(dataDir: scratch.sub("data"))
         app.start()
-        for _ in 0..<80 where !app.catalog.isReady { try await Task.sleep(nanoseconds: 50_000_000) }
+        // Wait for the result itself, generously: on a busy machine the first scan can take seconds.
+        for _ in 0..<300 where !(app.catalog.isReady && app.catalog.sets.count == 2) {
+            try await Task.sleep(nanoseconds: 50_000_000)
+        }
         XCTAssertEqual(app.catalog.sets.count, 2)
         app.selectedSetPath = app.catalog.sets.first?.path
 
