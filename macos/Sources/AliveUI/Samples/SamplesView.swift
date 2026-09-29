@@ -16,8 +16,9 @@ struct SamplesView: View {
             }
         }
         .task {
-            model.expandsRootsOnFirstLoad = true
+            if !model.started { model.expandsRootsOnFirstLoad = true }
             model.start()
+            model.syncRoots()      // a no-op when nothing changed; catches edits made from other tabs
         }
         .onChange(of: model.effectiveRoots) { _, _ in model.syncRoots() }
         .onDisappear { model.leave() }

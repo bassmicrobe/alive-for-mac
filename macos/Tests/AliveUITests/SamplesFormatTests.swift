@@ -8,6 +8,10 @@ final class SamplesFormatTests: XCTestCase {
         Localizer.shared.preference = .en
     }
 
+    override func tearDown() {
+        Localizer.shared.preference = .system
+    }
+
     func testSizesFollowUpstreamsRules() {
         XCTAssertEqual(SampleFormat.megabytes(0), "")
         XCTAssertEqual(SampleFormat.megabytes(5 * 1024 * 1024), "5.0 MB")
