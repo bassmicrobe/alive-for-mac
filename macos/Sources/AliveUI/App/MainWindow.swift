@@ -5,6 +5,7 @@ import SwiftUI
 struct MainWindow: View {
     @Environment(AppModel.self) private var app
     @Environment(\.openWindow) private var openWindow
+    @Environment(\.openSettings) private var openSettings
 
     var body: some View {
         @Bindable var app = app
@@ -23,7 +24,8 @@ struct MainWindow: View {
         .task {
             AppDelegate.attach(app)
             app.start()
-            await DebugLaunch.apply(to: app) { openWindow(id: $0) }
+            await DebugLaunch.apply(to: app, openWindow: { openWindow(id: $0) },
+                                    openSettings: { openSettings() })
         }
     }
 
@@ -62,10 +64,10 @@ private struct TopBar: View {
             PillTabs(items: MainTab.allCases.map { PillTabItem(value: $0, title: $0.title) },
                      selection: $app.tab)
                 .fixedSize()
-            PillButton(title: CommonStrings.filters.s, icon: .filters) { app.presentFilters() }
+            PillButton(title: filtersTitle, icon: .filters) { app.presentFilters() }
                 .disabled(!app.canPresentFilters)
             SearchField()
-            Text(CommonStrings.shownCount.f(app.shownCount))
+            Text(app.shownLabel ?? CommonStrings.shownCount.f(app.shownCount))
                 .font(Theme.fBody)
                 .foregroundStyle(Theme.textDim)
                 .monospacedDigit()
@@ -81,6 +83,7 @@ private struct TopBar: View {
                 CircleIconButton(icon: .folder, help: CommonStrings.scanFolders.s) { app.presentScanFolders() }
                 SettingsLink { IconView(icon: .settings) }
                     .buttonStyle(CircleIconButtonStyle())
+                    .overlay(alignment: .topTrailing) { updateDot }
                     .help(CommonStrings.settings.s)
                 CircleIconButton(icon: .help, help: CommonStrings.help.s) { app.presentHelp() }
             }
@@ -90,6 +93,24 @@ private struct TopBar: View {
         .padding(.trailing, Theme.pad)
         .padding(.top, 12)
         .padding(.bottom, 14)
+    }
+}
+
+extension TopBar {
+    /// "Filters", or "Filters · 3" while filters are on.
+    fileprivate var filtersTitle: String {
+        let n = app.activeFilterCount
+        return n > 0 ? "\(CommonStrings.filters.s) · \(n)" : CommonStrings.filters.s
+    }
+
+    /// A small dot on the gear while a newer release than the one already seen is out.
+    @ViewBuilder fileprivate var updateDot: some View {
+        if UpdateModel.shared.hasUnseenUpdate {
+            Circle().fill(Theme.focus).frame(width: 8, height: 8)
+                .offset(x: 1, y: -1)
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
+        }
     }
 }
 

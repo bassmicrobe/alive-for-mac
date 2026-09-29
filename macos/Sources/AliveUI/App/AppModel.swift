@@ -73,7 +73,10 @@ final class AppModel {
     func start() {
         guard !started else { return }
         started = true
+        RescueProbe.cleanupStale(dir: dataDir)
         catalog.start()
+        samples.expandsRootsOnFirstLoad = true
+        samples.start()
     }
 
     // MARK: - Settings
@@ -85,9 +88,12 @@ final class AppModel {
         change(&next)
         guard next != settings else { return }
         let groupingChanged = next.groupByFolder != settings.groupByFolder
+        let sampleRootsChanged = next.sampleRoots != settings.sampleRoots
+            || next.disabledSampleRoots != settings.disabledSampleRoots
         settings = next
         saveSettings()
         if groupingChanged { catalog.settingsDidChange() }
+        if sampleRootsChanged { samples.syncRoots() }
     }
 
     func saveSettings() {
@@ -107,6 +113,18 @@ final class AppModel {
         case .sets: return sets.shownCount
         case .plugins: return plugins.shownCount
         case .samples: return samples.shownCount
+        }
+    }
+
+    /// Overrides "N shown" in the toolbar (Samples: "12,923 samples · 23.7 GB"); nil: the plain count.
+    var shownLabel: String? { tab == .samples ? samples.shownLabel : nil }
+
+    /// Number of filters that are on for the tab (badge on the Filters pill).
+    var activeFilterCount: Int {
+        switch tab {
+        case .sets: return sets.activeFilterCount
+        case .plugins: return plugins.filter.activeCount
+        case .home, .samples: return 0
         }
     }
 
@@ -143,6 +161,7 @@ final class AppModel {
                                      disabledRoots: settings.disabledRoots).select)
         }
         flushPendingOpen()
+        UpdateModel.shared.dailyCheckIfDue(app: self)
     }
 
     func flushPendingOpen() {
@@ -240,7 +259,13 @@ final class AppModel {
     func presentRescue() { withSelectedSet { sheet = .rescue(path: $0) } }
     func presentExport() { withSelectedSet { sheet = .export(path: $0) } }
     func openSelectedInLive() { withSelectedSet { openInLive(path: $0) } }
-    func revealSelectedInFinder() { withSelectedSet { revealInFinder(path: $0) } }
+    func revealSelectedInFinder() {
+        if tab == .plugins {
+            if let row = plugins.selectedRow { plugins.reveal(row) }
+        } else {
+            withSelectedSet { revealInFinder(path: $0) }
+        }
+    }
     func togglePinSelected() { withSelectedSet { togglePin(path: $0) } }
 
     func focusSearch() { searchFocusRequest += 1 }

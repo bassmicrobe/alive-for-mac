@@ -22,7 +22,7 @@ struct AppCommands: Commands {
         CommandMenu(CommonStrings.menuSet.s) {
             Button(CommonStrings.showInFinder.s) { app.revealSelectedInFinder() }
                 .keyboardShortcut("r", modifiers: [.command, .shift])
-                .disabled(!app.hasSelectedSet)
+                .disabled(app.tab == .plugins ? app.plugins.selectedRow == nil : !app.hasSelectedSet)
             Button(CommonStrings.pin.s) { app.togglePinSelected() }
                 .keyboardShortcut("d", modifiers: .command)
                 .disabled(!app.hasSelectedSet)

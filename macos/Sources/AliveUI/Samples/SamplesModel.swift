@@ -81,6 +81,12 @@ final class SamplesModel {
         isFlat ? listing.rows.count : index.totalSamples
     }
 
+    /// The toolbar's counter text: "12,923 samples · 23.7 GB" for the tree, or what the list shows.
+    var shownLabel: String {
+        SampleCounter.text(isScanning: isScanning && isManualScan, found: found, listing: listing, lens: lens,
+                           hasQuery: !app.searchText.isEmpty, index: index, copies: copies)
+    }
+
     /// The app-wide player (`app.audio`), shared with render playback.
     var audio: AudioPlayback { app.audio }
 

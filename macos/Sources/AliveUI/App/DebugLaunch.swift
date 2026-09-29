@@ -5,7 +5,8 @@
 //   ALIVE_DEBUG_SELECT  first | <path of an .als in the catalog>
 //   ALIVE_DEBUG_SHEET   help | filters | pluginFilters | roots-projects | roots-samples |
 //                       tags | preview | rescue | export   (the last four act on the selected set)
-//   ALIVE_DEBUG_WINDOW  stat | player
+//   ALIVE_DEBUG_PLUGIN  <plugin name>  (selects it on the Plugins tab, once the catalog is ready)
+//   ALIVE_DEBUG_WINDOW  stat | player | settings
 import AliveCore
 import Foundation
 
@@ -14,13 +15,18 @@ enum DebugLaunch {
     private static let catalogWaitSeconds = 120
 
     static func apply(to app: AppModel, env: [String: String] = ProcessInfo.processInfo.environment,
-                      openWindow: (String) -> Void) async {
+                      openWindow: (String) -> Void, openSettings: () -> Void = {}) async {
         if let tab = env["ALIVE_DEBUG_TAB"].flatMap(MainTab.init(rawValue:)) { app.tab = tab }
-        if let window = env["ALIVE_DEBUG_WINDOW"], ["stat", "player"].contains(window) { openWindow(window) }
+        if let window = env["ALIVE_DEBUG_WINDOW"] {
+            if window == "settings" { openSettings() }
+            else if ["stat", "player"].contains(window) { openWindow(window) }
+        }
         let wantsSelection = env["ALIVE_DEBUG_SELECT"] != nil
+        let pluginName = env["ALIVE_DEBUG_PLUGIN"]
         let sheetName = env["ALIVE_DEBUG_SHEET"]
-        guard wantsSelection || sheetName != nil else { return }
+        guard wantsSelection || sheetName != nil || pluginName != nil else { return }
         await waitForCatalog(app)
+        if let pluginName { app.plugins.show(pluginNamed: pluginName) }
         if let target = env["ALIVE_DEBUG_SELECT"] { select(target, in: app) }
         if let name = sheetName, let sheet = sheet(named: name, selected: app.selectedSetPath) {
             app.sheet = sheet

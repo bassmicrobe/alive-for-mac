@@ -22,6 +22,7 @@ public struct AliveApp: App {
         Window(CommonStrings.windowStat.s, id: "stat") {
             StatWindow().environment(app).preferredColorScheme(.dark)
         }
+        .defaultSize(width: 1320, height: 820)
 
         Window(CommonStrings.windowPlayer.s, id: "player") {
             PlayerWindow().environment(app).preferredColorScheme(.dark)

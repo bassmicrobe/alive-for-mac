@@ -34,6 +34,12 @@ private let shortcutGroups: [ShortcutGroup] = [
         ShortcutRow(keys: ["⌥", "⌘", "R"], action: .rescueSet),
         ShortcutRow(keys: ["⌘", "E"], action: .exportSet),
     ]),
+    ShortcutGroup(title: .groupSamples, rows: [
+        ShortcutRow(keys: ["←", "→"], action: .sampleFolder),
+        ShortcutRow(keys: ["Space"], action: .sampleAudition),
+        ShortcutRow(keys: ["↩"], action: .sampleOpen),
+        ShortcutRow(keys: ["⇧", "↩"], action: .sampleReveal),
+    ]),
     ShortcutGroup(title: .groupPlayback, rows: [
         ShortcutRow(keys: ["Space"], action: .listSpace),
         ShortcutRow(keys: ["⌥", "⌘", "P"], action: .playPause),

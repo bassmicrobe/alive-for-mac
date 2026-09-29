@@ -7,7 +7,7 @@ enum SettingsStrings: LocalizedStrings {
     case transparency, transparencyHelp
     case pluginSource, pluginSourceLive, pluginSourceFolders, pluginSourceHelp
     case dataFolder, openDataFolder
-    case updatesTitle, updatesPlaceholder
+    case updatesTitle
     case version, versionDev, upstreamCommit, unknown
     case credit, linkUpstream, linkPort
     case disclaimer, trademarks
@@ -33,8 +33,6 @@ enum SettingsStrings: LocalizedStrings {
         case .dataFolder: return ("Data folder", "データフォルダ")
         case .openDataFolder: return ("Open Data Folder", "データフォルダを開く")
         case .updatesTitle: return ("Updates", "アップデート")
-        case .updatesPlaceholder: return ("Update checks are not available yet.",
-                                          "アップデートの確認はまだ利用できません。")
         case .version: return ("Version %@", "バージョン %@")
         case .versionDev: return ("dev", "dev")
         case .upstreamCommit: return ("Based on upstream commit %@", "ベースとなるオリジナルのコミット: %@")

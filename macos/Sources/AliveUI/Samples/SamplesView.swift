@@ -74,11 +74,7 @@ private struct SamplesBar: View {
         .animation(Theme.hoverAnimation, value: counterText)
     }
 
-    private var counterText: String {
-        SampleCounter.text(isScanning: model.isScanning && model.isManualScan, found: model.found,
-                           listing: model.listing, lens: model.lens, hasQuery: !model.app.searchText.isEmpty,
-                           index: model.index, copies: model.copies)
-    }
+    private var counterText: String { model.shownLabel }
 
     private var columnsMenu: some View {
         Menu {

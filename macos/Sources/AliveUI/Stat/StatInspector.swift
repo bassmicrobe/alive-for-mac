@@ -4,6 +4,7 @@ import SwiftUI
 import AliveCore
 
 struct StatInspector: View {
+    @Environment(AppModel.self) private var app
     let model: StatModel
     let onShowInList: () -> Void
 
@@ -20,7 +21,7 @@ struct StatInspector: View {
     }
 
     private func details(_ set: SetEntry) -> some View {
-        let meta = ProjectMeta.shared
+        let meta = app.sets.meta
         let tags = meta.tagsOf(set.projectDir)
         let note = meta.noteOf(set.projectDir)
         return VStack(alignment: .leading, spacing: 12) {

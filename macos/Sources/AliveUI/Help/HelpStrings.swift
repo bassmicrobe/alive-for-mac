@@ -3,7 +3,7 @@ import Foundation
 
 enum HelpStrings: LocalizedStrings {
     case title, shortcuts, tabsTitle
-    case groupNavigation, groupSets, groupPlayback, groupGeneral
+    case groupNavigation, groupSets, groupSamples, groupPlayback, groupGeneral
     // Tab descriptions
     case aboutHome, aboutSets, aboutPlugins, aboutSamples
     // Shortcut actions
@@ -13,6 +13,7 @@ enum HelpStrings: LocalizedStrings {
     case playPause, arrangementPreview
     case launchLive, openSettings, openHelp, fullscreen, minimize, quit
     case listReturn, listSpace
+    case sampleFolder, sampleAudition, sampleOpen, sampleReveal
 
     var en: String { text.en }
     var ja: String { text.ja }
@@ -24,6 +25,7 @@ enum HelpStrings: LocalizedStrings {
         case .tabsTitle: return ("What the tabs show", "各タブの内容")
         case .groupNavigation: return ("Navigation", "ナビゲーション")
         case .groupSets: return ("Sets", "セット")
+        case .groupSamples: return ("Samples", "サンプル")
         case .groupPlayback: return ("Playback", "再生")
         case .groupGeneral: return ("General", "一般")
 
@@ -63,6 +65,10 @@ enum HelpStrings: LocalizedStrings {
         case .minimize: return ("Minimize", "しまう")
         case .quit: return ("Quit", "終了")
         case .listReturn: return ("Open the selected set", "選択したセットを開く")
+        case .sampleFolder: return ("Collapse / expand the folder", "フォルダを閉じる / 開く")
+        case .sampleAudition: return ("Audition the selected sample", "選択したサンプルを試聴")
+        case .sampleOpen: return ("Open a folder / show a sample in the tree", "フォルダを開く / サンプルをツリーで表示")
+        case .sampleReveal: return ("Show the sample in Finder", "サンプルを Finder に表示")
         case .listSpace: return ("Play / pause in a focused list", "リストで再生 / 一時停止")
         }
     }
