@@ -46,7 +46,7 @@ struct PluginFiltersSheet: View {
         HStack(alignment: .firstTextBaseline, spacing: 12) {
             Text(title)
                 .font(Theme.fBody)
-                .foregroundStyle(Theme.textDim)
+                .foregroundStyle(Theme.secondaryText)
                 .frame(width: 110, alignment: .leading)
             content().frame(maxWidth: .infinity, alignment: .leading)
         }
@@ -81,7 +81,7 @@ struct PluginFiltersSheet: View {
         HStack(spacing: 10) {
             Text(PluginsStrings.filterMatches.f(facets.matches))
                 .font(Theme.fBody)
-                .foregroundStyle(facets.matches == 0 ? Theme.red : Theme.textDim)
+                .foregroundStyle(facets.matches == 0 ? Theme.errorText : Theme.secondaryText)
             Spacer()
             PillButton(title: PluginsStrings.filterReset.s) { app.plugins.filter.clear() }
                 .disabled(app.plugins.filter.isEmpty)

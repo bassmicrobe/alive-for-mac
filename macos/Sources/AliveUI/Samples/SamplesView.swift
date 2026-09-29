@@ -27,6 +27,8 @@ struct SamplesView: View {
 
 private struct SamplesContent: View {
     let model: SamplesModel
+    /// Roots whose single-folder chain was already opened, so a folder the person closes stays closed.
+    @State private var chained = Set<String>()
 
     var body: some View {
         HStack(alignment: .top, spacing: 16) {
@@ -41,6 +43,25 @@ private struct SamplesContent: View {
         .padding(.leading, Theme.pad)
         .padding(.trailing, Theme.pad)
         .padding(.bottom, Theme.pad)
+        .task(id: model.indexGeneration) { openSingleFolderChains() }
+    }
+
+    /// A root that holds nothing but one folder ("Splice" > "sounds" > …) would leave the list two
+    /// rows long and the rest of the tab empty: open such chains down to the first folder that
+    /// has files or branches.
+    private func openSingleFolderChains() {
+        guard model.lens == .all else { return }
+        let index = model.index
+        for root in index.roots {
+            let start = index.folders[root]
+            guard model.isOpen(start.path), chained.insert(start.path.lowercased()).inserted else { continue }
+            var folder = start
+            while folder.files.isEmpty, folder.children.count == 1 {
+                let child = index.folders[folder.children[0]]
+                if !model.isOpen(child.path) { model.toggleFolder(child.path) }
+                folder = child
+            }
+        }
     }
 }
 

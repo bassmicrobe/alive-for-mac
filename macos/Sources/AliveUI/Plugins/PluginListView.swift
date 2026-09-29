@@ -22,7 +22,7 @@ struct PluginListView: View {
     var body: some View {
         let model = app.plugins
         let rows = model.rows
-        VStack(spacing: 4) {
+        VStack(spacing: 0) {
             PluginHeaderRow()
             if rows.isEmpty {
                 emptyState(model)
@@ -56,7 +56,7 @@ struct PluginListView: View {
                             .contextMenu { PluginRowMenu(row: row) }
                     }
                 }
-                .padding(.bottom, 8)
+                .padding(.vertical, 2)
             }
             .scrollContentBackground(.hidden)
             .focusable()
@@ -104,7 +104,8 @@ private struct PluginHeaderRow: View {
             HeaderCell(column: .status).frame(width: Col.status, alignment: .trailing)
         }
         .padding(.horizontal, Theme.cellPadX)
-        .frame(height: 30)
+        .frame(height: 28)
+        .overlay(alignment: .bottom) { Rectangle().fill(Theme.hairline).frame(height: 1) }
     }
 }
 
@@ -147,7 +148,7 @@ private struct HeaderButtonStyle: ButtonStyle {
             configuration.label
                 .font(Theme.fLabel)
                 .foregroundStyle(configuration.isPressed ? Theme.lightPressed
-                                 : isSorted || hovering ? Theme.text : Theme.textDim)
+                                 : isSorted || hovering ? Theme.text : Theme.secondaryText)
                 .lineLimit(1)
                 .focusRing(isFocused, cornerRadius: 6)
                 .contentShape(Rectangle())
@@ -181,7 +182,7 @@ private struct PluginRowView: View {
             cell(row.format, width: Col.format)
             Text(PluginsFormat.sets(row.sets))
                 .monospacedDigit()
-                .foregroundStyle(row.sets > 0 ? Theme.text : Theme.textDim)
+                .foregroundStyle(row.sets > 0 || emphasised ? Theme.text : Theme.secondaryText)
                 .frame(width: Col.sets, alignment: .trailing)
             cell(PluginsFormat.lastUsed(row.lastUsed), width: Col.lastUsed)
             StatusMark(status: row.status)
@@ -192,7 +193,7 @@ private struct PluginRowView: View {
         .frame(height: Theme.rowPillH)
         .background(
             RoundedRectangle(cornerRadius: Theme.rowPillH / 2, style: .continuous)
-                .fill(isSelected ? Color.white.opacity(0.06) : hovering ? Theme.rowHover : .clear)
+                .fill(isSelected ? Theme.tableSelection : hovering ? Theme.rowHover : .clear)
         )
         .overlay(
             RoundedRectangle(cornerRadius: Theme.rowPillH / 2, style: .continuous)
@@ -205,9 +206,12 @@ private struct PluginRowView: View {
         .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
     }
 
+    /// Metadata is quiet at rest and full strength under the pointer or on the selected row.
+    private var emphasised: Bool { isSelected || hovering }
+
     private func cell(_ text: String, width: CGFloat) -> some View {
         Text(text)
-            .foregroundStyle(Theme.textDim)
+            .foregroundStyle(emphasised ? Theme.text : Theme.secondaryText)
             .lineLimit(1)
             .truncationMode(.tail)
             .frame(width: width, alignment: .leading)
@@ -221,7 +225,7 @@ private struct RoleGlyph: View {
     var body: some View {
         Image(systemName: symbol)
             .font(.system(size: 11, weight: .medium))
-            .foregroundStyle(Theme.textDim)
+            .foregroundStyle(Theme.secondaryText)
             .frame(width: 16)
             .opacity(role == .unknown ? 0.35 : 1)
             .help(PluginsFormat.role(role))
@@ -250,7 +254,7 @@ private struct StatusMark: View {
         case .otherFormat, .missing:
             TagPill(text: PluginsFormat.status(status))
         case .unknown:
-            Text("—").foregroundStyle(Theme.textDim)
+            Text("—").foregroundStyle(Theme.secondaryText)
         }
     }
 }

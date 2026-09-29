@@ -85,7 +85,7 @@ struct PlayerWindow: View {
         }
         .font(Theme.fBody)
         .monospacedDigit()
-        .foregroundStyle(Theme.textDim)
+        .foregroundStyle(Theme.secondaryText)
     }
 
     // MARK: - Transport
@@ -123,7 +123,7 @@ struct PlayerWindow: View {
                 Color.clear.frame(width: 24)
             }
             .font(Theme.fLabel)
-            .foregroundStyle(Theme.textDim)
+            .foregroundStyle(Theme.secondaryText)
             .padding(.horizontal, Theme.cellPadX)
             .padding(.bottom, 6)
             ScrollView {
@@ -223,7 +223,7 @@ private struct RenderRow: View {
         HStack(spacing: 12) {
             Button(action: onPlay) {
                 IconView(icon: isPlaying ? .pause : .play, size: 11)
-                    .foregroundStyle(isCurrent ? Theme.text : Theme.textDim)
+                    .foregroundStyle(isCurrent ? Theme.text : Theme.secondaryText)
                     .frame(width: 26, height: 26)
                     .contentShape(Rectangle())
             }
@@ -238,15 +238,15 @@ private struct RenderRow: View {
                 .truncationMode(.middle)
                 .frame(maxWidth: .infinity, alignment: .leading)
             if showFolder {
-                Text(file.folder).font(Theme.fBody).foregroundStyle(Theme.textDim).lineLimit(1)
+                Text(file.folder).font(Theme.fBody).foregroundStyle(Theme.secondaryText).lineLimit(1)
                     .frame(width: 90, alignment: .leading)
             }
             Text(file.modified > .distantPast ? HomeModel.dateText(file.modified) : "")
-                .font(Theme.fBody).foregroundStyle(Theme.textDim).monospacedDigit()
+                .font(Theme.fBody).foregroundStyle(Theme.secondaryText).monospacedDigit()
                 .frame(width: 90, alignment: .leading)
             Button(action: onPin) {
                 IconView(icon: file.pinned ? .starFill : .star, size: 12)
-                    .foregroundStyle(file.pinned ? Theme.light : Theme.textDim)
+                    .foregroundStyle(file.pinned ? Theme.light : Theme.secondaryText)
                     .frame(width: 24, height: 24)
                     .contentShape(Rectangle())
             }

@@ -9,11 +9,12 @@ struct PluginSummaryBar: View {
 
     var body: some View {
         let model = app.plugins
+        let rows = model.table.rows
         VStack(alignment: .leading, spacing: 10) {
             if model.inventoryAvailable {
                 HStack(spacing: 10) {
                     ForEach(PluginCard.allCases) { card in
-                        SummaryCard(card: card, health: model.health, isSelected: model.card == card) {
+                        SummaryCard(card: card, health: model.health, value: PluginsFormat.cardValue(card, health: model.health, rows: rows), isSelected: model.card == card) {
                             withAnimation(Theme.selectAnimation) { model.toggleCard(card) }
                         }
                     }
@@ -29,26 +30,27 @@ struct PluginSummaryBar: View {
 private struct SummaryCard: View {
     let card: PluginCard
     let health: PluginHealth
+    let value: Int
     let isSelected: Bool
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text(String(card.value(health)))
+                Text(String(value))
                     .font(Theme.fHead)
                     .monospacedDigit()
                     .foregroundStyle(tone)
                 Text(PluginsFormat.card(card))
                     .font(Theme.fLabel)
-                    .foregroundStyle(Theme.textDim)
+                    .foregroundStyle(Theme.secondaryText)
                     .lineLimit(1)
             }
             .padding(.horizontal, 18)
             .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
         }
         .buttonStyle(SummaryCardStyle(isSelected: isSelected))
-        .accessibilityLabel("\(PluginsFormat.card(card)): \(card.value(health))")
+        .accessibilityLabel("\(PluginsFormat.card(card)): \(value)")
         .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
@@ -56,8 +58,8 @@ private struct SummaryCard: View {
         switch card.tone(health) {
         case .normal: return Theme.text
         case .good: return Theme.green
-        case .bad: return Theme.red
-        case .dim: return Theme.textDim
+        case .bad: return Theme.errorText
+        case .dim: return Theme.secondaryText
         }
     }
 }
@@ -107,7 +109,7 @@ private struct MissingLine: View {
         HStack(spacing: 8) {
             Text(PluginsFormat.missingSummary(count))
                 .font(Theme.fLabel)
-                .foregroundStyle(Theme.textDim)
+                .foregroundStyle(Theme.secondaryText)
             Button(showing ? PluginsStrings.hideThem.s : PluginsStrings.showThem.s) {
                 withAnimation(Theme.selectAnimation) {
                     app.plugins.card = showing ? nil : .missing
@@ -128,13 +130,13 @@ private struct UnavailableNotice: View {
         SurfaceCard {
             HStack(alignment: .top, spacing: 12) {
                 IconView(icon: .info, size: 16)
-                    .foregroundStyle(Theme.textDim)
+                    .foregroundStyle(Theme.secondaryText)
                     .padding(.top, 1)
                 VStack(alignment: .leading, spacing: 4) {
                     Text(PluginsStrings.unavailableTitle.s)
                         .font(Theme.fTitle).foregroundStyle(Theme.text)
                     Text(PluginsStrings.unavailableBody.s)
-                        .font(Theme.fLabel).foregroundStyle(Theme.textDim)
+                        .font(Theme.fLabel).foregroundStyle(Theme.secondaryText)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer(minLength: 12)

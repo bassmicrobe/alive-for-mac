@@ -75,6 +75,13 @@ enum PluginsFormat {
         format == "Other" ? PluginsStrings.filterOther.s : format
     }
 
+    /// The number on a summary card. The "installed" card counts the rows the list shows (the
+    /// inventory holds one entry per format and path, the list one row per plugin), so what the
+    /// card says and what a click on it leaves in the list are the same number.
+    static func cardValue(_ card: PluginCard, health: PluginHealth, rows: [PluginRow]) -> Int {
+        card == .installed ? rows.filter { card.passes($0.stat) }.count : card.value(health)
+    }
+
     static func missingSummary(_ count: Int) -> String {
         count == 1 ? PluginsStrings.missingSummaryOne.s : PluginsStrings.missingSummaryMany.f(count)
     }

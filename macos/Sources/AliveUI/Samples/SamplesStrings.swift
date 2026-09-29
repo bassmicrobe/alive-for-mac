@@ -11,13 +11,13 @@ enum SamplesStrings: LocalizedStrings {
     // Cells
     case usageUnknown, never, noValue, sizeKB, sizeMB, sizeGB
     // Counter and progress
-    case countSamples, countOneSample, countCut, countDuplicates, indexing, indexingCount
+    case countSamples, countSamplesBare, countOneSample, countOneBare, countCut, countDuplicates, indexing, indexingCount
     // Empty states
     case emptyTitle, emptyBody, chooseFolders, chooseFoldersMessage, manageHint
     case suggestionLibrary, suggestionPacks, suggestionCore
-    case noSamplesTitle, noSamplesBody
+    case noSamplesTitle, noSamplesBody, noMatchTitle, noMatchBody, clearSearch
     // Rows and menus
-    case play, stop, expand, collapse, showInTree, copyPath, playing, notPlayable, dragHelp
+    case play, stop, expand, collapse, folderItems, waveSeek, showInTree, copyPath, playing, notPlayable, dragHelp
     // Panel
     case panelNoSelection, panelNoSelectionHint, panelSamples, panelUsed, panelProjects, panelLastUsed
     case panelCreated, panelCopies, panelDuration, panelFormat, panelByMonth, panelMostUsed
@@ -61,11 +61,13 @@ enum SamplesStrings: LocalizedStrings {
         case .sizeMB: return ("%@ MB", "%@ MB")
         case .sizeGB: return ("%@ GB", "%@ GB")
         case .countSamples: return ("%1$@ samples · %2$@", "%1$@ 個のサンプル · %2$@")
+        case .countSamplesBare: return ("%@ samples", "%@ 個のサンプル")
+        case .countOneBare: return ("1 sample", "1 個のサンプル")
         case .countOneSample: return ("1 sample · %@", "1 個のサンプル · %@")
         case .countCut: return ("first %1$@ of %2$@", "%2$@ 件中の先頭 %1$@ 件")
         case .countDuplicates: return ("%1$@ shown · %2$@ extra", "%1$@ 件を表示 · 余分 %2$@")
-        case .indexing: return ("Indexing samples…", "サンプルを索引中…")
-        case .indexingCount: return ("Indexing samples… %@", "サンプルを索引中… %@")
+        case .indexing: return ("Indexing samples…", "サンプルのインデックスを作成中…")
+        case .indexingCount: return ("Indexing samples… %@", "サンプルのインデックスを作成中… %@")
         case .emptyTitle: return ("No sample folders yet", "サンプルフォルダがまだありません")
         case .emptyBody: return ("Point Alive at your sample folders, or take the ones Live already knows. Alive only reads them; it never moves or deletes a sample.",
                                  "サンプルのフォルダを指定するか、Live が知っているフォルダを使います。Alive は読み取るだけで、サンプルの移動や削除はしません。")
@@ -77,6 +79,11 @@ enum SamplesStrings: LocalizedStrings {
         case .suggestionCore: return ("Core Library", "コアライブラリ")
         case .noSamplesTitle: return ("No samples found", "サンプルが見つかりません")
         case .noSamplesBody: return ("The sample folders hold no audio files Live can load.", "サンプルフォルダに Live で読み込める音声ファイルがありません。")
+        case .noMatchTitle: return ("No samples match", "一致するサンプルがありません")
+        case .noMatchBody: return ("Try another search or choose All folders.", "検索語を変えるか、「すべてのフォルダ」を選んでください。")
+        case .clearSearch: return ("Clear search", "検索をクリア")
+        case .folderItems: return ("%lld items", "%lld 個の項目")
+        case .waveSeek: return ("Playback position", "再生位置")
         case .play: return ("Play", "再生")
         case .stop: return ("Stop", "停止")
         case .expand: return ("Expand", "展開")
@@ -113,7 +120,7 @@ enum SamplesStrings: LocalizedStrings {
         case .formatBits: return ("%lld-bit", "%lld ビット")
         case .usedTag: return ("used", "使用中")
         case .outsideTitle: return ("Not in the sample library", "サンプルライブラリにありません")
-        case .outsideBody: return ("%@ lies outside the folders Alive indexes.", "%@ は Alive が索引しているフォルダの外にあります。")
+        case .outsideBody: return ("%@ lies outside the folders Alive indexes.", "%@ は Alive がインデックスを作成しているフォルダの外にあります。")
         case .addAsFolder: return ("Add as sample folder", "サンプルフォルダとして追加")
         case .alreadyInLibrary: return ("Already in the library", "すでにライブラリにあります")
         }

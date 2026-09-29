@@ -80,7 +80,7 @@ struct ChipPicker: View {
                 Chip(text: label(value)) { selection.remove(value) }
             }
             if chosen.isEmpty {
-                Text(placeholder).font(Theme.fBody).foregroundStyle(Theme.textDim).padding(.trailing, 4)
+                Text(placeholder).font(Theme.fBody).foregroundStyle(Theme.secondaryText).padding(.trailing, 4)
             }
             Button { open.toggle() } label: {
                 IconView(icon: .plus, size: 11, weight: .bold)
@@ -147,7 +147,7 @@ private struct OptionList: View {
                     ForEach(visible, id: \.self) { option in row(option) }
                     if visible.isEmpty {
                         Text(PluginsStrings.filterNothing.s)
-                            .font(Theme.fLabel).foregroundStyle(Theme.textDim).padding(8)
+                            .font(Theme.fLabel).foregroundStyle(Theme.secondaryText).padding(8)
                     }
                 }
             }

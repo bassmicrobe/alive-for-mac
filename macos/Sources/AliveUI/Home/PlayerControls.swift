@@ -11,6 +11,38 @@ enum PlayerFormat {
     }
 }
 
+/// Makes a position control reachable with the keyboard: it takes focus (with the shared ring),
+/// ←/→ move it by 5 %, Shift-←/→ by 10 %, Home/End go to the ends. `isEnabled` false leaves the keys alone.
+struct KeyboardScrub: ViewModifier {
+    let value: Double
+    var cornerRadius: CGFloat = 8
+    var isEnabled = true
+    let onChange: (Double) -> Void
+    @FocusState private var focused: Bool
+
+    static let step = 0.05
+
+    func body(content: Content) -> some View {
+        content
+            .focusable(isEnabled)
+            .focused($focused)
+            .focusEffectDisabled()
+            .focusRing(focused && isEnabled, cornerRadius: cornerRadius)
+            .onKeyPress(keys: [.leftArrow, .rightArrow, .home, .end], phases: [.down, .repeat]) { press in
+                guard isEnabled else { return .ignored }
+                let big = press.modifiers.contains(.shift) ? 2.0 : 1.0
+                switch press.key {
+                case .leftArrow: onChange(max(0, value - Self.step * big))
+                case .rightArrow: onChange(min(1, value + Self.step * big))
+                case .home: onChange(0)
+                case .end: onChange(1)
+                default: return .ignored
+                }
+                return .handled
+            }
+    }
+}
+
 /// The envelope of the current render with the played part in a lighter tone. Click or drag to seek.
 struct WaveformView: View {
     let waveform: Waveform?
@@ -28,7 +60,7 @@ struct WaveformView: View {
                 if let wave = waveform, wave.ok {
                     Canvas { context, size in draw(wave, in: &context, size: size) }
                 } else if let hint {
-                    Text(hint).font(Theme.fBody).foregroundStyle(Theme.textDim)
+                    Text(hint).font(Theme.fBody).foregroundStyle(Theme.secondaryText)
                 }
             }
             .contentShape(Rectangle())
@@ -37,6 +69,7 @@ struct WaveformView: View {
                 onSeek(min(1, max(0, (value.location.x - pad) / width)))
             })
         }
+        .modifier(KeyboardScrub(value: progress, cornerRadius: Theme.cardR, onChange: onSeek))
         .accessibilityElement()
         .accessibilityLabel(HomeStrings.nowPlayingSeek.s)
         .accessibilityValue("\(Int(progress * 100))%")
@@ -66,7 +99,7 @@ struct WaveformView: View {
             let bottom = mid - CGFloat(wave.min[i]) * half
             let x = inner.minX + CGFloat(px)
             let rect = CGRect(x: x, y: top, width: 1, height: max(1, bottom - top))
-            context.fill(Path(rect), with: .color(x <= playedX ? Theme.light : Theme.textDim.opacity(0.55)))
+            context.fill(Path(rect), with: .color(x <= playedX ? Theme.light : Theme.secondaryText.opacity(0.55)))
         }
         context.fill(Path(CGRect(x: playedX - 0.5, y: inner.minY - 4, width: 1.5, height: inner.height + 8)),
                      with: .color(Theme.lightTop))
@@ -97,6 +130,7 @@ struct ScrubBar: View {
             .animation(Theme.hoverAnimation, value: hovering)
         }
         .frame(height: 18)
+        .modifier(KeyboardScrub(value: value, cornerRadius: 6, onChange: onChange))
         .accessibilityElement()
         .accessibilityLabel(label)
         .accessibilityValue("\(Int(value * 100))%")
@@ -125,7 +159,7 @@ struct VolumeControl: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .foregroundStyle(Theme.textDim)
+            .foregroundStyle(Theme.secondaryText)
             .help(HomeStrings.mute.s)
             .accessibilityLabel(HomeStrings.mute.s)
             ScrubBar(value: Double(volume), label: HomeStrings.volume.s) { volume = Float($0) }

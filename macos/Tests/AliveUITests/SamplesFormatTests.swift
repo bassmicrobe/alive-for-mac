@@ -125,6 +125,18 @@ final class SamplesFormatTests: XCTestCase {
                                           index: idx, copies: .empty), "first 1 of 9,000")
     }
 
+    func testEmptyLibraryCounterHasNoDanglingSeparator() {
+        let none = SampleListing(rows: [], matches: 0, isFlat: false)
+        func text() -> String {
+            SampleCounter.text(isScanning: false, found: 0, listing: none, lens: .all, hasQuery: false,
+                               index: .empty, copies: .empty)
+        }
+        XCTAssertEqual(text(), "0 samples")
+        Localizer.shared.preference = .ja
+        XCTAssertEqual(text(), "0 個のサンプル")
+        XCTAssertEqual(SamplesStrings.indexing.s, "サンプルのインデックスを作成中…")
+    }
+
     // MARK: suggestions
 
     func testSuggestionsSkipProjectFoldersExistingRootsAndMissingFolders() {

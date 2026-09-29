@@ -87,8 +87,29 @@ struct SamplesListArea: View {
         } else if model.index.files.isEmpty {
             EmptyState(icon: .wave, title: SamplesStrings.noSamplesTitle.s, message: SamplesStrings.noSamplesBody.s)
         } else {
-            EmptyState(icon: .magnifier, title: SamplesStrings.noSamplesTitle.s)
+            noMatch
         }
+    }
+
+    /// Samples exist, but the search or lens leaves none: say so, and offer the way back.
+    private var noMatch: some View {
+        VStack(spacing: 10) {
+            IconView(icon: .magnifier, size: 26, weight: .light).foregroundStyle(Theme.secondaryText)
+            Text(SamplesStrings.noMatchTitle.s).font(Theme.fHead).foregroundStyle(Theme.text)
+            Text(SamplesStrings.noMatchBody.s)
+                .font(Theme.fBody)
+                .foregroundStyle(Theme.secondaryText)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: 360)
+            if !model.app.searchText.isEmpty {
+                PillButton(title: SamplesStrings.clearSearch.s) { model.app.searchText = "" }.padding(.top, 6)
+            } else if model.lens != .all {
+                PillButton(title: SamplesStrings.lensAll.s) { model.lens = .all }.padding(.top, 6)
+            }
+        }
+        .padding(Theme.pad)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .accessibilityElement(children: .contain)
     }
 }
 
@@ -114,7 +135,6 @@ private struct HeaderCell: View {
     let model: SamplesModel
     let column: SampleColumn
     let width: CGFloat?
-    @State private var hovering = false
 
     var body: some View {
         Button {
@@ -129,14 +149,9 @@ private struct HeaderCell: View {
                 }
                 if !column.isRightAligned { Spacer(minLength: 0) }
             }
-            .font(Theme.fLabel)
-            .foregroundStyle(hovering || model.sort.column == column ? Theme.text : Theme.textDim)
             .padding(.horizontal, 6)
-            .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
-        .onHover { hovering = $0 }
-        .animation(Theme.hoverAnimation, value: hovering)
+        .buttonStyle(SampleHeaderButtonStyle(isSorted: model.sort.column == column))
         .frame(width: width)
         .frame(minWidth: width == nil ? 0 : nil, maxWidth: width == nil ? .infinity : nil)
         .accessibilityAddTraits(.isButton)
@@ -148,5 +163,33 @@ extension SamplesModel {
     func sortBy(_ column: SampleColumn) {
         sort = sort.column == column ? SampleSort(column: column, descending: !sort.descending)
                                      : SampleSort(column: column, descending: false)
+    }
+}
+
+/// A heading: quiet at rest, full strength under the pointer or when it is the order, brighter
+/// still while pressed, ringed when the keyboard is on it.
+private struct SampleHeaderButtonStyle: ButtonStyle {
+    let isSorted: Bool
+
+    func makeBody(configuration: Configuration) -> some View {
+        Styled(isSorted: isSorted, configuration: configuration)
+    }
+
+    private struct Styled: View {
+        let isSorted: Bool
+        let configuration: ButtonStyleConfiguration
+        @State private var hovering = false
+        @Environment(\.isFocused) private var isFocused
+
+        var body: some View {
+            configuration.label
+                .font(Theme.fLabel)
+                .foregroundStyle(configuration.isPressed ? Theme.lightPressed
+                                 : isSorted || hovering ? Theme.text : Theme.secondaryText)
+                .contentShape(Rectangle())
+                .focusRing(isFocused, cornerRadius: 6)
+                .onHover { hovering = $0 }
+                .animation(Theme.hoverAnimation, value: hovering)
+        }
     }
 }

@@ -72,4 +72,18 @@ final class PluginsFormatTests: XCTestCase {
         XCTAssertEqual(PluginsFormat.category("Instrument"), "Instrument")
         XCTAssertEqual(PluginsFormat.category(""), "")
     }
+
+    func testInstalledCardCountsTheRowsTheListShowsNotRawInventoryEntries() {
+        var health = PluginHealth()
+        health.installedTotal = 2613; health.used = 2; health.missing = 1; health.installedUnused = 1
+        let rows = [row(name: "A", sets: 3), row(name: "B", sets: 0), row(name: "C", sets: 1, match: .missing)]
+        XCTAssertEqual(PluginsFormat.cardValue(.installed, health: health, rows: rows), 2,
+                       "the card equals what a click on it leaves in the list")
+        XCTAssertEqual(PluginsFormat.cardValue(.missing, health: health, rows: rows), 1)
+        XCTAssertEqual(PluginsFormat.cardValue(.used, health: health, rows: rows), 2)
+    }
+
+    func testStatusKeepsTheLocalizedCapitalisation() {
+        XCTAssertEqual(PluginsFormat.status(.installed), "Installed")
+    }
 }

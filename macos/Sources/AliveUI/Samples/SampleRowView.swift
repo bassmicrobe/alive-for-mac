@@ -10,11 +10,14 @@ struct SampleRowView: View {
     let cells: SampleCells
 
     private static let indentStep: CGFloat = 20
+    private static let chevronSlot: CGFloat = 14
+
+    @State private var hovering = false
 
     var body: some View {
         let selected = model.selection == row.id
         let playing = isFile && model.isPlaying(row.id)
-        let dim = cells.isDim(row)
+        let dim = cells.isDim(row) && !hovering && !selected
         HStack(spacing: 0) {
             ForEach(layout.columns, id: \.self) { c in
                 cell(c, dim: dim, playing: playing)
@@ -22,9 +25,10 @@ struct SampleRowView: View {
         }
         .padding(.horizontal, Theme.cellPadX)
         .frame(height: Theme.rowPillH)
-        .background(selected ? Theme.rowHover.opacity(0.6) : .clear, in: Capsule())
+        .background(selected ? Theme.tableSelection : .clear, in: Capsule())
         .overlay(Capsule().strokeBorder(Theme.text.opacity(selected ? 0.85 : 0), lineWidth: 1))
-        .rowHover()
+        .background(hovering && !selected ? Theme.rowHover : .clear, in: Capsule())
+        .onHover { inside in withAnimation(Theme.hoverAnimation) { hovering = inside } }
         .frame(height: Theme.rowH)
         .contentShape(Rectangle())
         .onTapGesture { model.click(row) }
@@ -40,6 +44,13 @@ struct SampleRowView: View {
         .accessibilityElement(children: .combine)
         .accessibilityLabel(cells.text(.name, row))
         .accessibilityAddTraits(selected ? [.isSelected, .isButton] : .isButton)
+        .accessibilityActions {
+            if childCount != nil {
+                Button(model.isOpen(row.id) ? SamplesStrings.collapse.s : SamplesStrings.expand.s) {
+                    model.toggleFolder(row.id)
+                }
+            }
+        }
     }
 
     private var isFile: Bool {
@@ -57,7 +68,7 @@ struct SampleRowView: View {
             } else {
                 Text(cells.text(c, row))
                     .font(Theme.fBody)
-                    .foregroundStyle(dim ? Theme.textDim : Theme.text)
+                    .foregroundStyle(dim ? Theme.secondaryText : Theme.text)
                     .lineLimit(1)
                     .truncationMode(c.isPath ? .middle : .tail)
                     .monospacedDigit()
@@ -72,11 +83,12 @@ struct SampleRowView: View {
     private func nameCell(dim: Bool, playing: Bool) -> some View {
         HStack(spacing: 10) {
             Color.clear.frame(width: CGFloat(row.depth) * Self.indentStep, height: 1)
+            if !model.isFlat { chevron }
             icon(playing: playing)
                 .frame(width: 16)
             Text(cells.text(.name, row))
                 .font(isFile ? Theme.fBody : Theme.fTitle)
-                .foregroundStyle(dim ? Theme.textDim : Theme.text)
+                .foregroundStyle(dim ? Theme.secondaryText : Theme.text)
                 .lineLimit(1)
                 .truncationMode(.middle)
             tail
@@ -93,11 +105,11 @@ struct SampleRowView: View {
                 .accessibilityLabel(SamplesStrings.playing.s)
         } else if isFile {
             IconView(icon: .wave, size: 11)
-                .foregroundStyle(Theme.textDim)
+                .foregroundStyle(Theme.secondaryText)
                 .opacity(canPlay ? 1 : 0.45)
         } else {
             IconView(icon: .folder, size: 12)
-                .foregroundStyle(Theme.textDim)
+                .foregroundStyle(Theme.secondaryText)
         }
     }
 
@@ -106,25 +118,45 @@ struct SampleRowView: View {
         return false
     }
 
-    /// "+53" / "−53": what is inside a folder, and the button that opens it (tree only).
-    @ViewBuilder private var tail: some View {
-        if case .folder(let d) = row.kind, !model.isFlat {
-            let folder = model.index.folders[d]
-            let kids = folder.children.count + folder.files.count
-            if kids > 0 {
-                Button {
-                    model.toggleFolder(row.id)
-                } label: {
-                    Text((model.isOpen(row.id) ? "−" : "+") + SampleFormat.number(kids))
-                        .font(Theme.fBody)
-                        .foregroundStyle(Theme.textDim)
-                        .monospacedDigit()
-                        .padding(.horizontal, 4)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .help(model.isOpen(row.id) ? SamplesStrings.collapse.s : SamplesStrings.expand.s)
+    /// How many things a folder holds; nil for a file, a flat list or an empty folder.
+    private var childCount: Int? {
+        guard case .folder(let d) = row.kind, !model.isFlat else { return nil }
+        let folder = model.index.folders[d]
+        let kids = folder.children.count + folder.files.count
+        return kids > 0 ? kids : nil
+    }
+
+    /// The button that opens a folder: a chevron that turns down when it is open (tree only).
+    /// The slot is kept on every row of the tree so the icons line up.
+    @ViewBuilder private var chevron: some View {
+        if childCount != nil {
+            let open = model.isOpen(row.id)
+            Button {
+                model.toggleFolder(row.id)
+            } label: {
+                IconView(icon: .chevronDown, size: 10, weight: .bold)
+                    .rotationEffect(.degrees(open ? 0 : -90))
+                    .foregroundStyle(hovering ? Theme.text : Theme.secondaryText)
+                    .frame(width: Self.chevronSlot, height: 24)
+                    .contentShape(Rectangle())
             }
+            .buttonStyle(.plain)
+            .help(open ? SamplesStrings.collapse.s : SamplesStrings.expand.s)
+            .accessibilityLabel(open ? SamplesStrings.collapse.s : SamplesStrings.expand.s)
+        } else {
+            Color.clear.frame(width: Self.chevronSlot, height: 1)
+        }
+    }
+
+    /// "53": what is inside a folder, as a plain count after its name.
+    @ViewBuilder private var tail: some View {
+        if let kids = childCount {
+            Text(SampleFormat.number(kids))
+                .font(Theme.fCaption)
+                .foregroundStyle(Theme.secondaryText)
+                .monospacedDigit()
+                .padding(.horizontal, 4)
+                .help(SamplesStrings.folderItems.f(kids))
         }
     }
 

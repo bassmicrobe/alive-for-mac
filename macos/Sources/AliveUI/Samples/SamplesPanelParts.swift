@@ -16,7 +16,7 @@ struct PanelHeader: View {
             Spacer(minLength: 4)
             Text(trailing)
                 .font(Theme.fBody)
-                .foregroundStyle(Theme.textDim)
+                .foregroundStyle(Theme.secondaryText)
                 .monospacedDigit()
                 .lineLimit(1)
         }
@@ -31,11 +31,11 @@ struct PanelRow: View {
 
     var body: some View {
         HStack(alignment: .firstTextBaseline) {
-            Text(label).font(Theme.fLabel).foregroundStyle(Theme.textDim)
+            Text(label).font(Theme.fLabel).foregroundStyle(Theme.secondaryText)
             Spacer(minLength: 8)
             Text(value ?? empty)
                 .font(Theme.fBody)
-                .foregroundStyle(value == nil ? Theme.textDim : Theme.text)
+                .foregroundStyle(value == nil ? Theme.secondaryText : Theme.text)
                 .monospacedDigit()
                 .lineLimit(1)
                 .truncationMode(.middle)
@@ -55,7 +55,7 @@ struct PathLink: View {
         } label: {
             Text(path)
                 .font(Theme.fBody)
-                .foregroundStyle(hovering ? Theme.text : Theme.textDim)
+                .foregroundStyle(hovering ? Theme.text : Theme.secondaryText)
                 .underline(hovering)
                 .multilineTextAlignment(.leading)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -79,12 +79,12 @@ struct LinkList<Rows: View>: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(heading).font(Theme.fLabel).foregroundStyle(Theme.textDim).padding(.bottom, 4)
+            Text(heading).font(Theme.fLabel).foregroundStyle(Theme.secondaryText).padding(.bottom, 4)
             rows()
             if total > shown {
                 Text(SamplesStrings.panelMore.f(SampleFormat.number(total - shown)))
                     .font(Theme.fLabel)
-                    .foregroundStyle(Theme.textDim)
+                    .foregroundStyle(Theme.secondaryText)
                     .padding(.top, 2)
             }
         }
@@ -107,7 +107,7 @@ struct LinkRow: View {
                     .lineLimit(1)
                     .truncationMode(.middle)
                 Spacer(minLength: 6)
-                Text(note).font(Theme.fBody).foregroundStyle(Theme.textDim).monospacedDigit()
+                Text(note).font(Theme.fBody).foregroundStyle(Theme.secondaryText).monospacedDigit()
             }
             .frame(minHeight: 22)
             .contentShape(Rectangle())
@@ -154,12 +154,12 @@ struct UsageChart: View {
         if !months.counts.isEmpty {
             let top = max(1, months.counts.max() ?? 1)
             VStack(alignment: .leading, spacing: 6) {
-                Text(SamplesStrings.panelByMonth.s).font(Theme.fLabel).foregroundStyle(Theme.textDim)
+                Text(SamplesStrings.panelByMonth.s).font(Theme.fLabel).foregroundStyle(Theme.secondaryText)
                 bars(top: top)
                 HStack {
-                    Text(label(0)).font(Theme.fLabel).foregroundStyle(Theme.textDim)
+                    Text(label(0)).font(Theme.fLabel).foregroundStyle(Theme.secondaryText)
                     Spacer()
-                    Text(label(months.counts.count - 1)).font(Theme.fLabel).foregroundStyle(Theme.textDim)
+                    Text(label(months.counts.count - 1)).font(Theme.fLabel).foregroundStyle(Theme.secondaryText)
                 }
             }
         }
@@ -170,7 +170,7 @@ struct UsageChart: View {
             ForEach(months.counts.indices, id: \.self) { i in
                 let n = months.counts[i]
                 RoundedRectangle(cornerRadius: 2, style: .continuous)
-                    .fill(n > 0 ? Theme.textDim : Theme.hairline)
+                    .fill(n > 0 ? Theme.secondaryText : Theme.hairline)
                     .frame(height: n > 0 ? max(4, Self.height * CGFloat(n) / CGFloat(top)) : 2)
                     .frame(maxWidth: .infinity)
                     .help("\(label(i)) · \(n)")
@@ -178,7 +178,7 @@ struct UsageChart: View {
         }
         .frame(height: Self.height, alignment: .bottom)
         .overlay(alignment: .topLeading) {
-            Text(SampleFormat.number(top)).font(Theme.fMini).foregroundStyle(Theme.textDim).offset(y: -12)
+            Text(SampleFormat.number(top)).font(Theme.fMini).foregroundStyle(Theme.secondaryText).offset(y: -12)
         }
         .padding(.top, 12)
         .accessibilityElement(children: .ignore)
@@ -219,6 +219,20 @@ struct WaveView: View {
         .background(GeometryReader { g in Color.clear.preference(key: WaveWidthKey.self, value: g.size.width) })
         .onPreferenceChange(WaveWidthKey.self) { geometryWidth = $0 }
         .help(file.canPreview ? SamplesStrings.play.s : SamplesStrings.notPlayable.s)
+        .modifier(KeyboardScrub(value: progress ?? 0, isEnabled: file.canPreview && progress != nil) {
+            model.seek(toFraction: $0)
+        })
+        .accessibilityElement()
+        .accessibilityLabel(SamplesStrings.waveSeek.s)
+        .accessibilityValue(progress.map { "\(Int($0 * 100))%" } ?? "")
+        .accessibilityAdjustableAction { direction in
+            guard file.canPreview, let p = progress else { return }
+            switch direction {
+            case .increment: model.seek(toFraction: min(1, p + KeyboardScrub.step))
+            case .decrement: model.seek(toFraction: max(0, p - KeyboardScrub.step))
+            @unknown default: break
+            }
+        }
     }
 
     @State private var geometryWidth: CGFloat?
@@ -236,7 +250,7 @@ struct WaveView: View {
     }
 
     private func hint(_ text: String) -> some View {
-        Text(text).font(Theme.fLabel).foregroundStyle(Theme.textDim)
+        Text(text).font(Theme.fLabel).foregroundStyle(Theme.secondaryText)
     }
 
     private var progress: Double? {

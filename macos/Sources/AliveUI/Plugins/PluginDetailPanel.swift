@@ -14,7 +14,7 @@ struct PluginDetailPanel: View {
             } else {
                 Text(PluginsStrings.selectPrompt.s)
                     .font(Theme.fBody)
-                    .foregroundStyle(Theme.textDim)
+                    .foregroundStyle(Theme.secondaryText)
                     .multilineTextAlignment(.center)
                     .padding(Theme.panelPad * 2)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -49,14 +49,14 @@ private struct Detail: View {
                 .fixedSize(horizontal: false, vertical: true)
                 .textSelection(.enabled)
             if !row.vendor.isEmpty {
-                Text(row.vendor).font(Theme.fBody).foregroundStyle(Theme.textDim)
+                Text(row.vendor).font(Theme.fBody).foregroundStyle(Theme.secondaryText)
             }
         }
     }
 
     private var facts: some View {
         VStack(spacing: 6) {
-            Fact(PluginsStrings.detailStatus.s, PluginsFormat.status(row.status).lowercased(), tone: statusTone)
+            Fact(PluginsStrings.detailStatus.s, PluginsFormat.status(row.status), tone: statusTone)
             Fact(PluginsStrings.detailFormat.s, row.format)
             Fact(PluginsStrings.detailKind.s, PluginsFormat.role(row.role))
             Fact(PluginsStrings.detailVersion.s, row.version)
@@ -70,7 +70,7 @@ private struct Detail: View {
     private var statusTone: Color {
         switch row.status {
         case .installed: return Theme.green
-        case .otherFormat, .missing, .unknown: return Theme.textDim
+        case .otherFormat, .missing, .unknown: return Theme.secondaryText
         }
     }
 
@@ -80,7 +80,7 @@ private struct Detail: View {
         } label: {
             Text(row.path)
                 .font(Theme.fLabel)
-                .foregroundStyle(Theme.textDim)
+                .foregroundStyle(Theme.secondaryText)
                 .multilineTextAlignment(.leading)
                 .lineLimit(4)
                 .truncationMode(.middle)
@@ -95,7 +95,7 @@ private struct Detail: View {
         VStack(alignment: .leading, spacing: 6) {
             SectionHeader(PluginsStrings.detailSetsHeader.f(sets.count))
             if sets.isEmpty {
-                Text(PluginsStrings.noSetsUse.s).font(Theme.fLabel).foregroundStyle(Theme.textDim)
+                Text(PluginsStrings.noSetsUse.s).font(Theme.fLabel).foregroundStyle(Theme.secondaryText)
             } else {
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 0) {
@@ -124,7 +124,7 @@ private struct Fact: View {
     var body: some View {
         if !value.isEmpty {
             HStack(alignment: .firstTextBaseline) {
-                Text(label).foregroundStyle(Theme.textDim)
+                Text(label).foregroundStyle(Theme.secondaryText)
                 Spacer(minLength: 8)
                 Text(value).foregroundStyle(tone).multilineTextAlignment(.trailing).textSelection(.enabled)
             }
@@ -149,7 +149,7 @@ private struct SetLink: View {
             .frame(minHeight: 26)
         }
         .buttonStyle(SetLinkStyle())
-        .help(set.path)
+        .help(set.name + "\n" + set.path)
     }
 }
 

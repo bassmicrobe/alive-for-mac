@@ -13,15 +13,15 @@ struct SamplesEmptyState: View {
         VStack(spacing: 22) {
             VStack(spacing: 10) {
                 IconView(icon: .wave, size: 30, weight: .light)
-                    .foregroundStyle(Theme.textDim)
+                    .foregroundStyle(Theme.secondaryText)
                 Text(SamplesStrings.emptyTitle.s)
                     .font(Theme.fHead)
                     .foregroundStyle(Theme.text)
                 Text(SamplesStrings.emptyBody.s)
                     .font(Theme.fBody)
-                    .foregroundStyle(Theme.textDim)
+                    .foregroundStyle(Theme.secondaryText)
                     .multilineTextAlignment(.center)
-                    .frame(maxWidth: 400)
+                    .frame(maxWidth: 460)
             }
             PillButton(title: SamplesStrings.chooseFolders.s, icon: .plus, kind: .primary, action: choose)
             if !suggestions.isEmpty {
@@ -29,7 +29,7 @@ struct SamplesEmptyState: View {
             }
             Text(SamplesStrings.manageHint.s)
                 .font(Theme.fSmall)
-                .foregroundStyle(Theme.textDim)
+                .foregroundStyle(Theme.secondaryText)
         }
         .padding(Theme.pad)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -66,20 +66,20 @@ private struct SuggestionButton: View {
         Button(action: add) {
             HStack(spacing: 10) {
                 IconView(icon: .folder, size: 13)
-                    .foregroundStyle(Theme.textDim)
+                    .foregroundStyle(Theme.secondaryText)
                 Text(suggestion.title)
                     .font(Theme.fTitle)
                     .foregroundStyle(Theme.text)
                     .lineLimit(1)
                 Text(suggestion.display())
                     .font(Theme.fSmall)
-                    .foregroundStyle(Theme.textDim)
+                    .foregroundStyle(Theme.secondaryText)
                     .lineLimit(1)
                     .truncationMode(.middle)
                 Spacer(minLength: 8)
                 Text(CommonStrings.addSuggestion.s)
                     .font(Theme.fSmall)
-                    .foregroundStyle(Theme.textDim)
+                    .foregroundStyle(Theme.secondaryText)
             }
             .padding(.horizontal, 14)
             .frame(height: Theme.rowPillH)

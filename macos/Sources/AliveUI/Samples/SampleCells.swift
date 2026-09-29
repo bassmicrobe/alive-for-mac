@@ -80,6 +80,10 @@ enum SampleCounter {
         if !listing.isFlat {
             let total = index.totalSamples
             let size = SampleFormat.megabytes(index.totalBytes)
+            // No size yet (nothing indexed, or sizes unknown): no dangling " · " either.
+            if size.isEmpty {
+                return total == 1 ? SamplesStrings.countOneBare.s : SamplesStrings.countSamplesBare.f(SampleFormat.number(total))
+            }
             return total == 1 ? SamplesStrings.countOneSample.f(size)
                               : SamplesStrings.countSamples.f(SampleFormat.number(total), size)
         }
