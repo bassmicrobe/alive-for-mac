@@ -61,8 +61,8 @@ final class RescueModel {
     var canEditList: Bool { usable && phase == .ready }
     var canSaveRescued: Bool { usable && phase == .ready && !(session?.rescueSelection().isEmpty ?? true) }
 
-    /// The set was found in the catalog or made up from its path.
-    var setName: String { session?.set.name ?? "" }
+    /// The set's name for the title: the catalog's entry, or made up from the path.
+    private(set) var setName = ""
 
     var runEnabled: Bool {
         switch phase {
@@ -108,6 +108,7 @@ final class RescueModel {
         guard mine == generation else { made.cancel(); return }
 
         session = made
+        setName = made.set.name
         checked = Set(made.targets.map(\.uid))          // opens with every box ticked: nothing disabled yet
         liveRunning = isLiveRunning()
         phase = .ready
@@ -123,6 +124,7 @@ final class RescueModel {
         poller = nil
         session?.cancel()
         session = nil
+        setName = ""
         phase = .idle
         status = nil
         notes = [:]

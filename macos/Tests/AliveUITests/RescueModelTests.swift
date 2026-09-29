@@ -49,6 +49,12 @@ enum UIFixture {
     }
 }
 
+/// A box for callbacks that Swift treats as concurrent.
+final class ChangeFlag: @unchecked Sendable {
+    private(set) var value = 0
+    func bump() { value += 1 }
+}
+
 final class RescueTextTests: XCTestCase {
     private var saved: LanguagePreference = .system
 
@@ -182,6 +188,17 @@ final class RescueModelTests: XCTestCase {
         XCTAssertEqual(UIFixture.sha(als), before)
         XCTAssertEqual(model.setName, "Song")
         XCTAssertEqual(model.runTitle, .open)
+    }
+
+    func testTheTitleNameIsObservable() async throws {
+        // The sheet's title reads it outside the content closure: it must be tracked state.
+        let changed = ChangeFlag()
+        withObservationTracking { _ = model.setName } onChange: { changed.bump() }
+        await model.open(path: try makeSet(devices: threePlugins))
+        XCTAssertGreaterThan(changed.value, 0)
+        XCTAssertEqual(model.setName, "Song")
+        model.close()
+        XCTAssertEqual(model.setName, "")
     }
 
     func testListEditingAndSuggestion() async throws {
