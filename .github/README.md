@@ -10,7 +10,7 @@ An **unofficial macOS port** of [Alive](https://github.com/rueblose/alive) by Ru
 ![arch](https://img.shields.io/badge/Apple%20Silicon%20%7C%20Intel-native-555555)
 ![license](https://img.shields.io/badge/license-MIT-blue)
 
-[**Download**](../../releases) · [Features](#features) · [Shortcuts](#keyboard-shortcuts) · [Build](#building-from-source) · [Parity with upstream](../macos/PARITY.md) · **English** · [日本語](README.ja.md)
+[**Download**](https://github.com/bassmicrobe/alive-for-mac/releases) · [Features](#features) · [Shortcuts](#keyboard-shortcuts) · [Build](#building-from-source) · [Parity with upstream](../macos/PARITY.md) · **English** · [日本語](README.ja.md)
 
 </div>
 
@@ -29,7 +29,7 @@ wrapper. The original C# sources stay in this repository untouched, as the refer
 
 ## Install
 
-1. Download `AliveForMac-<version>.zip` from [Releases](../../releases) and unpack it.
+1. Download `AliveForMac-<version>.zip` from [Releases](https://github.com/bassmicrobe/alive-for-mac/releases) and unpack it.
 2. Move **Alive for Mac.app** to `/Applications`.
 3. The app is **ad-hoc signed, not notarized**, so macOS blocks the first launch. Either
    right-click the app → **Open** → **Open**, or run

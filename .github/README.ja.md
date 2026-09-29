@@ -10,7 +10,7 @@ RueBlose 作 [Alive](https://github.com/rueblose/alive) の**非公式 macOS 版
 ![arch](https://img.shields.io/badge/Apple%20Silicon%20%7C%20Intel-native-555555)
 ![license](https://img.shields.io/badge/license-MIT-blue)
 
-[**ダウンロード**](../../releases) · [機能](#機能) · [ショートカット](#キーボードショートカット) · [ビルド](#ソースからのビルド) · [オリジナルとの差分](../macos/PARITY.md) · [English](README.md) · **日本語**
+[**ダウンロード**](https://github.com/bassmicrobe/alive-for-mac/releases) · [機能](#機能) · [ショートカット](#キーボードショートカット) · [ビルド](#ソースからのビルド) · [オリジナルとの差分](../macos/PARITY.md) · [English](README.md) · **日本語**
 
 </div>
 
@@ -29,7 +29,7 @@ Windows 専用だったオリジナルを Swift / SwiftUI で書き直したも�
 
 ## インストール
 
-1. [Releases](../../releases) から `AliveForMac-<バージョン>.zip` をダウンロードして展開します。
+1. [Releases](https://github.com/bassmicrobe/alive-for-mac/releases) から `AliveForMac-<バージョン>.zip` をダウンロードして展開します。
 2. **Alive for Mac.app** を `/Applications` に移動します。
 3. このアプリは **ad-hoc 署名のみで公証（notarize）されていない**ため、初回起動が macOS にブロックされます。
    アプリを右クリック →「開く」→「開く」を選ぶか、次のコマンドを実行してください。
