@@ -11,6 +11,7 @@ struct RescueSheet: View {
 
     var body: some View {
         let model = app.rescue
+        let _ = model.revision      // the session is not observable itself; every change bumps this
         SheetFrame(title: title(model), width: 660) {
             VStack(alignment: .leading, spacing: 12) {
                 if model.phase == .loading || model.phase == .idle {
