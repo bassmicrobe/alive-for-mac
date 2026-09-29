@@ -2,6 +2,7 @@
 // model per feature; contextual actions used by menus and toolbar live here.
 import Foundation
 import Observation
+import AliveCore
 
 enum MainTab: String, CaseIterable, Identifiable {
     case home, sets, plugins, samples
@@ -29,10 +30,21 @@ final class AppModel {
     var toasts: [ToastMessage] = []
     /// Bumped by ⌘F; the toolbar's search field focuses itself when it changes.
     var searchFocusRequest = 0
-    /// Files handed to the app by Finder ("Open With"): consumed by wave 1.5.
+    /// Files handed to the app by Finder ("Open With", `open -a`) that wait for the catalog.
     private(set) var pendingOpenPaths: [String] = []
+    /// Paths whose folder was just added as a root: select them once that scan is done.
+    @ObservationIgnored private var reselectPaths: [String] = []
 
-    let prefs = AppPreferences()
+    /// The core settings (settings.cfg). Change them only through `mutateSettings`.
+    private(set) var settings: AppSettings
+    /// Where settings.cfg and the caches live (`AppHome.path`; tests pass a scratch folder).
+    @ObservationIgnored let dataDir: String
+    /// The one audio player of the app: render playback and sample audition share it, so two
+    /// sounds never overlap. Its errors surface as toasts.
+    @ObservationIgnored let audio = AudioPlayback()
+    @ObservationIgnored private var started = false
+
+    @ObservationIgnored lazy var prefs = AppPreferences(app: self)
 
     // Feature models. `lazy` because each takes `self`; ignored by Observation because the
     // references never change (their own properties are observed).
@@ -46,7 +58,46 @@ final class AppModel {
     @ObservationIgnored lazy var rescue = RescueModel(app: self)
     @ObservationIgnored lazy var export = ExportModel(app: self)
 
-    init() {}
+    init(dataDir: String = AppHome.path) {
+        self.dataDir = dataDir
+        settings = AppSettings.load(dir: dataDir)
+        Localizer.shared.preference = LanguagePreference(configValue: settings.lang)
+        audio.onError = { [weak self] error in
+            MainActor.assumeIsolated {
+                self?.toast(CommonStrings.audioFailed.f(error.localizedDescription), kind: .error)
+            }
+        }
+    }
+
+    /// Called once by the main window: starts the catalog (cache, then scan).
+    func start() {
+        guard !started else { return }
+        started = true
+        catalog.start()
+    }
+
+    // MARK: - Settings
+
+    /// Applies `change` to the settings and writes settings.cfg atomically when something changed.
+    /// A failed write is logged and shown; the in-memory value stays.
+    func mutateSettings(_ change: (inout AppSettings) -> Void) {
+        var next = settings
+        change(&next)
+        guard next != settings else { return }
+        let groupingChanged = next.groupByFolder != settings.groupByFolder
+        settings = next
+        saveSettings()
+        if groupingChanged { catalog.settingsDidChange() }
+    }
+
+    func saveSettings() {
+        do {
+            try settings.save(dir: dataDir)
+        } catch {
+            Diag.fail("save settings.cfg", error)
+            toast(CommonStrings.settingsSaveFailed.f(error.localizedDescription), kind: .error)
+        }
+    }
 
     // MARK: - Toolbar state
 
@@ -76,8 +127,41 @@ final class AppModel {
 
     // MARK: - Contextual actions
 
+    /// Files from Finder / `open -a`. They wait until the catalog is ready, then `flushPendingOpen`
+    /// selects each known set (Sets tab) or takes its folder in as a new root (upstream OpenPaths).
     func openPaths(_ paths: [String]) {
         pendingOpenPaths.append(contentsOf: paths)
+        flushPendingOpen()
+    }
+
+    /// Called by `CatalogModel` whenever it becomes ready (cache loaded with no roots, or a scan ended).
+    func catalogDidBecomeReady() {
+        if !reselectPaths.isEmpty {
+            let paths = reselectPaths
+            reselectPaths = []
+            select(OpenPathPlan.make(paths: paths, sets: catalog.sets, roots: settings.roots,
+                                     disabledRoots: settings.disabledRoots).select)
+        }
+        flushPendingOpen()
+    }
+
+    func flushPendingOpen() {
+        guard catalog.isReady, !pendingOpenPaths.isEmpty else { return }
+        let paths = takePendingOpenPaths()
+        let plan = OpenPathPlan.make(paths: paths, sets: catalog.sets, roots: settings.roots,
+                                     disabledRoots: settings.disabledRoots)
+        select(plan.select)
+        plan.openDirectly.forEach { openInLive(path: $0) }
+        guard !plan.addRoots.isEmpty else { return }
+        if !catalog.addRoots(plan.addRoots).isEmpty { reselectPaths = paths }
+    }
+
+    /// Shows the last of `paths` selected on the Sets tab.
+    private func select(_ paths: [String]) {
+        guard let last = paths.last else { return }
+        searchText = ""
+        tab = .sets
+        selectedSetPath = last
     }
 
     func takePendingOpenPaths() -> [String] {

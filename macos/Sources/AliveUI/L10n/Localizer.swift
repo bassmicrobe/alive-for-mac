@@ -11,7 +11,7 @@ enum LanguagePreference: String, CaseIterable, Identifiable, Sendable {
 
     var id: String { rawValue }
 
-    /// Value stored in `settings.cfg` (`lang=system|en|ja`) once wave 1.5 moves persistence there.
+    /// Value stored in `settings.cfg` (`lang=system|en|ja`).
     var configValue: String { rawValue }
 
     init(configValue: String?) {
@@ -37,12 +37,12 @@ final class Localizer {
     var preference: LanguagePreference {
         didSet {
             guard preference != oldValue else { return }
-            PreferenceStore.language = preference
             Localizer.applyAppleLanguages(preference)
         }
     }
 
-    init(preference: LanguagePreference = PreferenceStore.language) {
+    /// Persistence is `AppModel`'s job (`settings.lang`); it sets `preference` from there at launch.
+    init(preference: LanguagePreference = .system) {
         self.preference = preference
     }
 

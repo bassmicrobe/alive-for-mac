@@ -11,7 +11,10 @@ final class PlayerModel {
         self.app = app
     }
 
+    /// The app-wide player (`app.audio`), shared with sample audition.
+    var audio: AudioPlayback { app.audio }
+
     func playRender(forSetAt path: String) {}
 
-    func togglePlayPause() {}
+    func togglePlayPause() { audio.togglePlayPause() }
 }
