@@ -6,9 +6,9 @@ import AliveCore
 
 /// Column widths; the plugin's name takes the rest.
 private enum Col {
-    static let developer: CGFloat = 130
+    static let developer: CGFloat = 122
     static let type: CGFloat = 84
-    static let format: CGFloat = 76
+    static let format: CGFloat = 88
     static let sets: CGFloat = 52
     static let lastUsed: CGFloat = 98
     static let status: CGFloat = 104

@@ -15,8 +15,10 @@ public struct FileStat: Equatable, Sendable {
     public static func of(_ path: String) -> FileStat? {
         var st = stat()
         guard stat(path, &st) == 0 else { return nil }
+        // Network volumes report no birth time (0): fall back to the change time, not 1970.
+        let born = st.st_birthtimespec.tv_sec == 0 ? st.st_ctimespec : st.st_birthtimespec
         return FileStat(size: Int64(st.st_size), modified: date(st.st_mtimespec),
-                        created: date(st.st_birthtimespec), isDirectory: (st.st_mode & S_IFMT) == S_IFDIR)
+                        created: date(born), isDirectory: (st.st_mode & S_IFMT) == S_IFDIR)
     }
 
     /// File size in bytes; 0 when the file is not there.

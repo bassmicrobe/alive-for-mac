@@ -42,7 +42,7 @@ Legend: **Done** = same behaviour · **Simplified** = works, but less than upstr
 
 | Upstream feature | Status | Note |
 |---|---|---|
-| Plugin list: vendor, type, format, sets, last used, status | Done | Custom list (not `Table`) so a plugin can be scrolled to; columns are not configurable (`pluginColumns` ignored). |
+| Plugin list: vendor, type, format, sets, last used, status | Done | The Type column shows the plugin's own category text (data from the plugin/Live, so it stays English) and falls back to a localized role. Custom list (not `Table`) so a plugin can be scrolled to; columns are not configurable (`pluginColumns` ignored). |
 | Summary cards that filter | Done | |
 | Plugin filters | Done | |
 | Where the list comes from (Live's database or VST folders) | Simplified | The plugin bundles (AU, VST, VST3) are always scanned; Live's scanner log (`PluginScanner.txt`) and `PluginScanDb.txt` are layered on top. "Plugin folders" ignores Live's records. Live's SQLite database is not read. |
