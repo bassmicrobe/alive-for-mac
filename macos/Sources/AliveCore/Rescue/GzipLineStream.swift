@@ -17,8 +17,16 @@ final class GzipLineReader {
     private var pos = 0
     private var scan = 0
     private let chunk = 256 * 1024
+    private let maxLine: Int
+    private let maxTotal: Int
+    private var total = 0
 
-    init(path: String) throws {
+    /// `maxLine` bounds a line without a newline (a file that is not a text set would otherwise
+    /// grow `pending` without limit); `maxTotal` bounds the inflated bytes (a bomb).
+    /// Both throw `GzipError.tooLarge`.
+    init(path: String, maxLine: Int = 512 * 1024 * 1024, maxTotal: Int = Gzip.maxInflatedBytes) throws {
+        self.maxLine = maxLine
+        self.maxTotal = maxTotal
         guard let h = FileHandle(forReadingAtPath: path) else {
             throw CocoaError(.fileReadNoSuchFile, userInfo: [NSFilePathErrorKey: path])
         }
@@ -62,6 +70,7 @@ final class GzipLineReader {
                 pos = 0
             }
             try fill()
+            if pending.count - pos > maxLine || total > maxTotal { throw GzipError.tooLarge }
         }
     }
 
@@ -80,25 +89,36 @@ final class GzipLineReader {
             finished = true
             return
         }
-        if raw { pending.append(contentsOf: data); return }
+        if raw { pending.append(contentsOf: data); total += data.count; return }
 
         var input = [UInt8](data)
         var out = [UInt8](repeating: 0, count: chunk)
         var streamEnded = false
+        let before = pending.count
         try input.withUnsafeMutableBufferPointer { inBuf in
             stream.next_in = inBuf.baseAddress
             stream.avail_in = uInt(inBuf.count)
-            while stream.avail_in > 0 && !streamEnded {
+            // Keep going while input is left OR the last call filled the output buffer
+            // completely: zlib may still hold pending output with all input consumed.
+            var again = true
+            while again {
                 let status = out.withUnsafeMutableBufferPointer { o -> Int32 in
                     stream.next_out = o.baseAddress
                     stream.avail_out = uInt(o.count)
                     return inflate(&stream, Z_NO_FLUSH)
                 }
+                // No progress possible without more input (the buffer was filled exactly).
+                if status == Z_BUF_ERROR && stream.avail_in == 0 { break }
                 guard status == Z_OK || status == Z_STREAM_END else { throw GzipError.corrupt(code: status) }
-                pending.append(contentsOf: out[0..<(out.count - Int(stream.avail_out))])
+                let produced = out.count - Int(stream.avail_out)
+                pending.append(contentsOf: out[0..<produced])
                 if status == Z_STREAM_END { streamEnded = true }
+                // A bomb is stopped as it grows, not after the chunk is fully inflated.
+                if pending.count - pos > maxLine || total + pending.count - before > maxTotal { throw GzipError.tooLarge }
+                again = !streamEnded && (stream.avail_in > 0 || stream.avail_out == 0)
             }
         }
+        total += pending.count - before
         if streamEnded { finished = true }
     }
 }
@@ -113,11 +133,14 @@ final class GzipLineWriter {
     private let flushAt = 256 * 1024
 
     init(path: String) throws {
-        guard FileManager.default.createFile(atPath: path, contents: nil),
-              let h = FileHandle(forWritingAtPath: path) else {
-            throw CocoaError(.fileWriteUnknown, userInfo: [NSFilePathErrorKey: path])
+        // O_EXCL: never truncate or reuse what is already there — the file might be the
+        // user's. A failed open is reported and nothing is removed by the caller.
+        let fd = Darwin.open(path, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW, 0o644)
+        guard fd >= 0 else {
+            let code: CocoaError.Code = errno == EEXIST ? .fileWriteFileExists : .fileWriteUnknown
+            throw CocoaError(code, userInfo: [NSFilePathErrorKey: path])
         }
-        handle = h
+        handle = FileHandle(fileDescriptor: fd, closeOnDealloc: true)
         let rc = deflateInit2_(&stream, 6, Z_DEFLATED, 31, 8, Z_DEFAULT_STRATEGY,
                                ZLIB_VERSION, Int32(MemoryLayout<z_stream>.size))
         guard rc == Z_OK else { throw GzipError.initFailed(code: rc) }

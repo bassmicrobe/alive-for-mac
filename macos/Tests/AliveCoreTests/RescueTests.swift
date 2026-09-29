@@ -28,7 +28,7 @@ final class RescueProbeTests: XCTestCase {
     func testCleanupStaleRemovesOnlyProbesAndClearsTheJournal() throws {
         let t = makeTemp()
         let dir = t.mkdir("home")
-        let probe = t.write("P Project/Song.alive-probe.als", "probe")
+        let probe = t.write("P Project/Song.alive-probe.als", "<?xml probe")
         let ghost = t.sub("P Project/Ghost.alive-probe.als")            // journalled but already gone
         let precious = t.write("P Project/Song.als", "precious")        // a hand-edited journal must not be able to delete this
         for p in [probe, ghost, precious] { RescueProbe.remember(p, dir: dir) }
@@ -43,7 +43,7 @@ final class RescueProbeTests: XCTestCase {
     func testDropOnlyDeletesProbesAndForgetsThem() {
         let t = makeTemp()
         let dir = t.mkdir("home")
-        let probe = t.write("P Project/Song.alive-probe.als")
+        let probe = t.write("P Project/Song.alive-probe.als", "<?xml probe")
         let original = t.write("P Project/Song.als")
         RescueProbe.remember(probe, dir: dir)
         RescueProbe.drop(original, dir: dir)

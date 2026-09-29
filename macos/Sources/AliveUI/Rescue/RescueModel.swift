@@ -38,6 +38,9 @@ final class RescueModel {
     @ObservationIgnored private var poller: Task<Void, Never>?
     @ObservationIgnored private var waitingSince = Date()
     @ObservationIgnored private var generation = 0
+    /// The probe being written on the blocking queue; `close()` cancels it.
+    @ObservationIgnored private var probeTask: Task<Result<RescueSession.WrittenProbe, Error>, Never>?
+    @ObservationIgnored private var ticking = false
 
     // Seams for tests: Live's processes, Live's logs, and how a probe is opened.
     @ObservationIgnored var isLiveRunning: () -> Bool = { RescueModel.liveIsRunning() }
@@ -102,9 +105,10 @@ final class RescueModel {
         let inventory = app.catalog.index.inventory
         let dir = app.dataDir
         let logs = logFiles
-        let made = await Task.detached(priority: .userInitiated) {
-            RescueSession(set: set, inventory: inventory, dataDir: dir, logFiles: logs)
-        }.value
+        let entry = set
+        let made = await BlockingWork.run { _ in
+            RescueSession(set: entry, inventory: inventory, dataDir: dir, logFiles: logs)
+        }
         guard mine == generation else { made.cancel(); return }
 
         session = made
@@ -122,6 +126,10 @@ final class RescueModel {
         generation += 1
         poller?.cancel()
         poller = nil
+        // A probe still being written is stopped, and removed when the write returns (see
+        // `runProbe`): it lands in the user's project folder and must not outlive the sheet.
+        probeTask?.cancel()
+        probeTask = nil
         session?.cancel()
         session = nil
         setName = ""
@@ -166,18 +174,34 @@ final class RescueModel {
         phase = .preparing
         status = nil
         let mine = generation
-        let outcome: Result<String, Error> = await Task.detached(priority: .userInitiated) {
-            Result { try s.prepare(disable: off) }
-        }.value
-        guard mine == generation else { return }
+        // Written on a queue of its own and without touching the session: the views read the
+        // session on the main actor. The result is taken over here, on the main actor.
+        let task = Task { () -> Result<RescueSession.WrittenProbe, Error> in
+            do {
+                return .success(try await BlockingWork.run { isCancelled in
+                    try s.writeProbe(disable: off, isCancelled: isCancelled)
+                })
+            } catch { return .failure(error) }
+        }
+        probeTask = task
+        let outcome = await task.value
+        guard mine == generation else {
+            // The sheet was closed (or another set opened) meanwhile: nobody wants this probe.
+            if case .success(let written) = outcome { s.discard(written) }
+            return
+        }
+        probeTask = nil
 
         switch outcome {
         case .failure(let error):
-            Diag.fail("rescue: run", error)
-            status = .startFailed(Self.message(for: error))
+            if !(error is CancellationError) {
+                Diag.fail("rescue: run", error)
+                status = .startFailed(Self.message(for: error))
+            }
             phase = .ready
-        case .success(let probe):
-            openProbe(probe)
+        case .success(let written):
+            s.commit(written)
+            openProbe(written.path)
             phase = .waiting
             waitingSince = Date()
             status = .started(round: s.round, disabled: off.map(\.name))
@@ -199,19 +223,32 @@ final class RescueModel {
             while !Task.isCancelled {
                 try? await Task.sleep(for: self?.pollInterval ?? .seconds(1))
                 guard !Task.isCancelled else { return }
-                self?.tick()
+                await self?.tick()
             }
         }
     }
 
     /// One second of the sheet's life: is Live running, and — while a probe is out — has Live
     /// written its verdict into the log. Reading only what was appended keeps this cheap.
-    func tick() {
-        let live = isLiveRunning()
+    ///
+    /// The process list and the log files are read on the blocking queue, never on the main
+    /// actor; the result is applied here if the sheet is still in the state it was asked in.
+    func tick() async {
+        guard !ticking else { return }
+        ticking = true
+        defer { ticking = false }
+        let mine = generation
+        let s = session
+        let wasWaiting = phase == .waiting
+        let liveCheck = isLiveRunning
+        let (live, polled) = await BlockingWork.run { _ in
+            (liveCheck(), wasWaiting ? s?.poll() : nil)
+        }
+        guard mine == generation else { return }
         if live != liveRunning { liveRunning = live }
-        guard phase == .waiting, let s = session else { return }
+        guard phase == .waiting, wasWaiting, let s else { return }
 
-        guard let a = s.poll() else {
+        guard let a = polled else {
             // The probe was never opened: the person changed their mind, or Live did not start.
             if Date().timeIntervalSince(waitingSince) > giveUpAfter, !live {
                 s.cancel()
@@ -256,12 +293,17 @@ final class RescueModel {
         guard canSaveRescued, let s = session else { return }
         let pick = s.rescueSelection()
         phase = .preparing
-        let outcome: Result<String, Error> = await Task.detached(priority: .userInitiated) {
-            Result { try s.saveRescued(disable: pick) }
-        }.value
+        let mine = generation
+        let outcome: Result<String, Error> = await BlockingWork.run { _ in
+            Result { try s.writeRescued(disable: pick) }
+        }
+        // The sheet was closed or another set opened while the copy was written: the file is
+        // the person's to keep, but this model's state is no longer about that set.
+        guard mine == generation else { return }
         phase = .ready
         switch outcome {
         case .success(let path):
+            s.noteSaved(path)
             produced = path
             status = .saved(fileName: (path as NSString).lastPathComponent, disabled: pick.map(\.name))
             app.toast(RescueStrings.toastSaved.f((path as NSString).lastPathComponent))
@@ -284,7 +326,7 @@ final class RescueModel {
 
     /// Whether Ableton Live is running — that is how "still loading" is told from "died", and
     /// why a probe is never started while Live holds an open project.
-    static func liveIsRunning() -> Bool {
+    nonisolated static func liveIsRunning() -> Bool {
         NSWorkspace.shared.runningApplications.contains {
             $0.bundleIdentifier?.hasPrefix("com.ableton.live") == true
                 || $0.localizedName?.hasPrefix("Ableton Live") == true
