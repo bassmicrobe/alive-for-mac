@@ -8,7 +8,7 @@ import AliveCore
 private enum Col {
     static let developer: CGFloat = 150
     static let type: CGFloat = 120
-    static let format: CGFloat = 64
+    static let format: CGFloat = 84
     static let sets: CGFloat = 52
     static let lastUsed: CGFloat = 100
     static let status: CGFloat = 116
@@ -93,17 +93,15 @@ struct PluginListView: View {
 // MARK: - Header
 
 private struct PluginHeaderRow: View {
-    @Environment(AppModel.self) private var app
-
     var body: some View {
         HStack(spacing: Col.gap) {
             HeaderCell(column: .name).frame(maxWidth: .infinity, alignment: .leading)
             HeaderCell(column: .vendor).frame(width: Col.developer, alignment: .leading)
             HeaderCell(column: .fxType).frame(width: Col.type, alignment: .leading)
             HeaderCell(column: .format).frame(width: Col.format, alignment: .leading)
-            HeaderCell(column: .sets, alignment: .trailing).frame(width: Col.sets, alignment: .trailing)
+            HeaderCell(column: .sets).frame(width: Col.sets, alignment: .trailing)
             HeaderCell(column: .lastUsed).frame(width: Col.lastUsed, alignment: .leading)
-            HeaderCell(column: .status, alignment: .trailing).frame(width: Col.status, alignment: .trailing)
+            HeaderCell(column: .status).frame(width: Col.status, alignment: .trailing)
         }
         .padding(.horizontal, Theme.cellPadX)
         .frame(height: 30)
@@ -113,7 +111,6 @@ private struct PluginHeaderRow: View {
 private struct HeaderCell: View {
     @Environment(AppModel.self) private var app
     let column: PluginColumn
-    var alignment: Alignment = .leading
 
     var body: some View {
         let model = app.plugins
