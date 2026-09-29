@@ -282,12 +282,12 @@ final class LiveFolderSuggestionsTests: XCTestCase {
 
 final class PluginStatusTests: XCTestCase {
     func testAnEmptyInventoryIsUnknownNotMissing() {
-        XCTAssertFalse(PluginStatus.isKnown(PluginInventory()))
+        XCTAssertFalse(PluginKnowledge.isKnown(PluginInventory()))
         var inventory = PluginInventory()
         var plugin = InstalledPlugin()
         plugin.name = "Serum"
         plugin.uid = "vst3:abc"
         inventory.add(plugin)
-        XCTAssertTrue(PluginStatus.isKnown(inventory))
+        XCTAssertTrue(PluginKnowledge.isKnown(inventory))
     }
 }

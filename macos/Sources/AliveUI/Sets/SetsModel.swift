@@ -102,7 +102,7 @@ final class SetsModel {
 
     /// Whether "missing plugin" is a known fact: false while the installed-plugin list could not be
     /// read. Then no missing marks are shown anywhere: the status is unknown, not missing.
-    var pluginsKnown: Bool { PluginStatus.isKnown(app.catalog.index.inventory) }
+    var pluginsKnown: Bool { PluginKnowledge.isKnown(app.catalog.index.inventory) }
 
     func set(at path: String) -> SetEntry? {
         app.catalog.sets.first { $0.path == path }
