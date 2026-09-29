@@ -117,7 +117,7 @@ private struct SearchField: View {
             }
         }
         .padding(.horizontal, 14)
-        .frame(minWidth: 200, maxWidth: 320, minHeight: Theme.controlH, maxHeight: Theme.controlH)
+        .frame(minWidth: 80, maxWidth: 320, minHeight: Theme.controlH, maxHeight: Theme.controlH)
         .background(Theme.sunken, in: Capsule())
         .focusRing(isFocused, cornerRadius: Theme.controlH / 2)
         .onChange(of: app.searchFocusRequest) { _, _ in isFocused = true }

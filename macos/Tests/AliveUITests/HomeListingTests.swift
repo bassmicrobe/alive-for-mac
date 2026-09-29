@@ -103,11 +103,11 @@ final class HomeTileNavigationTests: XCTestCase {
     }
 
     func testColumnCountFollowsUpstream() {
-        // (width + gap) / (250 + gap), 1...8
+        // (width + gap) / (250 + gap), at least 1
         XCTAssertEqual(HomeContentColumns.count(for: 100), 1)
         XCTAssertEqual(HomeContentColumns.count(for: 1000), 3)
         XCTAssertEqual(HomeContentColumns.count(for: 1150), 4)
-        XCTAssertEqual(HomeContentColumns.count(for: 9000), 8)
+        XCTAssertEqual(HomeContentColumns.count(for: 9000), 33)
     }
 
     func testKeyCodesMapToGridKeys() {

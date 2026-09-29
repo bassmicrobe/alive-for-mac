@@ -127,67 +127,77 @@ struct HeatmapMetrics: Equatable {
     var height: CGFloat { CGFloat(HeatmapGrid.rows) * step - Self.gap }
 }
 
+/// Sizes its one child to the calendar for the proposed width, without any state feedback: a
+/// size measured into @State made the window's structural-region pass loop at start-up.
+struct HeatmapFit: Layout {
+    let cols: Int
+
+    static let monthH: CGFloat = 12
+    static let monthGap: CGFloat = 7
+
+    static func size(cols: Int, available: CGFloat) -> CGSize {
+        let m = HeatmapMetrics(cols: cols, available: available)
+        return CGSize(width: m.width(cols: cols), height: monthH + monthGap + m.height)
+    }
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        Self.size(cols: cols, available: proposal.width ?? 700)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        let size = Self.size(cols: cols, available: bounds.width)
+        subviews.first?.place(at: bounds.origin, anchor: .topLeading, proposal: ProposedViewSize(size))
+    }
+}
+
 struct ActivityHeatmap: View {
     let grid: HeatmapGrid
-    let available: CGFloat
     @Binding var hovered: HeatmapCell?
 
-    private var metrics: HeatmapMetrics { HeatmapMetrics(cols: grid.cols, available: available) }
-    private let monthH: CGFloat = 12
-    private let monthGap: CGFloat = 7
-
     var body: some View {
-        let m = metrics
-        VStack(alignment: .leading, spacing: monthGap) {
-            monthRow(m)
-            cellCanvas(m)
+        HeatmapFit(cols: grid.cols) {
+            GeometryReader { proxy in
+                // The cell size is recovered from the size we were given: width = cols * step - gap.
+                let m = HeatmapMetrics(cols: grid.cols, available: proxy.size.width)
+                Canvas { context, _ in draw(&context, m) }
+                    .onContinuousHover { phase in hover(phase, m) }
+            }
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(HomeStrings.activeDays.s)
     }
 
-    private func monthRow(_ m: HeatmapMetrics) -> some View {
-        ZStack(alignment: .topLeading) {
-            ForEach(grid.monthLabels, id: \.col) { label in
-                Text(monthName(label.month))
-                    .font(Theme.fMini)
-                    .foregroundStyle(Theme.textDim)
-                    .fixedSize()
-                    .offset(x: CGFloat(label.col) * m.step)
-            }
+    private var gridTop: CGFloat { HeatmapFit.monthH + HeatmapFit.monthGap }
+
+    private func draw(_ context: inout GraphicsContext, _ m: HeatmapMetrics) {
+        for label in grid.monthLabels {
+            let text = context.resolve(Text(monthName(label.month)).font(Theme.fMini).foregroundStyle(Theme.textDim))
+            context.draw(text, at: CGPoint(x: CGFloat(label.col) * m.step, y: 0), anchor: .topLeading)
         }
-        .frame(width: m.width(cols: grid.cols), height: monthH, alignment: .topLeading)
+        let radius = m.cell * 0.3
+        for cell in grid.cells {
+            let rect = CGRect(x: CGFloat(cell.col) * m.step, y: gridTop + CGFloat(cell.row) * m.step, width: m.cell, height: m.cell)
+            let level = HeatmapGrid.level(saves: cell.saves, maxSaves: grid.maxSaves)
+            let color = level.map { Theme.light.opacity(HeatmapGrid.levelAlpha[$0]) } ?? Color.white.opacity(HeatmapGrid.emptyAlpha)
+            context.fill(Path(roundedRect: rect, cornerRadius: radius), with: .color(color))
+        }
+        if let hovered {
+            let rect = CGRect(x: CGFloat(hovered.col) * m.step, y: gridTop + CGFloat(hovered.row) * m.step,
+                              width: m.cell, height: m.cell).insetBy(dx: -1, dy: -1)
+            context.fill(Path(roundedRect: rect, cornerRadius: radius), with: .color(Theme.lightTop))
+        }
     }
 
-    private func cellCanvas(_ m: HeatmapMetrics) -> some View {
-        Canvas { context, _ in
-            let radius = m.cell * 0.3
-            for cell in grid.cells {
-                let rect = CGRect(x: CGFloat(cell.col) * m.step, y: CGFloat(cell.row) * m.step, width: m.cell, height: m.cell)
-                let alpha = HeatmapGrid.level(saves: cell.saves, maxSaves: grid.maxSaves)
-                    .map { HeatmapGrid.levelAlpha[$0] } ?? HeatmapGrid.emptyAlpha
-                let color = cell.saves > 0 ? Theme.light.opacity(alpha) : Color.white.opacity(alpha)
-                context.fill(Path(roundedRect: rect, cornerRadius: radius), with: .color(color))
-            }
-            if let hovered {
-                let rect = CGRect(x: CGFloat(hovered.col) * m.step, y: CGFloat(hovered.row) * m.step,
-                                  width: m.cell, height: m.cell).insetBy(dx: -1, dy: -1)
-                context.fill(Path(roundedRect: rect, cornerRadius: radius), with: .color(Theme.lightTop))
-            }
-        }
-        .frame(width: m.width(cols: grid.cols), height: m.height)
-        .onContinuousHover { phase in
-            switch phase {
-            case .active(let point):
-                let col = Int(point.x / m.step), row = Int(point.y / m.step)
-                // The gaps between cells belong to no day.
-                let inside = point.x.truncatingRemainder(dividingBy: m.step) < m.cell
-                    && point.y.truncatingRemainder(dividingBy: m.step) < m.cell
-                let next = inside ? grid.cell(col: col, row: row) : nil
-                if next != hovered { hovered = next }
-            case .ended:
-                if hovered != nil { hovered = nil }
-            }
+    private func hover(_ phase: HoverPhase, _ m: HeatmapMetrics) {
+        switch phase {
+        case .active(let point):
+            let y = point.y - gridTop
+            let inside = y >= 0 && point.x.truncatingRemainder(dividingBy: m.step) < m.cell
+                && y.truncatingRemainder(dividingBy: m.step) < m.cell
+            let next = inside ? grid.cell(col: Int(point.x / m.step), row: Int(y / m.step)) : nil
+            if next != hovered { hovered = next }
+        case .ended:
+            if hovered != nil { hovered = nil }
         }
     }
 

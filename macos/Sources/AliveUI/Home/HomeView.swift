@@ -1,6 +1,7 @@
 // Port of src/HomeView.cs: the Home tab — Overview panel, then the Projects grid with a "New Live
 // Set" tile first. Tiles are lazy and load their picture when they appear. Keeps the first-run screen.
 import AliveCore
+import AppKit
 import SwiftUI
 
 struct HomeView: View {
@@ -19,11 +20,10 @@ struct HomeView: View {
 enum HomeContentColumns {
     static let gap: CGFloat = 16
     static let targetTileWidth: CGFloat = 250
-    static let maxColumns = 8
 
-    /// upstream: `Math.Min(8, Math.Max(1, (Width + gap) / (target + gap)))`
+    /// upstream: `Math.Max(1, (Width + gap) / (target + gap))` (upstream also caps it at 8; the adaptive grid does not)
     static func count(for width: CGFloat) -> Int {
-        min(maxColumns, max(1, Int((width + gap) / (targetTileWidth + gap))))
+        max(1, Int((width + gap) / (targetTileWidth + gap)))
     }
 }
 
@@ -37,32 +37,25 @@ private struct HomeContent: View {
 
     var body: some View {
         ZStack(alignment: .bottom) {
-            GeometryReader { proxy in
-                let columns = HomeContentColumns.count(for: proxy.size.width - Theme.pad * 2)
-                ScrollViewReader { scroller in
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: 28) {
-                            OverviewPanel()
-                            projects(columns: columns)
-                        }
-                        .padding(.horizontal, Theme.pad)
-                        .padding(.top, 4)
-                        .padding(.bottom, app.player.isStripVisible ? 96 : Theme.pad)
+            ScrollViewReader { scroller in
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 28) {
+                        OverviewPanel()
+                        projects
                     }
-                    // Not `.focusable()`: a focusable scroll view inside the hidden-title-bar window
-                    // made AppKit's drag-region pass raise. Keys come from a local event monitor.
-                    .onChange(of: app.selectedSetPath) { _, path in
-                        if let path { scroller.scrollTo(path) }
-                    }
-                    .onAppear {
-                        keys.start { key in handle(key, columns: columns) }
-                    }
-                    .onChange(of: columns) { _, _ in
-                        keys.start { key in handle(key, columns: HomeContentColumns.count(for: proxy.size.width - Theme.pad * 2)) }
-                    }
-                    .onDisappear { keys.stop() }
+                    .padding(.horizontal, Theme.pad)
+                    .padding(.top, 4)
+                    .padding(.bottom, app.player.isStripVisible ? 96 : Theme.pad)
                 }
-            }
+                // Not `.focusable()`, and no GeometryReader: both made AppKit's window structural-region
+                // pass abort at start-up. Keys come from a local event monitor; the column count
+                // is read from the window when a key arrives.
+                .onChange(of: app.selectedSetPath) { _, path in
+                    if let path { scroller.scrollTo(path) }
+                }
+                .onAppear { keys.start { key in handle(key) } }
+                .onDisappear { keys.stop() }
+                            }
             if app.player.isStripVisible {
                 NowPlayingStrip().transition(.move(edge: .bottom).combined(with: .opacity))
             }
@@ -72,11 +65,11 @@ private struct HomeContent: View {
 
     // MARK: - Projects
 
-    private func projects(columns: Int) -> some View {
+    private var projects: some View {
         let rows = app.home.rows
         return VStack(alignment: .leading, spacing: 16) {
             projectsHeader
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: Self.gap), count: columns),
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: HomeContentColumns.targetTileWidth), spacing: Self.gap)],
                       spacing: Self.gap) {
                 newSetTile
                 ForEach(rows) { set in tile(for: set) }
@@ -149,7 +142,8 @@ private struct HomeContent: View {
     // MARK: - Keyboard
 
     /// Returns true when the key was ours.
-    private func handle(_ key: HomeKeyMonitor.Key, columns: Int) -> Bool {
+    private func handle(_ key: HomeKeyMonitor.Key) -> Bool {
+        let columns = HomeContentColumns.count(for: (NSApp.keyWindow?.contentView?.bounds.width ?? 1200) - Theme.pad * 2)
         guard app.sheet == nil, app.tab == .home else { return false }
         let rows = app.home.rows
         let current = app.selectedSetPath.flatMap { path in rows.firstIndex { $0.path == path } }
