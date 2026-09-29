@@ -409,6 +409,8 @@ final class ElementStream {
         return nil
     }
 
+    static let maxAttributesPerTag = 1024
+
     /// Reads `name = "value"` at `i`; appends a record; returns an error text or nil.
     private static func readAttribute(_ p: UnsafePointer<UInt8>, _ n: Int, _ i: inout Int,
                                       _ scratch: AttrScratch) -> String? {
@@ -435,6 +437,9 @@ final class ElementStream {
         guard i < n else { return "unterminated attribute value" }
         let vl = i - vs
         i += 1
+        // The duplicate check below is linear in the attributes so far: cap them, or a tag with
+        // a million attributes costs a trillion comparisons.
+        if scratch.recs.count >= Self.maxAttributesPerTag { return "too many attributes in one tag" }
         for r in scratch.recs where r.nameLen == nl && memcmp(p + r.nameStart, p + ns, nl) == 0 {
             return "duplicate attribute"
         }

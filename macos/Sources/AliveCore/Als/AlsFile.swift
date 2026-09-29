@@ -105,6 +105,10 @@ public enum AlsFile {
         do {
             let xml = try Gzip.readMaybeGzip(path: path)
             return parse(xml: xml, path: path)
+        } catch GzipError.tooLarge {
+            Diag.warn("set is larger than \(Gzip.maxInflatedBytes >> 20) MB inflated, skipped: \(path)")
+            info.error = "Too large to be a set (decompression limit)"
+            return info
         } catch {
             info.error = error.localizedDescription
             return info
@@ -201,7 +205,12 @@ final class AlsParser {
             if t > 0 { info.tempo = t; tempoSeen = true }
         }
         if songScaleDepth >= 0, e.depth == songScaleDepth + 1 {
-            if e.name == "Root" { info.scaleRoot = e.int() } else if e.name == "Name" { info.scaleIndex = e.int() }
+            // Clamped here: a crafted value would otherwise travel into the Int32 cache fields.
+            if e.name == "Root" {
+                let v = e.int(); info.scaleRoot = (0..<12).contains(v) ? v : -1
+            } else if e.name == "Name" {
+                let v = e.int(); info.scaleIndex = (0..<Scales.scaleCount).contains(v) ? v : -1
+            }
         }
     }
 

@@ -17,7 +17,7 @@ enum CommonStrings: LocalizedStrings {
     case comingSoonTitle, comingSoonBody
     // Toasts
     case liveNotFound, liveOpenFailed, liveLaunchFailed, audioFailed, folderOpenFailed
-    case pathMissing, settingsSaveFailed, rootAdded, rootsAdded, alreadyWatching, notAFolder
+    case pathMissing, settingsSaveFailed, dataFileBackedUp, rootAdded, rootsAdded, alreadyWatching, notAFolder
     // Scan status and first run
     case scanning, scanProgress
     case emptyRootsTitle, emptyRootsBody, addProjectsFolder, chooseFolderPrompt, chooseFolderMessage
@@ -74,6 +74,9 @@ enum CommonStrings: LocalizedStrings {
         case .folderOpenFailed: return ("Could not open the folder: %@", "フォルダを開けませんでした: %@")
         case .pathMissing: return ("The file no longer exists: %@", "ファイルが見つかりません: %@")
         case .settingsSaveFailed: return ("Could not save settings: %@", "設定を保存できませんでした: %@")
+        case .dataFileBackedUp:
+            return ("“%1$@” could not be read. The original was kept as “%1$@.bak”.",
+                    "「%1$@」を読み込めませんでした。元のファイルは「%1$@.bak」として残してあります。")
         case .rootAdded: return ("Added %@", "%@を追加しました")
         case .rootsAdded: return ("Added %lld folders", "%lld 個のフォルダを追加しました")
         case .alreadyWatching: return ("Already watching that folder", "そのフォルダはすでに監視しています")

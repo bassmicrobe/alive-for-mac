@@ -83,7 +83,9 @@ public enum AiffReader {
                     header.channels = HeaderIO.be16(comm, 0)
                     header.frames = HeaderIO.be32(comm, 2)
                     header.bits = HeaderIO.be16(comm, 6)
-                    header.rate = Int(extended(Array(comm[8..<18])).rounded())
+                    let rate = extended(Array(comm[8..<18]))
+                    // A crafted exponent gives inf/NaN, which would trap in Int(_:).
+                    header.rate = rate.isFinite && rate > 0 && rate < 1e7 ? Int(rate.rounded()) : 0
                     if isAifc, n >= 22 { header.compression = HeaderIO.tag(comm, 18) }
                     gotComm = true
                 }

@@ -88,6 +88,9 @@ public enum UpdateCheck {
         return n
     }
 
+    /// The largest reply that is read at all.
+    public static let maxBodyBytes = 1024 * 1024
+
     // MARK: answer
 
     private struct Payload: Decodable {
@@ -98,6 +101,8 @@ public enum UpdateCheck {
 
     /// Reads GitHub's answer. Total: every status and every body ends up as an `Outcome`.
     public static func outcome(status: Int, body: Data, current: String) -> Outcome {
+        // A release description is a few KB; a megabyte is not GitHub's answer.
+        guard body.count <= maxBodyBytes else { return .failed(.unexpectedAnswer) }
         switch status {
         case 200: break
         case 404: return .noReleases
@@ -156,7 +161,14 @@ public struct URLSessionFetcher: UpdateFetching {
         // Ephemeral: no cookies, no credentials, no cache kept on disk.
         let session = URLSession(configuration: .ephemeral)
         defer { session.finishTasksAndInvalidate() }
-        let (data, response) = try await session.data(for: request)
+        // Read as a stream and stop past the cap: the body of a hostile or broken server is
+        // not held in memory whole.
+        let (bytes, response) = try await session.bytes(for: request)
+        var data = Data()
+        for try await byte in bytes {
+            data.append(byte)
+            if data.count > UpdateCheck.maxBodyBytes { break }
+        }
         return (data, (response as? HTTPURLResponse)?.statusCode ?? 0)
     }
 }

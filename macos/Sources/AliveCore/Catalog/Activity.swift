@@ -144,7 +144,10 @@ public struct Activity: Sendable {
             guard try r.int32() == cacheVersion else { return .empty }
             let n = Int(try r.int32())
             guard n >= 0, n <= 5_000_000 else { return .empty }
-            for _ in 0..<n { stamps.append(DotNetTicks.date(local: try r.int64())) }
+            for _ in 0..<n {
+                let ticks = try r.int64()
+                if DotNetTicks.isValid(ticks: ticks) { stamps.append(DotNetTicks.date(local: ticks)) }   // damaged record: skipped
+            }
         } catch {
             if stamps.isEmpty { Diag.warn("activity.cache unreadable: \(error)") }
         }
@@ -155,7 +158,7 @@ public struct Activity: Sendable {
     public func saveCache(dir: String = AppHome.path) {
         var w = DotNetWriter()
         w.int32(Activity.cacheVersion)
-        w.int32(Int32(stamps.count))
+        w.int32(Int32(clamping: stamps.count))
         stamps.forEach { w.int64(DotNetTicks.local($0)) }
         do { try AppHome.writeAtomically(w.data, to: Activity.cachePath(dir: dir)) } catch {
             Diag.fail("activity.cache write", error)

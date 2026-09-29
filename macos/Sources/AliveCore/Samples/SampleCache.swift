@@ -8,6 +8,8 @@ import Foundation
 public enum SampleCache {
     static let version: Int32 = 4
     private static let oldVersion: Int32 = 2
+    private static let minFolderBytes = 17   // path string (1) + parent (4) + samples (4) + bytes (8); v2 has no dates
+    private static let minFileBytes = 14     // folder (4) + name (1) + size (8) + silent (1)
 
     public static func path(dir: String) -> String { AppHome.file("samples.cache", in: dir) }
 
@@ -15,7 +17,7 @@ public enum SampleCache {
     public static func load(dir: String) -> SampleIndex {
         guard let data = FileManager.default.contents(atPath: path(dir: dir)) else { return .empty }
         do { return try decode(data) } catch {
-            Diag.fail("samples.cache read", error)
+            Diag.fail("samples.cache unreadable, will rescan", error)
             return .empty
         }
     }
@@ -30,18 +32,18 @@ public enum SampleCache {
     static func encode(_ index: SampleIndex) -> Data {
         var w = DotNetWriter()
         w.int32(version)
-        w.int32(Int32(index.folders.count))
+        w.int32(Int32(clamping: index.folders.count))
         for f in index.folders {
             w.string(f.path)
-            w.int32(Int32(f.parent ?? -1))
-            w.int32(Int32(f.totalSamples))
+            w.int32(Int32(clamping: f.parent ?? -1))
+            w.int32(Int32(clamping: f.totalSamples))
             w.int64(f.totalBytes)
             w.int64(ticks(f.created))
             w.int64(ticks(f.modified))
         }
-        w.int32(Int32(index.files.count))
+        w.int32(Int32(clamping: index.files.count))
         for s in index.files {
-            w.int32(Int32(s.folder))
+            w.int32(Int32(clamping: s.folder))
             w.string(s.name)
             w.int64(s.size)
             w.bool(s.silent)
@@ -49,8 +51,8 @@ public enum SampleCache {
             w.int64(ticks(s.modified))
             w.int64(Int64(bitPattern: s.print))
         }
-        w.int32(Int32(index.roots.count))
-        for r in index.roots { w.int32(Int32(r)) }
+        w.int32(Int32(clamping: index.roots.count))
+        for r in index.roots { w.int32(Int32(clamping: r)) }
         return w.data
     }
 
@@ -61,8 +63,11 @@ public enum SampleCache {
         let dates = v == version
         var idx = SampleIndex()
 
+        // A count from the file is checked against the bytes left (a folder takes at least 33,
+        // a file 5+, a root 4) and never used to reserve memory: a damaged cache must fall
+        // back to a rescan, not crash the launch.
         let folders = Int(try r.int32())
-        idx.folders.reserveCapacity(folders)
+        guard folders >= 0, folders <= r.remaining / minFolderBytes else { throw BinaryFormatError.truncated }
         for i in 0..<folders {
             var f = SampleFolder()
             f.path = try r.string()
@@ -85,7 +90,7 @@ public enum SampleCache {
         }
 
         let files = Int(try r.int32())
-        idx.files.reserveCapacity(files)
+        guard files >= 0, files <= r.remaining / minFileBytes else { throw BinaryFormatError.truncated }
         for i in 0..<files {
             var s = SampleFile()
             s.folder = Int(try r.int32())
@@ -103,6 +108,7 @@ public enum SampleCache {
         }
 
         let roots = Int(try r.int32())
+        guard roots >= 0, roots <= r.remaining / 4 else { throw BinaryFormatError.truncated }
         for _ in 0..<roots {
             let root = Int(try r.int32())
             guard root >= 0, root < idx.folders.count else { throw BinaryFormatError.truncated }
@@ -114,6 +120,6 @@ public enum SampleCache {
     private static func ticks(_ d: Date?) -> Int64 { d.map(DotNetTicks.utc) ?? 0 }
 
     private static func date(_ ticks: Int64) -> Date? {
-        ticks > 0 && ticks <= 3_155_378_975_999_999_999 ? DotNetTicks.date(utc: ticks) : nil
+        ticks > 0 && DotNetTicks.isValid(ticks: ticks) ? DotNetTicks.date(utc: ticks) : nil
     }
 }

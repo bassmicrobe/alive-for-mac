@@ -46,9 +46,16 @@ public enum Diag {
         return f.string(from: Date())
     }
 
+    /// The home folder is written as `~`: a log gets attached to bug reports, and the user name
+    /// inside every path is nobody's business but the owner's.
+    static func redacted(_ text: String, home: String = NSHomeDirectory()) -> String {
+        guard home.count > 1 else { return text }
+        return text.replacingOccurrences(of: home, with: "~")
+    }
+
     private static func append(_ text: String) {
         gate.lock(); defer { gate.unlock() }
-        guard let path = logPath, let data = (text + "\n").data(using: .utf8),
+        guard let path = logPath, let data = (redacted(text) + "\n").data(using: .utf8),
               let h = FileHandle(forWritingAtPath: path) else { return }
         defer { try? h.close() }
         _ = try? h.seekToEnd()

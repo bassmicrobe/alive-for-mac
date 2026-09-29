@@ -74,6 +74,11 @@ final class AppModel {
         guard !started else { return }
         started = true
         RescueProbe.cleanupStale(dir: dataDir)
+        // The lazily read files are read now, so a damaged one is noticed (and backed up before
+        // anything can overwrite it) at launch and the person is told once.
+        _ = ProjectMeta.shared.allTags()
+        _ = HomeStore.shared.pins
+        announceBackedUpFiles()
         catalog.start()
         samples.expandsRootsOnFirstLoad = true
         samples.start()
@@ -133,6 +138,13 @@ final class AppModel {
     var canPresentFilters: Bool { tab == .sets || tab == .plugins }
 
     // MARK: - Toasts
+
+    /// One toast per data file that was unreadable and has been copied to `<file>.bak`.
+    func announceBackedUpFiles() {
+        for name in AppHome.takeBackupNotices() {
+            toast(CommonStrings.dataFileBackedUp.f(name), kind: .error)
+        }
+    }
 
     func toast(_ text: String, kind: ToastMessage.Kind = .info) {
         let message = ToastMessage(text: text, kind: kind)
