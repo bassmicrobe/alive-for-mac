@@ -2,7 +2,7 @@ import XCTest
 @testable import AliveCore
 
 /// Differential run + benchmark of the byte tokenizer against the original XMLParser engine on a
-/// real library. Skipped unless `ALIVE_TEST_SETS=/path/to/projects` is set. Never commit paths.
+/// real library. Skipped unless `ALIVE_TEST_PARSER_DIFF=/path/to/projects` is set (heavy: minutes, GBs of RAM). Never commit paths.
 final class ElementStreamRealLibraryTests: XCTestCase {
     private func sets(under root: String) -> [String] {
         var out: [String] = []
@@ -19,8 +19,8 @@ final class ElementStreamRealLibraryTests: XCTestCase {
     }
 
     private func root() throws -> String {
-        guard let r = ProcessInfo.processInfo.environment["ALIVE_TEST_SETS"], !r.isEmpty else {
-            throw XCTSkip("ALIVE_TEST_SETS not set")
+        guard let r = ProcessInfo.processInfo.environment["ALIVE_TEST_PARSER_DIFF"], !r.isEmpty else {
+            throw XCTSkip("ALIVE_TEST_PARSER_DIFF not set")
         }
         return r
     }

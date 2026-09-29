@@ -256,7 +256,7 @@ scan, a working minimal Sets list, end-to-end run against a real library.
   dir. Never commit user data and never hardcode paths from this machine.
 - Real-library smoke tests are gated by env vars and skipped otherwise:
   `ALIVE_TEST_SETS=/path/to/projects` (parse every set, no crash, sane stats),
-  `ALIVE_TEST_SAMPLES=/path/to/samples`.
+  `ALIVE_TEST_SAMPLES=/path/to/samples`. The parser differential (reference XMLParser vs tokenizer) is heavier and has its own gate, `ALIVE_TEST_PARSER_DIFF`. `swift test --filter` does not select tests with this toolchain; run the whole suite with the env var set.
 - Every string table has its completeness test.
 - Before reporting done: `swift build` and `swift test` are green in `macos/`, with no new warnings
   in your files.
