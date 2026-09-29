@@ -24,6 +24,23 @@ final class SetsPipelineTests: XCTestCase {
         return SetsPipeline.make(input)
     }
 
+    func testRowIndexFollowsDisplayOrderPinnedFirstAndUnfoldedChildren() {
+        let dirA = "/lib/A Project", dirB = "/lib/B Project", dirC = "/lib/C Project"
+        let sets = [entry("a2", dir: dirA, modified: 300), entry("a1", dir: dirA, modified: 100),
+                    entry("b", dir: dirB, modified: 200), entry("c", dir: dirC, modified: 50)]
+        let pinned = dirC + "/c.als"
+        let p = make(sets) { $0.pinnedFirst = true; $0.pins = [pinned] }
+        let open: Set<String> = [SetsPipeline.key(forDirectory: dirA)]
+        // c (pinned), a2, a1 (unfolded under a2), b
+        XCTAssertEqual(p.rowIndex(of: pinned, expanded: open), 0)
+        XCTAssertEqual(p.rowIndex(of: dirA + "/a2.als", expanded: open), 1)
+        XCTAssertEqual(p.rowIndex(of: dirA + "/a1.als", expanded: open), 2)
+        XCTAssertEqual(p.rowIndex(of: dirB + "/b.als", expanded: open), 3)
+        // Folded: the child has no row, and the rows after it move up.
+        XCTAssertNil(p.rowIndex(of: dirA + "/a1.als", expanded: []))
+        XCTAssertEqual(p.rowIndex(of: dirB + "/b.als", expanded: []), 2)
+    }
+
     func testFoldsAFolderUnderItsNewestSetAndListsTheRestNewestFirst() {
         let sets = [entry("v1", modified: 100), entry("v3", modified: 300), entry("v2", modified: 200),
                     entry("other", dir: "/lib/B Project", modified: 50)]

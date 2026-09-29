@@ -95,6 +95,12 @@ struct SetsPipeline {
         }
     }
 
+    /// The table row (0-based, in display order) that `path` occupies, or nil when it is not shown
+    /// (filtered out, or folded under a row that is not open).
+    func rowIndex(of path: String, expanded: Set<String>) -> Int? {
+        flattened(expanded: expanded).firstIndex { $0.path == path }
+    }
+
     /// The head row that stands for `path` (the row itself, or the row it is folded under).
     func head(containing path: String) -> SetEntry? {
         if let h = heads.first(where: { $0.path == path }) { return h }

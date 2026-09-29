@@ -19,19 +19,49 @@ struct TableScrollBridge: NSViewRepresentable {
 
     func updateNSView(_ view: NSView, context: Context) {
         let coordinator = context.coordinator
+        coordinator.paths = rows.map(\.path)
         guard request.serial != coordinator.handled, let path = request.path else { return }
         coordinator.handled = request.serial
-        let paths = rows.map(\.path)
-        // The table lays a just-unfolded folder out on the next pass: scroll after it.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) { [weak view] in
-            guard let table = view?.window.flatMap({ Self.findTable(in: $0.contentView) }),
-                  let row = paths.firstIndex(of: path), row < table.numberOfRows else { return }
-            table.scrollRowToVisible(row)
-        }
+        coordinator.attempt(path: path, serial: request.serial, view: view, tries: 0)
     }
 
     final class Coordinator {
         var handled = 0
+        /// The rows as of the latest update: a later layout pass may have changed them.
+        var paths: [String] = []
+
+        /// Centres `path`'s row once the table has laid out and applied the selection. The table is
+        /// still being sized and filled on the first passes (the inspector opens beside it), so a
+        /// scroll done too early lands short: check the row really is on screen, else try again.
+        func attempt(path: String, serial: Int, view: NSView?, tries: Int) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + (tries == 0 ? 0.08 : 0.25)) { [weak self, weak view] in
+                guard let self, self.handled == serial,
+                      let table = view?.window.flatMap({ TableScrollBridge.findTable(in: $0.contentView) }),
+                      let row = self.paths.firstIndex(of: path), row < table.numberOfRows else { return }
+                TableScrollBridge.center(row: row, in: table)
+                let onScreen = table.visibleRect.contains(table.rect(ofRow: row))
+                if (!onScreen || !table.selectedRowIndexes.contains(row)) && tries < Self.maxTries {
+                    self.attempt(path: path, serial: serial, view: view, tries: tries + 1)
+                }
+            }
+        }
+
+        private static let maxTries = 6
+    }
+
+    /// Scrolls so the row sits in the middle of the visible area (as far as the ends allow).
+    static func center(row: Int, in table: NSTableView) {
+        guard let scroll = table.enclosingScrollView else { table.scrollRowToVisible(row); return }
+        let clip = scroll.contentView
+        table.layoutSubtreeIfNeeded()
+        let rect = table.rect(ofRow: row)
+        let top = table.headerView?.frame.height ?? 0
+        let visibleHeight = clip.bounds.height - top
+        let target = rect.midY - top - visibleHeight / 2
+        let maxY = max(0, table.frame.height - clip.bounds.height)
+        let y = min(max(-clip.contentInsets.top, target), maxY)
+        clip.scroll(to: NSPoint(x: clip.bounds.origin.x, y: y))
+        scroll.reflectScrolledClipView(clip)
     }
 
     /// The biggest NSTableView below `root` (the window has one list at a time).
