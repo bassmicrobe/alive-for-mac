@@ -1,0 +1,9 @@
+# SwiftPM / Xcode
+.build/
+.swiftpm/
+*.xcodeproj/
+xcuserdata/
+DerivedData/
+# App bundle and release archives produced by scripts/build-app.sh
+build/
+dist/

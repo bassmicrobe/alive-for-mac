@@ -1,0 +1,3 @@
+import AliveUI
+
+AliveApp.main()

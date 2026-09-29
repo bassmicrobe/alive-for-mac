@@ -1,0 +1,76 @@
+# upstream_path	swift_paths (;-separated, relative to macos/)	owner	notes
+src/Activity.cs	Sources/AliveCore/Catalog/Activity.swift	1B	
+src/AiffReader.cs	Sources/AliveCore/Samples/AiffReader.swift	S4	may be replaced by AVFoundation metadata
+src/AlsFile.cs	Sources/AliveCore/Als/AlsFile.swift	1B	+AU fields (Mac)
+src/AlsPatch.cs	Sources/AliveCore/Rescue/AlsPatch.swift	S6	+AuPluginInfo (Mac)
+src/AlsSamplePatch.cs	Sources/AliveCore/Rescue/AlsSamplePatch.swift	S6	
+src/app.manifest	scripts/build-app.sh	1A	Info.plist equivalent
+src/Arrangement.cs	Sources/AliveCore/Als/Arrangement.swift	1B	
+src/ArrangementLoader.cs	Sources/AliveCore/Als/ArrangementLoader.swift	1B	UI-free part only
+src/ArrangementRender.cs	Sources/AliveUI/Home/ArrangementRender.swift	S2	CoreGraphics / Canvas
+src/AssemblyInfo.cs	scripts/build-app.sh	1A	version -> Info.plist
+src/AudioPlayer.cs	Sources/AliveUI/Services/AudioPlayback.swift;Sources/AliveUI/Home/PlayerModel.swift	1A;S2	AVFoundation
+src/CollectAll.cs	Sources/AliveCore/Export/CollectAll.swift	S6	zip via /usr/bin/ditto
+src/CollectDialog.cs	Sources/AliveUI/Export/ExportSheet.swift	S6	
+src/Controls.cs	Sources/AliveUI/Theme/Components.swift	1A	shared SwiftUI components
+src/DetailPanel.cs	Sources/AliveUI/Sets/DetailPanel.swift	S1	
+src/Diag.cs	Sources/AliveCore/Infra/Diag.swift	1B	
+src/FiltersDialog.cs	Sources/AliveUI/Sets/FiltersSheet.swift	S1	
+src/FolderScan.cs	Sources/AliveCore/Catalog/FolderScan.swift	1B	
+src/FolderWatch.cs	Sources/AliveCore/Catalog/FolderWatch.swift	S1	FSEvents
+src/Glass.cs	Sources/AliveUI/Theme/Glass.swift	1A	NSVisualEffectView
+src/GlassDialog.cs	Sources/AliveUI/Theme/Components.swift	1A	
+src/HelpOverlay.cs	Sources/AliveUI/Help/HelpSheet.swift	1A	
+src/HomeStore.cs	Sources/AliveCore/Catalog/HomeStore.swift	1B	
+src/HomeView.cs	Sources/AliveUI/Home/HomeView.swift	S2	
+src/Icons.cs	Sources/AliveUI/Theme/Icons.swift	1A	SF Symbols
+src/LiveColors.cs	Sources/AliveCore/Als/LiveColors.swift	1B	RGB only, no AppKit
+src/LiveEnvironment.cs	Sources/AliveCore/Live/LiveEnvironment.swift	1B	Mac paths, no Registry
+src/LiveLog.cs	Sources/AliveCore/Live/LiveLog.swift	S6	Mac Log.txt
+src/MainForm.cs	Sources/AliveUI/App/MainWindow.swift;Sources/AliveUI/App/AppModel.swift;Sources/AliveUI/App/AppCommands.swift	1A;W1.5	
+src/MediaDecoder.cs	-	-	N/A: AVFoundation decodes
+src/MediaKeys.cs	Sources/AliveUI/Home/MediaKeys.swift	S2	MPRemoteCommandCenter
+src/MfInterop.cs	-	-	N/A: Media Foundation
+src/NotesDialog.cs	Sources/AliveUI/Sets/TagsSheet.swift	S1	
+src/OverviewPanel.cs	Sources/AliveUI/Sets/OverviewPanel.swift	S1	
+src/PlayerDialog.cs	Sources/AliveUI/Home/PlayerWindow.swift	S2	
+src/PluginFilter.cs	Sources/AliveCore/Plugins/PluginFilter.swift	S3	
+src/PluginFiltersDialog.cs	Sources/AliveUI/Plugins/PluginFiltersSheet.swift	S3	
+src/PluginInventory.cs	Sources/AliveCore/Plugins/PluginInventory.swift	1B stub;S3	AU/VST/VST3 bundles
+src/PluginSummary.cs	Sources/AliveUI/Plugins/PluginSummary.swift	S3	
+src/PreviewDialog.cs	Sources/AliveUI/Home/PreviewSheet.swift	S2	
+src/Program.cs	Sources/AliveUI/App/AliveApp.swift;Sources/AliveUI/App/AppDelegate.swift	1A	
+src/ProjectIndex.cs	Sources/AliveCore/Catalog/ProjectIndex.swift	1B	
+src/ProjectMeta.cs	Sources/AliveCore/Catalog/ProjectMeta.swift	1B	
+src/RefResolver.cs	Sources/AliveCore/Als/RefResolver.swift	1B	
+src/RenderIndex.cs	Sources/AliveCore/Catalog/RenderIndex.swift	1B	
+src/RescueDialog.cs	Sources/AliveUI/Rescue/RescueSheet.swift	S6	
+src/RescueSession.cs	Sources/AliveCore/Rescue/RescueSession.swift	S6	launches Live via NSWorkspace from UI side
+src/RootsDialog.cs	Sources/AliveUI/Sets/RootsSheet.swift	S1	projects + samples pages
+src/RowListView.cs	Sources/AliveUI/Sets/SetsView.swift	S1	SwiftUI Table
+src/SampleIndex.cs	Sources/AliveCore/Samples/SampleIndex.swift	S4	
+src/SampleScan.cs	Sources/AliveCore/Samples/SampleScan.swift	S4	
+src/SamplesTab.cs	Sources/AliveUI/Samples/SamplesView.swift	S4	
+src/SampleUsage.cs	Sources/AliveCore/Samples/SampleUsage.swift	S4	
+src/Scales.cs	Sources/AliveCore/Als/Scales.swift	1B	
+src/SetFilter.cs	Sources/AliveCore/Catalog/SetFilter.swift	S1	
+src/Settings.cs	Sources/AliveCore/Infra/Settings.swift	1B	+Mac keys (lang)
+src/SettingsDialog.cs	Sources/AliveUI/Settings/SettingsView.swift	1A;S5	
+src/SingleInstance.cs	-	-	N/A: LaunchServices is single-instance
+src/SmoothScrollEngine.cs	-	-	N/A: native macOS scrolling
+src/TagEditor.cs	Sources/AliveUI/Sets/TagsSheet.swift	S1	
+src/TagField.cs	Sources/AliveUI/Sets/TagsSheet.swift	S1	
+src/Theme.cs	Sources/AliveUI/Theme/Theme.swift	1A	
+src/ThumbCache.cs	Sources/AliveUI/Home/ThumbCache.swift	S2	
+src/Toast.cs	Sources/AliveUI/Theme/Toast.swift	1A	
+src/UpdateCheck.cs	Sources/AliveCore/Update/UpdateCheck.swift	S5	fork releases API
+src/icons/	scripts/build-app.sh	1A	icns from icon256.ico
+nebula/Channels.cs	Sources/AliveUI/Stat/StatChannels.swift	S5	
+nebula/Cloud.cs	Sources/AliveUI/Stat/CloudCanvas.swift	S5	
+nebula/NebulaForm.cs	Sources/AliveUI/Stat/StatWindow.swift	S5	
+FORMAT.md	-	-	reference; read before touching Als/
+README.md	../.github/README.md	docs	Mac README lives in .github/
+README.ru.md	-	-	not ported
+build.cmd	scripts/build-app.sh	1A	
+tools/	-	-	Windows test harnesses; Swift tests live in Tests/
+LICENSE	-	-	kept verbatim; copied into the .app
