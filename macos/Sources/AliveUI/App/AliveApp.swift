@@ -16,6 +16,7 @@ public struct AliveApp: App {
             MainWindow().environment(app)
         }
         .windowStyle(.hiddenTitleBar)
+        .defaultSize(width: 1240, height: 780)
         .commands { AppCommands(app: app) }
 
         Window(CommonStrings.windowStat.s, id: "stat") {

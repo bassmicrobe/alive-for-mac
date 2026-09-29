@@ -15,7 +15,7 @@ struct MainWindow: View {
             }
             ToastOverlay(app: app)
         }
-        .frame(minWidth: 960, minHeight: 600)
+        .frame(minWidth: 1120, minHeight: 600)
         .background(WindowTransparency(isTransparent: app.prefs.transparency))
         .sheet(item: $app.sheet) { sheet in SheetHost(sheet: sheet) }
         .preferredColorScheme(.dark)
@@ -59,6 +59,7 @@ private struct TopBar: View {
         HStack(spacing: Theme.iconGap + 4) {
             PillTabs(items: MainTab.allCases.map { PillTabItem(value: $0, title: $0.title) },
                      selection: $app.tab)
+                .fixedSize()
             PillButton(title: CommonStrings.filters.s, icon: .filters) { app.presentFilters() }
                 .disabled(!app.canPresentFilters)
             SearchField()
