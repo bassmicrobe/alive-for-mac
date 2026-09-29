@@ -43,6 +43,17 @@ public final class ProjectIndex: @unchecked Sendable {
     var _usageCache: (generation: Int, list: [PluginStat])?
     var _vendorCache: (generation: Int, set: Set<String>)?
     var _lastStats = ScanStats()
+    /// The decoded index.cache (with the file's stamp it was read at), reused by the next scan
+    /// instead of decoding the file again.
+    var _cacheMap: (stamp: FileStat?, entries: [String: SetEntry])?
+    /// The weights of the last scan by lowercased project folder, with the sets they were taken
+    /// for: a rescan that finds a folder's sets unchanged does not walk its tree again.
+    var _weightMemo: [String: ProjectWeight] = [:]
+
+    struct ProjectWeight {
+        var weight: FolderScan.Weight
+        var setPaths: Set<String>
+    }
 
     /// The inventory source; the default is `PluginInventory.load(settings:)`.
     public var inventoryLoader: @Sendable (Settings) -> PluginInventory = { PluginInventory.load(settings: $0) }
@@ -73,60 +84,78 @@ public final class ProjectIndex: @unchecked Sendable {
 
     // MARK: loading and scanning
 
-    /// Loads the cache instantly at launch. False when there is none.
+    /// Loads the cache instantly at launch. False when there is none. `refreshInventory: false`
+    /// leaves the plug-in discovery to the caller (the catalog is visible first; the scan that
+    /// follows does the discovery once, and `refreshInstalled()` can be called by hand).
     @discardableResult
-    public func loadFromCache() -> Bool {
-        let cache = IndexCache.load(dir: dir)
+    public func loadFromCache(refreshInventory: Bool = true) -> Bool {
+        let cache = cachedEntries()
         guard !cache.isEmpty else { return false }
         let list = cache.values.sorted { $0.path.localizedStandardCompare($1.path) == .orderedAscending }
         let history = Activity.loadCache(dir: dir)
         lock.lock()
         _sets = list; _history = history; _generation += 1
         lock.unlock()
-        refreshInstalled()
+        if refreshInventory { refreshInstalled() }
         return true
+    }
+
+    /// The decoded index.cache, from memory while the file is the one we read or wrote last.
+    func cachedEntries() -> [String: SetEntry] {
+        let stamp = FileStat.of(IndexCache.path(dir: dir))
+        lock.lock()
+        if let held = _cacheMap, held.stamp == stamp, stamp != nil { lock.unlock(); return held.entries }
+        lock.unlock()
+        let entries = IndexCache.load(dir: dir)
+        lock.lock(); _cacheMap = (stamp, entries); lock.unlock()
+        return entries
     }
 
     /// Scans the roots in the settings (`settings.roots` minus `disabledRoots`).
     @discardableResult
-    public func scan(settings s: Settings, progress: ScanProgress? = nil,
+    public func scan(settings s: Settings, progress: ScanProgress? = nil, fullRescan: Bool = true,
                      isCancelled: @escaping @Sendable () -> Bool = { false }) -> ScanStats {
         settings = s
-        return scan(roots: s.roots, disabledRoots: s.disabledRoots, progress: progress, isCancelled: isCancelled)
+        return scan(roots: s.roots, disabledRoots: s.disabledRoots, progress: progress,
+                    fullRescan: fullRescan, isCancelled: isCancelled)
     }
 
     /// Async wrapper: runs the blocking scan on a background task; cancelling the calling task
     /// stops the scan at the next set.
     @discardableResult
-    public func scanAsync(roots: [String], disabledRoots: [String] = [], progress: ScanProgress? = nil) async -> ScanStats {
+    public func scanAsync(roots: [String], disabledRoots: [String] = [], progress: ScanProgress? = nil,
+                          fullRescan: Bool = true) async -> ScanStats {
         // A dedicated queue, not the cooperative pool: the scan blocks for a long time.
         await BlockingWork.run { [self] isCancelled in
-            scan(roots: roots, disabledRoots: disabledRoots, progress: progress, isCancelled: isCancelled)
+            scan(roots: roots, disabledRoots: disabledRoots, progress: progress,
+                 fullRescan: fullRescan, isCancelled: isCancelled)
         }
     }
 
     /// Blocking scan. Files whose size and mtime are unchanged are taken from the cache; the rest
-    /// are parsed in parallel. Renders, project weights, activity and plugin health are rebuilt
-    /// on every scan (they change without the .als changing).
+    /// are parsed in parallel. Renders, activity and plugin health are rebuilt on every scan
+    /// (they change without the .als changing). Project weights and Backup histories are walked
+    /// for every project on a `fullRescan` (the default); otherwise only for projects whose sets
+    /// changed since the previous scan of this index (the rest keep their last weight).
     @discardableResult
     public func scan(roots: [String], disabledRoots: [String] = [], progress: ScanProgress? = nil,
-                     isCancelled: @escaping () -> Bool = { false }) -> ScanStats {
+                     fullRescan: Bool = true, isCancelled: @escaping () -> Bool = { false }) -> ScanStats {
         let started = Date()
         let probe = ProbeCache()          // lives for exactly one scan: "rescan" must check again
         let env = LiveEnvironment.detect(home: home, applicationsDirs: applicationsDirs)
         lock.lock(); _env = env; lock.unlock()
 
         let files = collectFiles(roots: roots, disabledRoots: disabledRoots, progress: progress, isCancelled: isCancelled)
-        let cache = IndexCache.load(dir: dir)
+        let cache = cachedEntries()
         var stats = ScanStats()
         stats.total = files.count
 
         let counters = Counters()
-        let results: [SetEntry?] = Parallel.map(count: files.count, isCancelled: isCancelled) { i in
-            let entry = self.entry(for: files[i], cache: cache, env: env, probe: probe, counters: counters)
+        let built: [(entry: SetEntry, reused: Bool)?] = Parallel.map(count: files.count, isCancelled: isCancelled) { i in
+            let r = self.entry(for: files[i], cache: cache, env: env, probe: probe, counters: counters)
             let n = counters.done()
-            if let progress, n % 8 == 0 || n == files.count { progress(n, files.count, entry.name) }
-            return entry
+            if let progress, n % 8 == 0 || n == files.count { progress(n, files.count, r.entry.name) }
+            return r
         }
         stats.parsed = counters.parsed
         stats.reused = counters.reused
@@ -139,7 +168,8 @@ public final class ProjectIndex: @unchecked Sendable {
             return stats
         }
 
-        var fresh = results.compactMap { $0 }
+        var fresh = built.compactMap { $0?.entry }
+        let changed = Set(built.compactMap { $0 }.filter { !$0.reused }.map { $0.entry.projectDir.lowercased() })
         // Each phase below stops early when cancelled and leaves partial data behind, so the
         // flag is looked at again after every one of them: nothing half-built is published or
         // written to the caches.
@@ -149,18 +179,22 @@ public final class ProjectIndex: @unchecked Sendable {
             stats.seconds = Date().timeIntervalSince(started)
             return true
         }
-        addRenders(&fresh, isCancelled: isCancelled)
-        if abandoned() { return stats }
         let known = history.total > 0 ? history : Activity.loadCache(dir: dir)
-        let activity = weighProjects(&fresh, known: known, isCancelled: isCancelled)
-        if abandoned() { return stats }
+        guard let walked = walkProjects(&fresh, changed: changed, full: fullRescan, isCancelled: isCancelled),
+              !abandoned() else {
+            _ = abandoned()
+            return stats
+        }
+        let activity = Activity.build(dirs: walked.dirs, weights: walked.weights, sets: fresh, previous: known)
 
         // Publish the catalog whole; readers saw the previous one until this moment.
         lock.lock()
         _sets = fresh; _history = activity; _generation += 1
+        _weightMemo = walked.memo
         lock.unlock()
         activity.saveCache(dir: dir)
         IndexCache.save(fresh, dir: dir)
+        rememberCache(fresh)
         refreshInstalled()
         progress?(fresh.count, files.count, "")
 
@@ -192,60 +226,90 @@ public final class ProjectIndex: @unchecked Sendable {
         return files.sorted { $0.lowercased() < $1.lowercased() }
     }
 
+    /// After a save the file on disk is what `fresh` says: keep it as the next scan's reuse map.
+    private func rememberCache(_ fresh: [SetEntry]) {
+        var map: [String: SetEntry] = [:]
+        map.reserveCapacity(fresh.count)
+        for e in fresh { map[e.path.lowercased()] = e }
+        let stamp = FileStat.of(IndexCache.path(dir: dir))
+        lock.lock(); _cacheMap = (stamp, map); lock.unlock()
+    }
+
     private func entry(for file: String, cache: [String: SetEntry], env: LiveEnvironment,
-                       probe: ProbeCache, counters: Counters) -> SetEntry {
+                       probe: ProbeCache, counters: Counters) -> (entry: SetEntry, reused: Bool) {
         guard let stamp = SetBuilder.stamp(of: file) else {
             counters.failed()
-            return SetBuilder.failed(path: file, error: "cannot read file attributes")
+            return (SetBuilder.failed(path: file, error: "cannot read file attributes"), false)
         }
         if let cached = cache[file.lowercased()], cached.size == stamp.size,
            DotNetTicks.sameInstant(cached.modified, stamp.modified) {
             counters.reuse()
-            return cached                          // the file has not changed — take it from the cache
+            return (cached, true)                  // the file has not changed — take it from the cache
         }
         counters.parse()
-        return SetBuilder.build(path: file, stamp: stamp, env: env, probe: probe)
+        return (SetBuilder.build(path: file, stamp: stamp, env: env, probe: probe), false)
     }
 
-    /// Renders are a property of the folder rather than of the set, so they go in a separate pass
-    /// and do not get into the cache: exporting a new file does not change the .als. Their names
-    /// are remembered so a set can be searched by the name of a render.
-    private func addRenders(_ sets: inout [SetEntry], isCancelled: () -> Bool) {
-        let snapshot = sets
-        let pins = PreviewPins(dir: dir)
-        let found: [[String]?] = Parallel.map(count: snapshot.count, isCancelled: isCancelled) { i in
-            RenderScan.find(snapshot[i], pins: pins).map(\.name)
+    /// What the walk of the project folders brought in, in the order of `dirs`.
+    struct Walked {
+        var dirs: [String]
+        var weights: [FolderScan.Weight]
+        var memo: [String: ProjectWeight]
+    }
+
+    /// One walk per DISTINCT project folder (a project usually holds a dozen .als versions; per
+    /// set it would read the same tree ten times) gives the folder weight, the save history from
+    /// Backup and the renders. Renders are a property of the folder rather than of the set, so
+    /// they do not get into the cache: exporting a new file does not change the .als. Their
+    /// names are remembered so a set can be searched by the name of a render. nil when cancelled.
+    ///
+    /// The weight (the expensive part: it reads Samples and Backup too) is taken from the
+    /// previous scan for a folder whose sets are the same and unchanged, unless `full`.
+    private func walkProjects(_ sets: inout [SetEntry], changed: Set<String>, full: Bool,
+                              isCancelled: () -> Bool) -> Walked? {
+        var dirs: [String] = []
+        var slot: [String: Int] = [:]
+        var pathsByDir: [String: Set<String>] = [:]
+        for s in sets {
+            let d = s.projectDir
+            if d.isEmpty { continue }
+            let key = d.lowercased()
+            pathsByDir[key, default: []].insert(s.path.lowercased())
+            if slot[key] != nil { continue }
+            slot[key] = dirs.count
+            dirs.append(d)
         }
+        lock.lock(); let memo = full ? [:] : _weightMemo; lock.unlock()
+        let pins = PreviewPins(dir: dir)
+        let walked: [(weight: FolderScan.Weight, renders: [String])?] =
+            Parallel.map(count: dirs.count, isCancelled: isCancelled) { i in
+                let key = dirs[i].lowercased()
+                var known: FolderScan.Weight?
+                if !changed.contains(key), let m = memo[key], m.setPaths == pathsByDir[key] { known = m.weight }
+                let r = FolderScan.walkProject(root: dirs[i], weigh: known == nil, renders: true,
+                                               isCancelled: isCancelled)
+                let names = RenderScan.finish(r.renders, root: dirs[i], pins: pins).map(\.name)
+                return (known ?? r.weight, names)
+            }
+        if isCancelled() { return nil }
+        let weights = walked.map { $0?.weight ?? FolderScan.Weight() }
         for i in sets.indices {
-            let names = found[i] ?? []
+            guard let k = slot[sets[i].projectDir.lowercased()] else {
+                sets[i].renderNames = []; sets[i].hasRenders = false
+                continue
+            }
+            sets[i].projectSize = weights[k].bytes
+            sets[i].projectFiles = weights[k].files
+            let names = walked[k]?.renders ?? []
             sets[i].renderNames = names
             sets[i].hasRenders = !names.isEmpty
         }
-    }
-
-    /// The folder weight of each project. We count by DISTINCT folders rather than by sets: one
-    /// project folder usually holds a dozen .als versions, and walking it for each would mean
-    /// re-reading the same tree ten times. The save history arrives by the same walk.
-    private func weighProjects(_ sets: inout [SetEntry], known: Activity,
-                               isCancelled: () -> Bool) -> Activity {
-        var dirs: [String] = []
-        var slot: [String: Int] = [:]
-        for s in sets {
-            let d = s.projectDir
-            if d.isEmpty || slot[d.lowercased()] != nil { continue }
-            slot[d.lowercased()] = dirs.count
-            dirs.append(d)
+        var newMemo: [String: ProjectWeight] = [:]
+        for (i, d) in dirs.enumerated() {
+            let key = d.lowercased()
+            newMemo[key] = ProjectWeight(weight: weights[i], setPaths: pathsByDir[key] ?? [])
         }
-        let weighed: [FolderScan.Weight?] = Parallel.map(count: dirs.count, isCancelled: isCancelled) { i in
-            FolderScan.weigh(root: dirs[i], isCancelled: isCancelled)
-        }
-        let weights = weighed.map { $0 ?? FolderScan.Weight() }
-        for i in sets.indices {
-            guard let k = slot[sets[i].projectDir.lowercased()] else { continue }
-            sets[i].projectSize = weights[k].bytes
-            sets[i].projectFiles = weights[k].files
-        }
-        return Activity.build(dirs: dirs, weights: weights, sets: sets, previous: known)
+        return Walked(dirs: dirs, weights: weights, memo: newMemo)
     }
 
     // MARK: grouping

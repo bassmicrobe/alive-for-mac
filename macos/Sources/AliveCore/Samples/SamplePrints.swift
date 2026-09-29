@@ -5,6 +5,10 @@ import Foundation
 /// 180,378 on the upstream development machine), read whole once. A hash from the previous index
 /// is kept while the file's size and date stay the same.
 enum SamplePrints {
+    /// Whole-file reads are disk-bound: a few in flight keep the disk busy, one per core only
+    /// multiplies buffers and seeks.
+    static let readers = 3
+
     static func take(_ idx: inout SampleIndex, known: [String: SampleFile], isCancelled: () -> Bool) {
         var groups: [String: [Int]] = [:]
         for (i, f) in idx.files.enumerated() {
@@ -26,7 +30,7 @@ enum SamplePrints {
         for (i, p) in reused { idx.files[i].print = p }
 
         let paths = todo.map { idx.path(of: $0) }
-        let prints = Parallel.map(count: todo.count, isCancelled: isCancelled) { k in
+        let prints = Parallel.map(count: todo.count, workers: readers, isCancelled: isCancelled) { k in
             SamplePrints.print(path: paths[k])
         }
         for (k, i) in todo.enumerated() { idx.files[i].print = prints[k] ?? 0 }

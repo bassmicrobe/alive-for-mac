@@ -8,9 +8,11 @@ enum Parallel {
     /// Runs `body(i)` for every index once, on up to `workerCount` threads, blocking until done.
     /// Indices are handed out one at a time, so slow items do not stall a whole chunk. Once
     /// `isCancelled` returns true no further index is started.
-    static func forEach(count: Int, isCancelled: () -> Bool = { false }, _ body: (Int) -> Void) {
+    /// `workers` caps the thread count (I/O-bound work wants a few, not one per core).
+    static func forEach(count: Int, workers limit: Int? = nil, isCancelled: () -> Bool = { false },
+                        _ body: (Int) -> Void) {
         guard count > 0 else { return }
-        let workers = min(workerCount, count)
+        let workers = min(max(1, limit ?? workerCount), count)
         let lock = NSLock()
         var next = 0
         func take() -> Int? {
@@ -20,16 +22,20 @@ enum Parallel {
             return next
         }
         DispatchQueue.concurrentPerform(iterations: workers) { _ in
-            while let i = take() { body(i) }
+            // One autorelease pool per item: without it everything Foundation autoreleased while
+            // handling item i (file contents, bridged strings) lives until the worker exits, i.e.
+            // to the end of the whole scan.
+            while let i = take() { autoreleasepool { body(i) } }
         }
     }
 
     /// `forEach` collecting one optional result per index (nil where cancelled or `body` gave nil).
-    static func map<T>(count: Int, isCancelled: () -> Bool = { false }, _ body: (Int) -> T?) -> [T?] {
+    static func map<T>(count: Int, workers: Int? = nil, isCancelled: () -> Bool = { false },
+                       _ body: (Int) -> T?) -> [T?] {
         var results = [T?](repeating: nil, count: count)
         results.withUnsafeMutableBufferPointer { buf in
             let out = buf
-            forEach(count: count, isCancelled: isCancelled) { i in out[i] = body(i) }
+            forEach(count: count, workers: workers, isCancelled: isCancelled) { i in out[i] = body(i) }
         }
         return results
     }

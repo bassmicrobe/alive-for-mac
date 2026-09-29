@@ -98,12 +98,28 @@ public struct AlsInfo: Sendable {
 /// Reads an .als: gzip over XML (or plain XML). Parsing is streaming (`XMLParser` over the
 /// inflated bytes): a typical set is 100 KB on disk and close to 3 MB of XML.
 public enum AlsFile {
+    /// How much inflated XML the scan's parallel workers may hold at once. Typical sets inflate
+    /// to a few MB, the largest seen to ~180 MB: the workers still run side by side on ordinary
+    /// sets, and a giant one waits for the others to finish instead of adding up to gigabytes.
+    static let inflateBudget = ByteBudget(limit: 256 * 1024 * 1024)
+
     /// Never throws: failures land in `AlsInfo.error`, with whatever was parsed before them.
     public static func read(path: String) -> AlsInfo {
         var info = AlsInfo()
         info.path = path
         do {
-            let xml = try Gzip.readMaybeGzip(path: path)
+            let raw = try Data(contentsOf: URL(fileURLWithPath: path))
+            // Hold the budget for the whole life of the inflated XML: inflate + parse.
+            let granted = inflateBudget.acquire(Gzip.inflatedSizeHint(raw) ?? raw.count)
+            defer { inflateBudget.release(granted) }
+            let xml: Data
+            if Gzip.isGzip(raw) {
+                xml = try Gzip.decompress(raw)
+            } else if raw.count > Gzip.maxInflatedBytes {
+                throw GzipError.tooLarge
+            } else {
+                xml = raw
+            }
             return parse(xml: xml, path: path)
         } catch GzipError.tooLarge {
             Diag.warn("set is larger than \(Gzip.maxInflatedBytes >> 20) MB inflated, skipped: \(path)")

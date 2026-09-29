@@ -8,13 +8,19 @@ public struct SampleUse: Sendable {
     /// The newest `modified` of the sets that use it (`.distantPast` — never).
     public var lastUsed = Date.distantPast
 
-    /// Notes one more set; false when it was already there.
-    mutating func add(_ s: SetEntry) -> Bool {
+    /// Notes one more set; false when it was already there. The caller does the duplicate check
+    /// (`isNew`) in O(1) — a popular sample is used by thousands of sets.
+    mutating func add(_ s: SetEntry, isNew: Bool) -> Bool {
         if s.modified > lastUsed { lastUsed = s.modified }
-        guard !sets.contains(where: { $0.path == s.path }) else { return false }
+        guard isNew else { return false }
         sets.append(s)
         return true
     }
+}
+
+private struct UsePair: Hashable {
+    var file: Int
+    var set: Int
 }
 
 /// The same over a folder's whole subtree.
@@ -70,8 +76,12 @@ public struct SampleUsage: Sendable {
         var names: [Int: [String: Int]] = [:]
         var projects: [Int: Set<String>] = [:]
         var hits: [Int] = []
+        // (sample, set path) pairs already recorded: the duplicate check in O(1).
+        var recorded = Set<UsePair>()
+        var pathIds: [String: Int] = [:]
 
         for s in sets {
+            let pathId = pathIds[s.path] ?? { let n = pathIds.count; pathIds[s.path] = n; return n }()
             let project = s.projectDir.lowercased()
             for (i, raw) in s.samples.enumerated() {
                 hits.removeAll(keepingCapacity: true)
@@ -82,7 +92,8 @@ public struct SampleUsage: Sendable {
                     copies(p, i < s.sampleSizes.count ? s.sampleSizes[i] : 0, index, bySize, &hits)
                 }
                 for f in hits {
-                    if u.byFile[f, default: SampleUse()].add(s) { u.bySet[s.path, default: []].append(f) }
+                    let isNew = recorded.insert(UsePair(file: f, set: pathId)).inserted
+                    if u.byFile[f, default: SampleUse()].add(s, isNew: isNew) { u.bySet[s.path, default: []].append(f) }
                     projects[f, default: []].insert(project)
                 }
             }

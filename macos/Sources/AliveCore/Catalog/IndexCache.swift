@@ -73,14 +73,15 @@ enum IndexCache {
         return e
     }
 
-    /// Atomic (temp file + rename); the cache is not critical — the worst case is a rescan — but
-    /// a failure is logged.
+    /// Atomic (temp file + rename), and skipped when the file already holds exactly this: a
+    /// rescan that changed nothing leaves index.cache (and its mtime) alone. The cache is not
+    /// critical — the worst case is a rescan — but a failure is logged.
     static func save(_ sets: [SetEntry], dir: String) {
         var w = DotNetWriter()
         w.int32(version)
         w.int32(Int32(clamping: sets.count))
         for e in sets { write(e, to: &w) }
-        do { try AppHome.writeAtomically(w.data, to: path(dir: dir)) } catch { Diag.fail("index.cache write", error) }
+        do { try AppHome.writeAtomicallyIfChanged(w.data, to: path(dir: dir)) } catch { Diag.fail("index.cache write", error) }
     }
 
     private static func write(_ e: SetEntry, to w: inout DotNetWriter) {

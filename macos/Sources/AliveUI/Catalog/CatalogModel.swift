@@ -39,6 +39,8 @@ final class CatalogModel {
     @ObservationIgnored private var started = false
     @ObservationIgnored private var generation = 0
     @ObservationIgnored private var scanTask: Task<Void, Never>?
+    /// The next scan has to walk every project (its weight and Backup history).
+    @ObservationIgnored private var fullPending = true
     /// A rescan was asked for before the cache was read: it runs right after, so the cache can
     /// neither be published over a fresh result nor be read while a scan writes the index.
     @ObservationIgnored private var rescanAfterLoad = false
@@ -65,8 +67,11 @@ final class CatalogModel {
         started = true
         let index = index
         Task { [weak self] in
+            // The catalog is published straight from the cache; plug-in discovery comes after it
+            // (the scan that follows does it once at its end — with no roots there is no scan,
+            // so it is done here).
             let detected = await Task.detached(priority: .userInitiated) { () -> LiveEnvironment in
-                index.loadFromCache()
+                index.loadFromCache(refreshInventory: false)
                 return LiveEnvironment.detect()
             }.value
             guard let self else { return }
@@ -76,6 +81,8 @@ final class CatalogModel {
                 self.rescanAfterLoad = false
                 self.rescan()
             } else {
+                await Task.detached(priority: .userInitiated) { index.refreshInstalled() }.value
+                self.publish(fallbackEnv: detected)
                 self.app.catalogDidBecomeReady()
             }
         }
@@ -83,8 +90,10 @@ final class CatalogModel {
 
     // MARK: - Scanning
 
-    /// Cancels a running scan and starts a new one over the current roots.
-    func rescan() {
+    /// Cancels a running scan and starts a new one over the current roots. `full: false` (a
+    /// folder-watch rescan) skips walking the weight and Backup history of projects whose sets
+    /// did not change; every other rescan reads them all.
+    func rescan(full: Bool = true) {
         guard started else { return }
         guard isLoaded else {
             rescanAfterLoad = true
@@ -96,6 +105,9 @@ final class CatalogModel {
         previous?.cancel()
         isScanning = true
         progress = CatalogProgress()
+        // A full request stays pending until a scan that asked for it completes.
+        if full { fullPending = true }
+        let fullRescan = fullPending
 
         let settings = app.settings
         let index = index
@@ -110,7 +122,8 @@ final class CatalogModel {
                     Task { @MainActor in
                         self.updateProgress(gen, CatalogProgress(done: done, total: total, current: current))
                     }
-                })
+                },
+                fullRescan: fullRescan)
             self.finishScan(gen, stats)
         }
     }
@@ -125,6 +138,7 @@ final class CatalogModel {
     private func finishScan(_ gen: Int, _ stats: ScanStats) {
         guard gen == generation else { return }   // superseded: the newer scan reports
         lastScanStats = stats
+        if !stats.cancelled { fullPending = false }
         isScanning = false
         progress = CatalogProgress()
         publish()

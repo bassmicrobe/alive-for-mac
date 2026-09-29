@@ -160,7 +160,7 @@ public struct Activity: Sendable {
         w.int32(Activity.cacheVersion)
         w.int32(Int32(clamping: stamps.count))
         stamps.forEach { w.int64(DotNetTicks.local($0)) }
-        do { try AppHome.writeAtomically(w.data, to: Activity.cachePath(dir: dir)) } catch {
+        do { try AppHome.writeAtomicallyIfChanged(w.data, to: Activity.cachePath(dir: dir)) } catch {
             Diag.fail("activity.cache write", error)
         }
     }
