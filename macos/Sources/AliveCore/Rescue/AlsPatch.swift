@@ -214,14 +214,14 @@ public enum AlsPatch {
 
     // MARK: substitution
 
-    private static func rewrite(_ node: String, kind: PluginKind, inventory: PluginInventory?) -> String {
+    private static func rewrite(_ node: String, kind: PluginKind, inventory: PluginInventory?) throws -> String {
         switch kind {
         case .vst2:
             guard let id = firstLong(node, "<UniqueId Value=\"") else { return node }
             let fake = freeVst2Id(Int32(truncatingIfNeeded: id), inventory)
             return suffixPaths(replaceAll(node, "<UniqueId Value=\"", String(fake)))
         case .audioUnit:
-            return rewriteAu(node, inventory)
+            return try rewriteAu(node, inventory)
         default:
             let m = freeVst3Marker(node, inventory)
             return replaceAll(node, "<Fields.0 Value=\"", String(m))
@@ -259,15 +259,17 @@ public enum AlsPatch {
 
     /// An Audio Unit is found by its component triple (type, subtype, manufacturer): the subtype
     /// and manufacturer codes are spoiled with the marker, the type (aumf/aumu/aufx) stays.
-    private static func rewriteAu(_ node: String, _ inventory: PluginInventory?) -> String {
+    private static func rewriteAu(_ node: String, _ inventory: PluginInventory?) throws -> String {
         guard let t = firstLong(node, "<ComponentType Value=\""),
               let s = firstLong(node, "<ComponentSubType Value=\""),
               let m = firstLong(node, "<ComponentManufacturer Value=\"") else { return node }
-        let signed = node.contains("<ComponentSubType Value=\"-")
-        func text(_ v: UInt32) -> String { signed ? String(Int32(bitPattern: v)) : String(v) }
+        // Live sets may spell each FourCC as a signed or unsigned decimal independently.
+        func text(_ v: UInt32, like original: Int64) -> String {
+            original < 0 ? String(Int32(bitPattern: v)) : String(v)
+        }
 
         let mark = UInt32(bitPattern: marker)
-        var sub = UInt32(truncatingIfNeeded: s) ^ mark, man = UInt32(truncatingIfNeeded: m) ^ mark
+        var sub: UInt32?, man: UInt32?
         for bump in UInt32(0)..<64 {
             var probe = PluginRef(kind: .audioUnit)
             probe.auType = UInt32(truncatingIfNeeded: t)
@@ -275,13 +277,14 @@ public enum AlsPatch {
             probe.auManufacturer = UInt32(truncatingIfNeeded: m) ^ (mark &+ bump)
             probe.finishUid()
             if inventory?.byUid(probe.uid) == nil {
-                sub = probe.auSubType ?? sub
-                man = probe.auManufacturer ?? man
+                sub = probe.auSubType
+                man = probe.auManufacturer
                 break
             }
         }
-        let a = replaceAll(node, "<ComponentSubType Value=\"", text(sub))
-        return replaceAll(a, "<ComponentManufacturer Value=\"", text(man))
+        guard let sub, let man else { throw RescueError.noFreeIdentifier }
+        let a = replaceAll(node, "<ComponentSubType Value=\"", text(sub, like: s))
+        return replaceAll(a, "<ComponentManufacturer Value=\"", text(man, like: m))
     }
 
     /// Appends ".alive-disabled" to every path in the node — no file by that name exists.

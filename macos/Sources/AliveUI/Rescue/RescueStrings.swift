@@ -21,7 +21,7 @@ enum RescueStrings: LocalizedStrings {
     // Verdicts and descriptions
     case verdictCulprit, verdictGroup, verdictNotPlugins
     case describeNothing, pluginsMany, pluginOne
-    case toastSaved, errNotFoundInSet, errNothingToDisable
+    case toastSaved, errNotFoundInSet, errNothingToDisable, errNoFreeIdentifier
 
     var en: String { text.en }
     var ja: String { text.ja }
@@ -125,6 +125,9 @@ enum RescueStrings: LocalizedStrings {
             return ("None of those plugins were found inside the set.", "選んだプラグインはセット内に見つかりませんでした。")
         case .errNothingToDisable:
             return ("Pick at least one plugin to disable.", "無効にするプラグインを1つ以上選んでください。")
+        case .errNoFreeIdentifier:
+            return ("Could not find an unused Audio Unit identifier for this probe.",
+                    "このプローブで使用できる未使用の Audio Unit 識別子が見つかりませんでした。")
         }
     }
 }

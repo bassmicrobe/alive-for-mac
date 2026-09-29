@@ -367,4 +367,19 @@ final class RescueSessionFileTests: XCTestCase {
         XCTAssertEqual(RescueFx.sha(sc.als), before)
         XCTAssertEqual(s.trail.last, .saved(fileName: "Song (rescued) 2.als"))
     }
+
+    func testSaveRescuedRejectsStaleAudioUnitSelectionWithoutLeavingACopy() throws {
+        let sc = scratch()
+        let s = RescueSession(set: sc.set, inventory: nil, dataDir: sc.home, logFiles: { [] })
+        let au = try XCTUnwrap(s.targets.first { $0.kind == .audioUnit })
+        // The set changed after the sheet read its target list.
+        sc.t.als("Song Project/Song.als", RescueFx.set(devices: [RescueFx.serum]))
+        let before = RescueFx.sha(sc.als)
+
+        XCTAssertThrowsError(try s.saveRescued(disable: [au])) {
+            XCTAssertEqual($0 as? RescueError, .notFoundInSet)
+        }
+        XCTAssertEqual(RescueFx.sha(sc.als), before)
+        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: sc.t.sub("Song Project")), ["Song.als"])
+    }
 }
