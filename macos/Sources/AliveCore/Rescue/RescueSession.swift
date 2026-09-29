@@ -52,7 +52,11 @@ public enum RescueError: Error, Equatable {
 /// always true, even when there is no pretty answer.
 ///
 /// One operation at a time (`prepare`, `poll`, `apply` are called by one model, one after the
-/// other); the class is marked Sendable only so a model can run `prepare` off the main thread.
+/// other); the class is marked Sendable only so a model can run the slow parts off the main
+/// thread. Those slow parts (`writeProbe`, `poll`, `writeRescued`) change no state that a view
+/// reads: state (`round`, `trail`, `probePath` …) is changed only by `commit`, `apply` and the
+/// other quick methods, which the model calls on the main actor. `poll` alone touches its own
+/// log bookkeeping and the probe path, under `stateLock`.
 public final class RescueSession: @unchecked Sendable {
     public private(set) var set: SetEntry
     public let info: AlsInfo
@@ -72,11 +76,16 @@ public final class RescueSession: @unchecked Sendable {
     public private(set) var verdict: RescueVerdict = .noProbeYet
     public private(set) var culprit: AlsPluginSlot?
     public private(set) var round = 0
-    public private(set) var probePath = ""
+    public private(set) var probePath: String {
+        get { stateLock.lock(); defer { stateLock.unlock() }; return _probePath }
+        set { stateLock.lock(); _probePath = newValue; stateLock.unlock() }
+    }
     public private(set) var probeDisabled: [AlsPluginSlot] = []
     public private(set) var probeStarted = Date.distantPast
     public private(set) var trail: [RescueTrailEntry] = []
 
+    private let stateLock = NSLock()
+    private var _probePath = ""
     private let inventory: PluginInventory?
     private let dataDir: String
     private let logProvider: () -> [LiveLogFile]
@@ -164,14 +173,30 @@ public final class RescueSession: @unchecked Sendable {
         return working ?? []
     }
 
+    /// A probe that has been written to disk but not yet taken into the session's state.
+    public struct WrittenProbe: @unchecked Sendable {
+        public let path: String
+        let disabled: [AlsPluginSlot]
+        let logs: [String: LiveLogFile]
+    }
+
     /// Assembles a probe copy with the chosen plugins disabled and returns its path; throws —
     /// failing to write a probe means failing to start, and that cannot be kept quiet. The
     /// original is only ever read.
     public func prepare(disable: [AlsPluginSlot], isCancelled: () -> Bool = { false }) throws -> String {
-        guard !disable.isEmpty else { throw RescueError.nothingToDisable }
-        cancel()
+        let written = try writeProbe(disable: disable, isCancelled: isCancelled)
+        commit(written)
+        return written.path
+    }
 
-        let probe = RescueProbe.path(for: set)
+    /// The slow half of `prepare`: writes the probe file (and the journal line) and remembers
+    /// where Live's logs end now. Changes no session state — safe off the main thread; the
+    /// caller hands the result to `commit`, or to `discard` if it is no longer wanted.
+    public func writeProbe(disable: [AlsPluginSlot], isCancelled: () -> Bool = { false }) throws -> WrittenProbe {
+        guard !disable.isEmpty else { throw RescueError.nothingToDisable }
+
+        // A name nobody is using: an existing file at the probe path is never touched.
+        let probe = RescueProbe.freePath(for: set)
         // The journal first, the disk second: a crash can happen in between.
         RescueProbe.remember(probe, dir: dataDir)
         let patched: Int
@@ -179,28 +204,47 @@ public final class RescueSession: @unchecked Sendable {
             patched = try AlsPatch.neutralize(src: set.path, dst: probe, uids: disable.map(\.uid),
                                               inventory: inventory, isCancelled: isCancelled)
         } catch {
-            RescueProbe.drop(probe, dir: dataDir)
+            // `neutralize` removes what it created; a name it could not create is not ours.
+            RescueProbe.forgetIfGone(probe, dir: dataDir)
             throw error
         }
         if patched == 0 {
-            RescueProbe.drop(probe, dir: dataDir)
+            RescueProbe.drop(probe, dir: dataDir)       // we created it a moment ago
             throw RescueError.notFoundInSet
         }
-
-        probePath = probe
-        probeDisabled = disable
-        probeStarted = Date()
-        round += 1
+        if isCancelled() {
+            // Cancelled while the probe was being finished: it must not outlive the request.
+            RescueProbe.drop(probe, dir: dataDir)
+            throw CancellationError()
+        }
 
         // Live's logs are read from their current end: whatever came before the probe has
         // already been parsed in `diagnose`.
-        logs = [:]
+        var logs: [String: LiveLogFile] = [:]
         for f in logProvider() {
             f.skipToEnd()
             logs[f.path] = f
         }
-        note(.probe(round: round, disabled: disable.map(\.name)))
-        return probe
+        return WrittenProbe(path: probe, disabled: disable, logs: logs)
+    }
+
+    /// The quick half of `prepare`: the written probe becomes the session's current one.
+    public func commit(_ written: WrittenProbe) {
+        cancel()
+        stateLock.lock()
+        _probePath = written.path
+        logs = written.logs
+        stateLock.unlock()
+        probeDisabled = written.disabled
+        probeStarted = Date()
+        round += 1
+        note(.probe(round: round, disabled: written.disabled.map(\.name)))
+    }
+
+    /// Removes a probe that `writeProbe` made but nobody took over (the sheet was closed while
+    /// it was being written).
+    public func discard(_ written: WrittenProbe) {
+        RescueProbe.drop(written.path, dir: dataDir)
     }
 
     /// Removes the current probe from disk and journal.
@@ -216,13 +260,18 @@ public final class RescueSession: @unchecked Sendable {
     /// What Live's logs say about the current probe; nil means Live has not opened it yet. The
     /// files are re-scanned every time: which Live version a person will start is not known in
     /// advance, and a fresh install may not have had a Log.txt until now.
+    ///
+    /// Reads files, so the model calls it off the main thread; the bookkeeping is under the lock.
     public func poll() -> LoadAttempt? {
-        guard !probePath.isEmpty else { return nil }
-        for f in logProvider() where logs[f.path] == nil { logs[f.path] = f }   // has only just appeared
+        let probe = probePath
+        guard !probe.isEmpty else { return nil }
+        let appeared = logProvider()
+        stateLock.lock(); defer { stateLock.unlock() }
+        for f in appeared where logs[f.path] == nil { logs[f.path] = f }   // has only just appeared
 
         var best: LoadAttempt?
         for f in logs.values {
-            for a in f.readNew() where LiveLog.samePath(a.document, probePath) {
+            for a in f.readNew() where LiveLog.samePath(a.document, probe) {
                 if best == nil || a.started >= best!.started { best = a }
             }
         }
@@ -303,11 +352,22 @@ public final class RescueSession: @unchecked Sendable {
     /// touched on any outcome: it will come in handy again when the plugin is updated or
     /// reinstalled. An existing file is never overwritten ("… (rescued) 2.als").
     public func saveRescued(disable: [AlsPluginSlot]) throws -> String {
+        let dst = try writeRescued(disable: disable)
+        noteSaved(dst)
+        return dst
+    }
+
+    /// The slow half of `saveRescued`: writes the copy, changes no session state (off the main
+    /// thread); `noteSaved` puts it into the trail.
+    public func writeRescued(disable: [AlsPluginSlot]) throws -> String {
         guard !disable.isEmpty else { throw RescueError.nothingToDisable }
         let dst = Self.unique(rescuedPath)
         try AlsPatch.neutralize(src: set.path, dst: dst, uids: disable.map(\.uid), inventory: inventory)
-        note(.saved(fileName: (dst as NSString).lastPathComponent))
         return dst
+    }
+
+    public func noteSaved(_ path: String) {
+        note(.saved(fileName: (path as NSString).lastPathComponent))
     }
 
     static func unique(_ path: String) -> String {

@@ -2,7 +2,7 @@
 // activity.cache keep upstream's on-disk format.
 import Foundation
 
-enum BinaryFormatError: Error { case truncated, badString }
+enum BinaryFormatError: Error { case truncated, badString, badValue }
 
 /// Little-endian primitives; strings are a 7-bit-encoded (LEB128) UTF-8 byte count + bytes.
 struct DotNetWriter {
@@ -32,6 +32,8 @@ struct DotNetReader {
     init(_ data: Data) { self.data = data; self.pos = data.startIndex }
 
     var isAtEnd: Bool { pos >= data.endIndex }
+    /// Bytes not yet read; counts read from a file are checked against it before any loop.
+    var remaining: Int { data.endIndex - pos }
 
     private mutating func take(_ n: Int) throws -> Data {
         guard n >= 0, pos + n <= data.endIndex else { throw BinaryFormatError.truncated }
@@ -66,12 +68,25 @@ enum DotNetTicks {
     static let unixEpoch: Int64 = 621_355_968_000_000_000
 
     /// A UTC instant as ticks.
-    static func utc(_ d: Date) -> Int64 { unixEpoch + Int64((d.timeIntervalSince1970 * 1e7).rounded()) }
-    static func date(utc ticks: Int64) -> Date { Date(timeIntervalSince1970: Double(ticks - unixEpoch) / 1e7) }
+    static func utc(_ d: Date) -> Int64 {
+        let t = (d.timeIntervalSince1970 * 1e7).rounded()
+        guard t.isFinite, abs(t) < 1e18 else { return t > 0 ? maxTicks : 0 }
+        return min(max(unixEpoch + Int64(t), 0), maxTicks)      // what is written is always readable
+    }
+    /// `DateTime` covers 0001-01-01 ... 9999-12-31; anything else in a cache file is damage.
+    static let maxTicks: Int64 = 3_155_378_975_999_999_999
+    static func isValid(ticks: Int64) -> Bool { ticks >= 0 && ticks <= maxTicks }
+
+    /// Never traps: out-of-range ticks are clamped into the valid range (readers that must
+    /// reject damaged data check `isValid` first).
+    static func date(utc ticks: Int64) -> Date {
+        let t = min(max(ticks, 0), maxTicks)
+        return Date(timeIntervalSince1970: Double(t - unixEpoch) / 1e7)
+    }
 
     /// Local wall-clock ticks (upstream stores DateTimeKind.Local values in activity.cache).
     static func local(_ d: Date) -> Int64 {
-        utc(d) + Int64(TimeZone.current.secondsFromGMT(for: d)) * 10_000_000
+        min(max(utc(d) + Int64(TimeZone.current.secondsFromGMT(for: d)) * 10_000_000, 0), maxTicks)
     }
     static func date(local ticks: Int64) -> Date {
         let wall = date(utc: ticks)

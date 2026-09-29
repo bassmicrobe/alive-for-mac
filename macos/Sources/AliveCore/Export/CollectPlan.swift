@@ -68,6 +68,12 @@ public struct CollectPlan: Sendable {
     public var copy: [CollectDependency] = []
     public var skipped: [CollectDependency] = []
     public var notFound: [CollectDependency] = []
+    /// Files the set refers to that are not collected for safety reasons (see `CollectSafety`):
+    /// not media, private or hidden places. Their references stay as they were.
+    public var refused: [CollectDependency] = []
+    /// The folders the "from elsewhere" files come from, so the person sees WHERE the copy
+    /// reaches before pressing OK.
+    public var elsewhereFolders: [String] = []
     public var totalBytes: Int64 = 0
     public var freeBytes: Int64 = 0
     /// FileRef number → new path. Empty for in-project ones: their path is right as it is.

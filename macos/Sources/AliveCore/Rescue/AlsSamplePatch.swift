@@ -53,10 +53,12 @@ public enum AlsSamplePatch {
                                isCancelled: () -> Bool = { false }) throws -> Int {
         var index = -1, patched = 0
         var ok = false
-        defer { if !ok { try? FileManager.default.removeItem(atPath: dst) } }
 
         let reader = try GzipLineReader(path: src)
+        // Created exclusively: if `dst` already exists this throws and nothing is removed —
+        // only a file this call created is ever deleted on failure.
         let writer = try GzipLineWriter(path: dst)
+        defer { if !ok { try? FileManager.default.removeItem(atPath: dst) } }
         var node: [UInt8]?
 
         while let line = try reader.next() {

@@ -15,7 +15,9 @@ enum ExportStrings: LocalizedStrings {
     // Progress
     case exporting, writingSet, packing
     // Grouped notices (one line each, the list behind a disclosure)
-    case notFoundSummary, failedSummary, showList, hideList, listItem
+    case notFoundSummary, failedSummary, refusedSummary, showList, hideList, listItem
+    // Where the files from elsewhere come from
+    case elsewhereFrom, andMore
     // Outcome
     case done, doneWithFailures, toastDone
     // Errors (one inline message, never one per file)
@@ -66,6 +68,11 @@ enum ExportStrings: LocalizedStrings {
         case .failedSummary:
             return ("%@ could not be copied — their references were left as they were",
                     "%@をコピーできませんでした。参照は元のままです")
+        case .refusedSummary:
+            return ("%@ not collected for safety (not audio or Live files, or in hidden or private folders) — left as they are",
+                    "%@は安全のためコピーしませんでした（音声・Live 以外のファイル、または隠しフォルダ／非公開フォルダ内）。参照は元のままです")
+        case .elsewhereFrom: return ("Copied from: %@", "コピー元: %@")
+        case .andMore: return ("%1$@ and %2$lld more", "%1$@ ほか %2$lld 件")
         case .showList: return ("Show list", "一覧を表示")
         case .hideList: return ("Hide list", "一覧を隠す")
         case .listItem: return ("%1$@ — %2$@", "%1$@ — %2$@")

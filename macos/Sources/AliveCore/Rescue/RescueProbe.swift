@@ -24,6 +24,42 @@ public enum RescueProbe {
         (set.directory as NSString).appendingPathComponent(set.name + suffix)
     }
 
+    /// The path a probe for this set gets: `<name>.alive-probe.als`, or — when something already
+    /// lies there (somebody's own file, or another running probe) — `<name> (2).alive-probe.als`
+    /// and so on. Still ends in the probe suffix, so the catalog filter and the journal rules
+    /// treat it alike.
+    public static func freePath(for set: SetEntry) -> String {
+        let first = path(for: set)
+        if !exists(first) { return first }
+        for i in 2..<1000 {
+            let p = (set.directory as NSString).appendingPathComponent("\(set.name) (\(i))" + suffix)
+            if !exists(p) { return p }
+        }
+        return first          // the exclusive create then fails cleanly instead of overwriting
+    }
+
+    /// `lstat`, so a dangling symlink counts as "something is there" too.
+    private static func exists(_ path: String) -> Bool {
+        var st = stat()
+        return lstat(path, &st) == 0
+    }
+
+    /// Whether `path` is something this program may delete as a probe: an absolute path with
+    /// the probe suffix that is a plain file (not a directory, not a link) which is empty or
+    /// starts like a gzip / XML document. The journal is a text file that lies in the open and
+    /// will one day be edited by hand; deleting what it names must not be able to go further.
+    static func isDeletableProbe(_ path: String) -> Bool {
+        guard isProbe(path), path.hasPrefix("/") else { return false }
+        var st = stat()
+        guard lstat(path, &st) == 0, (st.st_mode & S_IFMT) == S_IFREG else { return false }
+        if st.st_size == 0 { return true }
+        guard let h = FileHandle(forReadingAtPath: path) else { return false }
+        defer { try? h.close() }
+        guard let head = try? h.read(upToCount: 5), head.count >= 2 else { return false }
+        let bytes = [UInt8](head)
+        return (bytes[0] == 0x1F && bytes[1] == 0x8B) || bytes == Array("<?xml".utf8)
+    }
+
     /// Removes probes left over from the previous run. The program crashes rarely, but a probe is
     /// an .als inside somebody else's project folder, and it cannot be left there for good: one
     /// day a person opens it instead of their own set and cannot work out why half of it has no
@@ -38,8 +74,13 @@ public enum RescueProbe {
             // Only what really is a probe is deleted: the journal lies there in the open and
             // will one day be edited by hand.
             guard isProbe(p) else { continue }
+            guard exists(p) else { continue }           // already gone: strike it from the journal
+            guard isDeletableProbe(p) else {
+                Diag.warn("rescue: journal entry is not a probe file, left alone: \(p)")
+                continue
+            }
             do {
-                if FileManager.default.fileExists(atPath: p) { try FileManager.default.removeItem(atPath: p); gone += 1 }
+                try FileManager.default.removeItem(atPath: p); gone += 1
             } catch {
                 Diag.fail("rescue: cleanup \(p)", error)
                 stillThere.append(p)                     // keep it: the next launch tries again
@@ -68,12 +109,21 @@ public enum RescueProbe {
     /// open, and then only the next run can remove it — on the strength of this very record.
     public static func drop(_ probe: String, dir: String) {
         guard !probe.isEmpty, isProbe(probe) else { return }
-        do {
-            if FileManager.default.fileExists(atPath: probe) { try FileManager.default.removeItem(atPath: probe) }
-        } catch {
-            Diag.fail("rescue: drop \(probe)", error)
+        if exists(probe) {
+            guard isDeletableProbe(probe) else {
+                Diag.warn("rescue: not removing \(probe): not a probe file")
+                forget(probe, dir: dir)
+                return
+            }
+            do { try FileManager.default.removeItem(atPath: probe) } catch { Diag.fail("rescue: drop \(probe)", error) }
         }
-        if !FileManager.default.fileExists(atPath: probe) { forget(probe, dir: dir) }
+        if !exists(probe) { forget(probe, dir: dir) }
+    }
+
+    /// Strikes a probe from the journal when there is nothing on disk under that name; never
+    /// touches a file (used when creating the probe failed, and the name may be somebody's).
+    public static func forgetIfGone(_ probe: String, dir: String) {
+        if !exists(probe) { forget(probe, dir: dir) }
     }
 
     public static func journal(dir: String) -> [String] { readJournal(dir: dir) }

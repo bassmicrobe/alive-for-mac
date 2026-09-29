@@ -42,6 +42,10 @@ public struct CollectDependency: Sendable, Identifiable {
     public var isDevice = false
     /// FileRef numbers in document order — `AlsSamplePatch` addresses by them.
     public var refIndexes: [Int] = []
+    /// The file with every symlink resolved: what is really read when copying. Empty if missing.
+    public var realPath = ""
+    /// Set when collecting must not copy it (see `CollectSafety`); the reference stays as is.
+    public var refusal: CollectRefusal?
 
     public init(resolved: ResolvedRef) { self.resolved = resolved }
 
@@ -65,6 +69,7 @@ public enum CollectScan {
         var byRaw: [String: Int?] = [:]
         var byFile: [String: Int] = [:]
         let probe = ProbeCache()
+        let realSetDir = CollectSafety.realPath(setDir) ?? setDir
 
         for (i, fr) in info.files.enumerated() {
             if i % 512 == 0, isCancelled() { break }
@@ -95,15 +100,27 @@ public enum CollectScan {
             dep.ref = fr
             dep.isDevice = device
             dep.refIndexes = [i]
-            let (origin, pack) = classify(rr, fr, setDir: setDir, env: env)
+            var (origin, pack) = classify(rr, fr, setDir: setDir, env: env)
+            if origin != .missing { vet(&dep, &origin, realSetDir: realSetDir) }
             dep.origin = origin
             dep.packName = pack
-            dep.size = origin == .missing ? 0 : sizeOf(rr.resolvedPath)
+            dep.size = origin == .missing || dep.refusal != nil ? 0 : sizeOf(dep.realPath)
             byRaw[raw] = .some(list.count)
             byFile[fileKey] = list.count
             list.append(dep)
         }
         return list
+    }
+
+    /// Looks at what the reference really is on disk. A file that is "inside the project" only by
+    /// its name but is a symlink leading out of it is somebody else's file: it is treated as
+    /// coming from elsewhere, like any other, and must pass the same rules.
+    private static func vet(_ dep: inout CollectDependency, _ origin: inout CollectOrigin, realSetDir: String) {
+        guard let real = CollectSafety.realPath(dep.resolved.resolvedPath) else { return }
+        dep.realPath = real
+        if origin == .inProject, !under(real, realSetDir) { origin = .elsewhere }
+        dep.refusal = CollectSafety.refusal(forRealPath: real,
+                                            projectRoot: origin == .inProject ? realSetDir : nil)
     }
 
     /// The order of the checks matters. "In the project" comes first: a project lying inside the
@@ -163,20 +180,21 @@ public enum CollectScan {
         if !isDir.boolValue {
             return FileStat.size(of: path)
         }
-        return dirSize(path, depth: 0)
+        return dirSize(path)
     }
 
-    /// The recursive sum of file sizes in a folder, walked by hand: an inaccessible subfolder
-    /// only cuts the count short for itself. The depth limit stops a mounted loop.
-    private static func dirSize(_ dir: String, depth: Int) -> Int64 {
-        guard depth <= 4, let names = try? FileManager.default.contentsOfDirectory(atPath: dir) else { return 0 }
+    /// The sum of file sizes in a bundle folder. Symlinks are not followed (they are not what a
+    /// copy would read), so there is no loop to guard against and no depth limit that would
+    /// make the total smaller than what is copied. An inaccessible subfolder counts for 0.
+    private static func dirSize(_ dir: String) -> Int64 {
+        let keys: [URLResourceKey] = [.isRegularFileKey, .fileSizeKey]
+        guard let walk = FileManager.default.enumerator(
+            at: URL(fileURLWithPath: dir), includingPropertiesForKeys: keys, options: [], errorHandler: { _, _ in true })
+        else { return 0 }
         var total: Int64 = 0
-        for n in names {
-            let p = (dir as NSString).appendingPathComponent(n)
-            var isDir: ObjCBool = false
-            guard FileManager.default.fileExists(atPath: p, isDirectory: &isDir) else { continue }
-            if isDir.boolValue { total += dirSize(p, depth: depth + 1); continue }
-            total += FileStat.size(of: p)
+        for case let url as URL in walk {
+            guard let v = try? url.resourceValues(forKeys: Set(keys)), v.isRegularFile == true else { continue }
+            total += Int64(v.fileSize ?? 0)
         }
         return total
     }

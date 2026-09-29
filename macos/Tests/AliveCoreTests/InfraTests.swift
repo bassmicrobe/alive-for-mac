@@ -78,7 +78,7 @@ final class SettingsTests: XCTestCase {
         XCTAssertEqual(s.disabledRoots, ["/A/x"])
         XCTAssertTrue(s.smoothScroll)                      // legacy nosmoothscroll=0
         XCTAssertEqual(s.lang, "system")                   // invalid language falls back
-        XCTAssertEqual(s.unknownLines, ["unknown_thing=keep me", "spaced = value"])
+        XCTAssertEqual(s.unknownLines, ["# comment", "unknown_thing=keep me", "spaced = value"])   // comments round-trip
     }
 
     func testReloadRoots() throws {

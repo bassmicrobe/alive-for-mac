@@ -63,6 +63,7 @@ public struct Settings: Equatable, Sendable {
     public var unknownLines: [String] = []
 
     public static let systemLang = "system"
+    static let header = "# Alive - folders to scan for projects"
     public static let allowedLangs = ["system", "en", "ja"]
 
     public init() {}
@@ -80,7 +81,12 @@ public struct Settings: Equatable, Sendable {
         guard let lines = AppHome.readLines(filePath(dir: dir)) else { return s }
         for raw in lines {
             let line = raw.trimmingCharacters(in: .whitespaces)
-            if line.isEmpty || line.hasPrefix("#") { continue }
+            if line.isEmpty { continue }
+            if line.hasPrefix("#") {
+                // The header is written afresh on every save; anybody's own comments stay.
+                if line != Settings.header { s.unknownLines.append(line) }
+                continue
+            }
             guard let eq = line.firstIndex(of: "=") else { continue }
             let key = line[..<eq].trimmingCharacters(in: .whitespaces)
             let val = line[line.index(after: eq)...].trimmingCharacters(in: .whitespaces)
@@ -161,20 +167,27 @@ public struct Settings: Equatable, Sendable {
 
     /// Serialises to the exact upstream line format (plus `lang`, then unknown lines).
     public func serialized() -> String {
-        var out = ["# Alive - folders to scan for projects"]
+        var out = [Settings.header]
         func flag(_ k: String, _ b: Bool) { out.append("\(k)=\(b ? "1" : "0")") }
-        func opt(_ k: String, _ v: String) { if !v.isEmpty { out.append("\(k)=\(v)") } }
-        roots.forEach { out.append("root=\($0)") }
-        disabledRoots.forEach { out.append("root_off=\($0)") }
-        sampleRoots.forEach { out.append("samplefolder=\($0)") }
-        disabledSampleRoots.forEach { out.append("samplefolder_off=\($0)") }
+        // The file is line-based: a value with a line break (a folder name may have one) would
+        // split into a bogus line, so such values are left out and the fact is logged.
+        func single(_ k: String, _ v: String) -> String? {
+            guard v.contains(where: \.isNewline) else { return v }
+            Diag.warn("settings: not saving \(k) with a line break in its value")
+            return nil
+        }
+        func opt(_ k: String, _ v: String) { if !v.isEmpty, let v = single(k, v) { out.append("\(k)=\(v)") } }
+        func text(_ k: String, _ v: String) { if let v = single(k, v) { out.append("\(k)=\(v)") } }
+        func list(_ k: String, _ vs: [String]) { vs.forEach { if let v = single(k, $0) { out.append("\(k)=\(v)") } } }
+        list("root", roots); list("root_off", disabledRoots)
+        list("samplefolder", sampleRoots); list("samplefolder_off", disabledSampleRoots)
         flag("pinnedfirst", pinnedFirst); flag("overviewopen", overviewOpen)
         flag("noglass", disableGlass); flag("smoothscroll", smoothScroll)
         flag("groupbyfolder", groupByFolder); flag("pluginfolders", pluginsFromFolders)
-        out.append("pluginsource=\(pluginSource)")
-        flag("vst2custom", vst2CustomOn); out.append("vst2path=\(vst2CustomPath)")
+        text("pluginsource", pluginSource)
+        flag("vst2custom", vst2CustomOn); text("vst2path", vst2CustomPath)
         flag("vst3system", vst3SystemOn); flag("vst3custom", vst3CustomOn)
-        out.append("vst3path=\(vst3CustomPath)")
+        text("vst3path", vst3CustomPath)
         flag("collectelsewhere", collectElsewhere); flag("collectotherprojects", collectOtherProjects)
         flag("collectuserlibrary", collectUserLibrary); flag("collectfactorypacks", collectFactoryPacks)
         flag("collecttozip", collectToZip)

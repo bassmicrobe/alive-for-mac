@@ -287,14 +287,14 @@ final class RescueModelTests: XCTestCase {
         model.setAll(enabled: false)
         XCTAssertTrue(model.runEnabled)
         liveRunning = true
-        model.tick()
+        await model.tick()
         XCTAssertTrue(model.liveRunning)
         XCTAssertFalse(model.runEnabled)
         await model.runProbe()
         XCTAssertTrue(opened.isEmpty)
         XCTAssertEqual(siblings(), ["Song.als"])
         liveRunning = false
-        model.tick()
+        await model.tick()
         XCTAssertTrue(model.runEnabled)
     }
 
@@ -309,12 +309,42 @@ final class RescueModelTests: XCTestCase {
         XCTAssertEqual(model.phase, .idle)
     }
 
+    func testClosingWhileTheProbeIsBeingWrittenLeavesNothingBehind() async throws {
+        await model.open(path: try makeSet(devices: threePlugins))
+        model.setAll(enabled: false)
+        let run = Task { await model.runProbe() }
+        await Task.yield()                                      // runProbe is now waiting for the write
+        XCTAssertEqual(model.phase, .preparing)
+        model.close()
+        await run.value
+        XCTAssertEqual(model.phase, .idle)
+        XCTAssertEqual(siblings(), ["Song.als"], "the probe written after close() is removed again")
+        XCTAssertEqual(RescueProbe.journal(dir: app.dataDir), [])
+        XCTAssertTrue(opened.isEmpty)
+    }
+
+    func testAnExistingProbeNamedFileIsNotTouchedByARun() async throws {
+        let als = try makeSet(devices: threePlugins)
+        let mine = scratch + "/Song Project/Song.alive-probe.als"
+        try Data("mine".utf8).write(to: URL(fileURLWithPath: mine))
+        await model.open(path: als)
+        model.setAll(enabled: false)
+        await model.runProbe()
+        XCTAssertEqual(model.phase, .waiting)
+        XCTAssertEqual(opened.count, 1)
+        XCTAssertNotEqual(opened.first, mine)
+        XCTAssertEqual(model.probeFileName, (opened.first! as NSString).lastPathComponent, "the sheet names the real probe")
+        model.close()
+        XCTAssertEqual(try String(contentsOfFile: mine), "mine")
+        XCTAssertEqual(siblings(), ["Song.alive-probe.als", "Song.als"])
+    }
+
     func testNeverOpenedProbeIsGivenUp() async throws {
         await model.open(path: try makeSet(devices: threePlugins))
         model.setAll(enabled: false)
         model.giveUpAfter = -1
         await model.runProbe()
-        model.tick()                                            // no log entry, Live not running
+        await model.tick()                                            // no log entry, Live not running
         XCTAssertEqual(model.phase, .ready)
         XCTAssertEqual(model.status, .neverOpened)
         XCTAssertEqual(siblings(), ["Song.als"])
@@ -337,14 +367,14 @@ final class RescueModelTests: XCTestCase {
         try h.seekToEnd()
         try h.write(contentsOf: Data(("2026-03-28T10:00:00.000000: info: Loading document \"\(probe)\"\n"
             + "2026-03-28T10:00:01.000000: info: Audio Unit v2: Going to restore: RMX-1000\n").utf8))
-        model.tick()
+        await model.tick()
         XCTAssertEqual(model.phase, .waiting)
         XCTAssertEqual(model.status, .loading(round: 1, restored: 0))
 
         try h.write(contentsOf: Data(("2026-03-28T10:00:02.000000: info: Audio Unit v2: Restored: RMX-1000\n"
             + "2026-03-28T10:00:03.000000: info: Loaded document was created by Ableton Live 11.2.6\n").utf8))
         try h.close()
-        model.tick()
+        await model.tick()
         XCTAssertEqual(model.phase, .ready)
         XCTAssertEqual(model.session?.working?.count, 3)
         XCTAssertFalse(FileManager.default.fileExists(atPath: probe))

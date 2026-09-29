@@ -52,8 +52,17 @@ struct ExportSheet: View {
             if let project = model.groups.first(where: { $0.origin == .inProject }) {
                 ExtraLine(label: ExportText.label(.inProject), value: ExportText.groupNumbers(project))
             }
+            if model.options.fromElsewhere, let line = ExportText.elsewhereFolders(model.elsewhereFolders) {
+                Text(line).font(Theme.fSmall).foregroundStyle(Theme.textDim)
+                    .lineLimit(2).truncationMode(.middle)
+                    .padding(.horizontal, 4)
+                    .help(model.elsewhereFolders.joined(separator: "\n"))
+            }
             if let line = ExportText.notFoundSummary(model.notFound.count) {
                 DisclosureLine(summary: line, items: model.notFound.map { $0.name })
+            }
+            if let line = ExportText.refusedSummary(model.refused.count) {
+                DisclosureLine(summary: line, items: model.refused.map { $0.name })
             }
             Divider().overlay(Theme.hairline)
             destinationRow(model)

@@ -99,12 +99,10 @@ public final class ProjectIndex: @unchecked Sendable {
     /// stops the scan at the next set.
     @discardableResult
     public func scanAsync(roots: [String], disabledRoots: [String] = [], progress: ScanProgress? = nil) async -> ScanStats {
-        let flag = CancelFlag()
-        return await withTaskCancellationHandler {
-            await Task.detached(priority: .utility) { [self] in
-                scan(roots: roots, disabledRoots: disabledRoots, progress: progress, isCancelled: { flag.isSet })
-            }.value
-        } onCancel: { flag.set() }
+        // A dedicated queue, not the cooperative pool: the scan blocks for a long time.
+        await BlockingWork.run { [self] isCancelled in
+            scan(roots: roots, disabledRoots: disabledRoots, progress: progress, isCancelled: isCancelled)
+        }
     }
 
     /// Blocking scan. Files whose size and mtime are unchanged are taken from the cache; the rest
@@ -142,9 +140,20 @@ public final class ProjectIndex: @unchecked Sendable {
         }
 
         var fresh = results.compactMap { $0 }
+        // Each phase below stops early when cancelled and leaves partial data behind, so the
+        // flag is looked at again after every one of them: nothing half-built is published or
+        // written to the caches.
+        func abandoned() -> Bool {
+            guard isCancelled() else { return false }
+            stats.cancelled = true
+            stats.seconds = Date().timeIntervalSince(started)
+            return true
+        }
         addRenders(&fresh, isCancelled: isCancelled)
+        if abandoned() { return stats }
         let known = history.total > 0 ? history : Activity.loadCache(dir: dir)
         let activity = weighProjects(&fresh, known: known, isCancelled: isCancelled)
+        if abandoned() { return stats }
 
         // Publish the catalog whole; readers saw the previous one until this moment.
         lock.lock()

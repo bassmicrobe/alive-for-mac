@@ -43,6 +43,27 @@ final class PluginMissingStateTests: XCTestCase {
         XCTAssertEqual(idx.health(idx.pluginUsage()).missing, 0)
     }
 
+    private func generation(_ idx: ProjectIndex) -> Int { idx.lock.lock(); defer { idx.lock.unlock() }; return idx._generation }
+
+    func testRefreshAppliesToTheCurrentCatalogAndBumpsTheGeneration() {
+        let idx = PluginTableTests.index(sets: sets(), installed: [PluginTableTests.installed("vst3:a", "Alpha")])
+        let before = generation(idx)
+        var inv = PluginInventory()
+        inv.add(PluginTableTests.installed("vst3:a", "Alpha")); inv.add(PluginTableTests.installed("vst3:b", "Beta"))
+        let frozen = inv
+        idx.inventoryLoader = { _ in frozen }
+        // Readers on other threads must never be blocked or see a half-updated list.
+        let done = expectation(description: "readers")
+        DispatchQueue.global().async {
+            for _ in 0..<200 { _ = idx.sets.map(\.missingPlugins) }
+            done.fulfill()
+        }
+        idx.refreshInstalled()
+        wait(for: [done], timeout: 10)
+        XCTAssertGreaterThan(generation(idx), before)
+        XCTAssertTrue(idx.sets.allSatisfy { $0.missingPlugins == 1 }, "only Gamma is missing now")
+    }
+
     func testRealMissesAreCountedAsOneAggregate() {
         // Only Alpha is installed: Beta and Gamma are missing from all four sets.
         let idx = PluginTableTests.index(sets: sets(), installed: [PluginTableTests.installed("vst3:a", "Alpha")])
