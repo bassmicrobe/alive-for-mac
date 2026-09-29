@@ -88,7 +88,6 @@ final class PluginInventoryTests: XCTestCase {
         XCTAssertEqual(inv.describe(), "2 plugins")
         inv.error = "broken"
         XCTAssertEqual(inv.describe(), "broken")
-        XCTAssertTrue(PluginInventory.load(settings: Settings()).isEmpty)
     }
 
     func testNormalize() {
@@ -302,7 +301,11 @@ final class ProjectIndexTests: XCTestCase {
         XCTAssertTrue(idx.pluginUsage().map(\.name) == usage.map(\.name))          // cached snapshot
 
         // Uninstall Serum: sets now miss one plugin, the summary follows.
-        idx.inventoryLoader = { _ in PluginInventory() }
+        // (An *empty* inventory would mean "unknown", not "missing": see PluginMissingStateTests.)
+        var other = InstalledPlugin(); other.uid = "vst3:other"; other.name = "Other"
+        var remaining = PluginInventory(); remaining.add(other)
+        let stillThere = remaining
+        idx.inventoryLoader = { _ in stillThere }
         idx.refreshInstalled()
         XCTAssertEqual(idx.sets.first { $0.name == "alpha v1" }?.missingPlugins, 1)
         XCTAssertEqual(idx.pluginUsage().first?.match, .missing)

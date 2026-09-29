@@ -5,23 +5,38 @@ extension ProjectIndex {
     /// Re-reads the inventory of installed plugins and marks each set with how many plugins it is
     /// missing. Called after a scan and from the "refresh" button — the set of plugins changes
     /// without the sets being edited.
+    ///
+    /// Missing plugins are a state, not an error: nothing is logged per plugin, one summary line
+    /// per refresh. When the inventory is unavailable (nothing could be read) no plugin is called
+    /// missing at all — `missingPlugins` stays 0 for every set.
     public func refreshInstalled() {
         let inv = inventoryLoader(settings)
         lock.lock()
         _inventory = inv
         var updated = _sets
+        var missingNames = Set<String>(), affected = 0
         for i in updated.indices {
             let e = updated[i]
             var missing = 0
-            for (k, name) in e.plugins.enumerated() {
-                let uid = k < e.pluginUids.count ? e.pluginUids[k] : ""
-                if inv.match(uid: uid, name: name).kind == .missing { missing += 1 }
+            if inv.isAvailable {
+                for (k, name) in e.plugins.enumerated() {
+                    let uid = k < e.pluginUids.count ? e.pluginUids[k] : ""
+                    if inv.match(uid: uid, name: name).kind == .missing { missing += 1; missingNames.insert(name.lowercased()) }
+                }
             }
+            if missing > 0 { affected += 1 }
             updated[i].missingPlugins = missing
         }
         _sets = updated
         _generation += 1        // the vendor list and the plugin summary depend on what is installed
         lock.unlock()
+
+        if inv.isAvailable {
+            Diag.info("plugins: \(inv.all.count) installed (\(inv.sources.joined(separator: ", "))); "
+                      + "\(missingNames.count) used plugins not installed, in \(affected) sets")
+        } else {
+            Diag.info("plugins: inventory unavailable (\(inv.error ?? "nothing found")); missing plugins not reported")
+        }
     }
 
     public func health(_ usage: [PluginStat]) -> PluginHealth {
@@ -38,6 +53,7 @@ extension ProjectIndex {
             case .exact: h.installed += 1
             case .otherFormat: h.otherFormat += 1
             case .missing: h.missing += 1
+            case .unknown: break        // the inventory is unavailable: not counted as anything
             }
         }
         return h
