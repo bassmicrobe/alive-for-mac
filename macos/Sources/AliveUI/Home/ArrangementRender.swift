@@ -230,8 +230,13 @@ enum ArrangementRender {
     }
 
     static func desaturate(_ c: RGBColor) -> RGBColor {
-        let grey = Int(Double(c.r) * 0.3 + Double(c.g) * 0.59 + Double(c.b) * 0.11)
-        return RGBColor(r: UInt8((Int(c.r) + grey) / 2), g: UInt8((Int(c.g) + grey) / 2), b: UInt8((Int(c.b) + grey) / 2))
+        // Split into typed steps: Swift 6.3 (Xcode 26) gives up type-checking the one-line form.
+        let red: Double = Double(c.r) * 0.3
+        let green: Double = Double(c.g) * 0.59
+        let blue: Double = Double(c.b) * 0.11
+        let grey: Int = Int(red + green + blue)
+        func half(_ channel: UInt8) -> UInt8 { UInt8((Int(channel) + grey) / 2) }
+        return RGBColor(r: half(c.r), g: half(c.g), b: half(c.b))
     }
 
     static func blend(_ a: RGBColor, _ b: RGBColor, _ t: Double) -> RGBColor {
