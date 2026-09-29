@@ -82,7 +82,7 @@ struct SamplesListArea: View {
     // MARK: nothing to list
 
     @ViewBuilder private var placeholder: some View {
-        if !model.isLoaded || model.isScanning {
+        if !model.isLoaded || model.isScanning || model.isPreparing || model.usageUnknown {
             EmptyState(icon: .refresh, title: SamplesStrings.indexing.s)
         } else if model.index.files.isEmpty {
             EmptyState(icon: .wave, title: SamplesStrings.noSamplesTitle.s, message: SamplesStrings.noSamplesBody.s)

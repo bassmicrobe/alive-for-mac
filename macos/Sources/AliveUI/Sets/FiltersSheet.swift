@@ -7,6 +7,8 @@ struct FiltersSheet: View {
     @Environment(AppModel.self) private var app
     @Environment(\.dismiss) private var dismiss
     @State private var facets = SetFilterFacets()
+    /// Takes the sheet's initial focus so no field starts with a ring; click or Tab moves on.
+    @FocusState private var restingFocus: Bool
 
     var body: some View {
         @Bindable var sets = app.sets
@@ -80,6 +82,8 @@ struct FiltersSheet: View {
             .contentMargins(.bottom, 20, for: .scrollContent)
             footer
         }
+        .background(Color.clear.focusable().focused($restingFocus).focusEffectDisabled())
+        .defaultFocus($restingFocus, true)
         .onAppear(perform: refreshFacets)
         .onChange(of: app.sets.filter) { _, _ in refreshFacets() }
         .onKeyPress(.escape) { dismiss(); return .handled }

@@ -96,6 +96,6 @@ final class CatalogWatcher {
             return
         }
         Diag.info("folder watch: change on disk, rescanning")
-        app.catalog.rescan()
+        app.catalog.rescan(full: false)
     }
 }
