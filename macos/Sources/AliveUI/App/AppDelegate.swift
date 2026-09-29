@@ -1,5 +1,6 @@
 // Mac-only: Finder "Open With" for .als files, activation policy for `swift run`, dark appearance.
 import AppKit
+import AliveCore
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     /// The model the delegate forwards to; set by the main window once it exists.
@@ -24,8 +25,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         // ALIVE_NO_ACTIVATE=1 keeps the app in the background: automated test runs must not
         // steal keyboard focus from whoever is using the machine.
-        guard ProcessInfo.processInfo.environment["ALIVE_NO_ACTIVATE"] != "1" else { return }
+        guard ProcessInfo.processInfo.environment["ALIVE_NO_ACTIVATE"] != "1" else {
+            logWindowNumbers()
+            return
+        }
         NSApp.activate(ignoringOtherApps: true)
+    }
+
+    /// For background test runs: `screencapture -l <number>` photographs just our window
+    /// (never the user's desktop). The windows appear a moment after launch.
+    private func logWindowNumbers() {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+            for window in NSApp.windows where window.isVisible {
+                Diag.info("window-number: \(window.windowNumber) \(window.identifier?.rawValue ?? window.title)")
+            }
+        }
     }
 
     func application(_ application: NSApplication, open urls: [URL]) {
