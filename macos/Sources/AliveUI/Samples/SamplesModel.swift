@@ -35,8 +35,11 @@ final class SamplesModel {
         didSet { if lens != oldValue { sort = SampleSort() } }        // every lens has an order of its own
     }
     var sort = SampleSort()
-    private(set) var openFolders = Set<String>()
-    private(set) var openRevision = 0
+    var openFolders = Set<String>()
+    var openRevision = 0
+    /// The view asks for the roots to be shown open the first time a library arrives, so the packs are in
+    /// sight at once; the model itself starts with everything closed.
+    @ObservationIgnored var expandsRootsOnFirstLoad = false
     var selection: String?
     private(set) var scrollTarget: SampleScrollTarget?
     /// A folder that `showFolder` was asked for but that is not in the library.

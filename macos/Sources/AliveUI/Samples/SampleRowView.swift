@@ -66,7 +66,7 @@ struct SampleRowView: View {
             }
         }
         .frame(width: width)
-        .frame(maxWidth: width == nil ? .infinity : nil)
+        .frame(minWidth: width == nil ? 0 : nil, maxWidth: width == nil ? .infinity : nil)
     }
 
     private func nameCell(dim: Bool, playing: Bool) -> some View {

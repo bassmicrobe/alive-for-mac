@@ -22,7 +22,8 @@ struct SampleCells {
         let folder = index.folders[d]
         let use = usage.of(folder: d)
         switch column {
-        case .name: return folder.name
+        // A root's name is its whole path; the home folder is only ~.
+        case .name: return folder.parent == nil ? (folder.path as NSString).abbreviatingWithTildeInPath : folder.name
         case .location: return index.location(of: folder.parent)
         case .samples: return SampleFormat.number(folder.totalSamples)
         case .used: return unknown ? SamplesStrings.usageUnknown.s : count(use?.used ?? 0)

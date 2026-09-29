@@ -15,7 +15,10 @@ struct SamplesView: View {
                 SamplesEmptyState(model: model)
             }
         }
-        .task { model.start() }
+        .task {
+            model.expandsRootsOnFirstLoad = true
+            model.start()
+        }
         .onChange(of: model.effectiveRoots) { _, _ in model.syncRoots() }
         .onDisappear { model.leave() }
     }
@@ -30,6 +33,7 @@ private struct SamplesContent: View {
                 SamplesBar(model: model)
                 SamplesListArea(model: model)
             }
+            .frame(minWidth: 0, maxWidth: .infinity)
             SamplesPanel(model: model)
                 .frame(width: Theme.panelW)
         }

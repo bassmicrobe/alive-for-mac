@@ -138,7 +138,7 @@ private struct HeaderCell: View {
         .onHover { hovering = $0 }
         .animation(Theme.hoverAnimation, value: hovering)
         .frame(width: width)
-        .frame(maxWidth: width == nil ? .infinity : nil)
+        .frame(minWidth: width == nil ? 0 : nil, maxWidth: width == nil ? .infinity : nil)
         .accessibilityAddTraits(.isButton)
     }
 }

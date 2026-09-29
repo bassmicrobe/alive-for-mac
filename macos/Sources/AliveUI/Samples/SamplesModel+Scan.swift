@@ -43,7 +43,8 @@ extension SamplesModel {
             let s = self.app.settings
             self.adopt(cached.only(s.sampleRoots, disabled: s.disabledSampleRoots))
             self.isLoaded = true
-            if let path = self.pendingReveal {
+            // A folder the cache knows is shown at once; one it does not waits for the walk.
+            if let path = self.pendingReveal, !self.hasEnabledRoots || self.knows(folder: path) {
                 self.pendingReveal = nil
                 self.reveal(path)
             }
@@ -73,6 +74,11 @@ extension SamplesModel {
         index = fresh
         indexGeneration += 1
         estimate = fresh.totalSamples
+        if expandsRootsOnFirstLoad, !fresh.roots.isEmpty {
+            expandsRootsOnFirstLoad = false
+            openFolders.formUnion(fresh.roots.map { fresh.folders[$0].path.lowercased() })
+            openRevision += 1
+        }
         // The selection stays when its row is still there; otherwise the panel would show a ghost.
         if let sel = selection, kind(ofRow: sel) == nil {
             selection = nil
@@ -130,6 +136,11 @@ extension SamplesModel {
                 self.reveal(path)
             }
         }
+    }
+
+    func knows(folder path: String) -> Bool {
+        if case .folder? = kind(ofRow: SampleIndex.norm(path)) { return true }
+        return false
     }
 
     /// `showFolder` after the index is there.
