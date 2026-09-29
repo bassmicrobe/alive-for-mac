@@ -69,7 +69,6 @@ enum OverviewFormat {
 
 struct OverviewPanel: View {
     @Environment(AppModel.self) private var app
-    @State private var containerWidth: CGFloat = 0
     @State private var hovered: HeatmapCell?
     @State private var headerHover = false
 
@@ -87,20 +86,16 @@ struct OverviewPanel: View {
             header(open: open)
             if open {
                 let stats = app.home.overviewStats
-                let content = Self.contentWidth(for: containerWidth)
-                VStack(alignment: .leading, spacing: 20) {
-                    cards(stats)
-                    ActivityHeatmap(grid: app.home.heatmap, available: content, hovered: $hovered)
-                    footer(stats)
+                OverviewColumn {
+                    VStack(alignment: .leading, spacing: 20) {
+                        cards(stats)
+                        ActivityHeatmap(grid: app.home.heatmap, hovered: $hovered)
+                        footer(stats)
+                    }
                 }
-                .frame(width: content > 0 ? content : nil, alignment: .leading)
-                .transition(.opacity)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(GeometryReader { proxy in
-            Color.clear.onChange(of: proxy.size.width, initial: true) { _, w in containerWidth = w }
-        })
     }
 
     private func header(open: Bool) -> some View {
@@ -137,6 +132,20 @@ struct OverviewPanel: View {
             .foregroundStyle(Theme.textDim)
             .frame(minHeight: 16, alignment: .leading)
             .lineLimit(1)
+    }
+}
+
+/// Gives its child `OverviewPanel.contentWidth` of the proposed width (state-free, see `HeatmapFit`).
+struct OverviewColumn: Layout {
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let width = proposal.width ?? OverviewPanel.contentWidth(for: 800)
+        let inner = subviews.first?.sizeThatFits(ProposedViewSize(width: OverviewPanel.contentWidth(for: width), height: nil)) ?? .zero
+        return CGSize(width: width, height: inner.height)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        subviews.first?.place(at: bounds.origin, anchor: .topLeading,
+                              proposal: ProposedViewSize(width: OverviewPanel.contentWidth(for: bounds.width), height: nil))
     }
 }
 
