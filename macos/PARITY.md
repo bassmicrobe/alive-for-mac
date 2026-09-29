@@ -80,6 +80,7 @@ Legend: **Done** = same behaviour · **Simplified** = works, but less than upstr
 | Gather samples, other projects, User Library, packs into a folder | Done | Counts and sizes per group before you start. |
 | `.zip` | Simplified | Staged folder + `/usr/bin/ditto` instead of System.IO.Compression. |
 | Destination | Simplified | Save panel (default `<project>/<set> Project_export`); an existing destination is refused rather than merged. |
+| What gets copied | Stricter (safety) | Only regular media/Live files (or known Live bundles) are copied; anything inside a hidden folder or a sensitive location (Keychains, Mail, browser profiles…) and links leaving the project are refused and listed once in the sheet. Upstream copies whatever a set references, so a crafted set could pull unrelated files into an export. |
 
 ### Preview and player
 
@@ -144,6 +145,13 @@ Legend: **Done** = same behaviour · **Simplified** = works, but less than upstr
   (a root removed, a filter applied): table cells no longer read `AppModel` from the SwiftUI environment.
 - Samples are scanned quietly in the background at launch (upstream: only when the tab is opened).
 - `RescueProbe.cleanupStale` runs before the catalog starts, like upstream's leftover-probe cleanup.
+- Hardening after code review (Mac-only, upstream has none of these): inflated `.als` capped at 2 GB
+  (decompression bombs), at most 1,024 attributes per XML tag, cache files with impossible counts or
+  dates are discarded and rebuilt instead of crashing, a crafted AIFF sample rate can no longer crash the
+  sample scan, probe copies never overwrite an existing file (`Name (2).alive-probe.als`) and the
+  cleanup only deletes regular files that look like sets, unreadable `settings.cfg`/`notes.cfg`/`home.cfg`
+  are backed up to `.bak` before anything is rewritten (UTF-16 and Windows-1252 files from the Windows app
+  are read), and `alive.log` writes the home folder as `~`.
 
 ## Known gaps / tech debt
 
