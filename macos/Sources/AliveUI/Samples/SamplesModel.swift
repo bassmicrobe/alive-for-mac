@@ -13,6 +13,9 @@ final class SamplesModel {
 
     var shownCount: Int { 0 }
 
+    /// The app-wide player (`app.audio`), shared with render playback.
+    var audio: AudioPlayback { app.audio }
+
     func togglePlaySelected() {}
 
     func rescan() {}

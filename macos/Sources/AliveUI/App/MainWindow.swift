@@ -19,7 +19,10 @@ struct MainWindow: View {
         .background(WindowTransparency(isTransparent: app.prefs.transparency))
         .sheet(item: $app.sheet) { sheet in SheetHost(sheet: sheet) }
         .preferredColorScheme(.dark)
-        .task { AppDelegate.attach(app) }
+        .task {
+            AppDelegate.attach(app)
+            app.start()
+        }
     }
 
     @ViewBuilder private var background: some View {
@@ -65,6 +68,10 @@ private struct TopBar: View {
                 .monospacedDigit()
                 .lineLimit(1)
                 .fixedSize()
+            if app.catalog.isScanning {
+                ScanStatusPill(progress: app.catalog.progress)
+                    .transition(.opacity.combined(with: .scale(scale: 0.96)))
+            }
             Spacer(minLength: 8)
             HStack(spacing: Theme.iconGap) {
                 CircleIconButton(icon: .stat, help: CommonStrings.tabStat.s) { openWindow(id: "stat") }
@@ -75,6 +82,7 @@ private struct TopBar: View {
                 CircleIconButton(icon: .help, help: CommonStrings.help.s) { app.presentHelp() }
             }
         }
+        .animation(Theme.selectAnimation, value: app.catalog.isScanning)
         .padding(.leading, trafficLightInset)
         .padding(.trailing, Theme.pad)
         .padding(.top, 12)
@@ -111,5 +119,63 @@ private struct SearchField: View {
         .focusRing(isFocused, cornerRadius: Theme.controlH / 2)
         .onChange(of: app.searchFocusRequest) { _, _ in isFocused = true }
         .accessibilityLabel(CommonStrings.focusSearch.s)
+    }
+}
+
+/// "Scanning 120 / 754" with a small progress ring; indeterminate while the folder walk is still
+/// counting. The current set's name is the tooltip.
+private struct ScanStatusPill: View {
+    let progress: CatalogProgress
+
+    var body: some View {
+        HStack(spacing: 8) {
+            ProgressRing(fraction: progress.fraction)
+                .frame(width: 13, height: 13)
+            Text(label)
+                .font(Theme.fSmall)
+                .foregroundStyle(Theme.textDim)
+                .monospacedDigit()
+                .lineLimit(1)
+                .contentTransition(.numericText())
+        }
+        .padding(.horizontal, 12)
+        .frame(height: Theme.controlH - 6)
+        .fixedSize()
+        .background(Theme.sunken, in: Capsule())
+        .overlay(Capsule().strokeBorder(Theme.cardBorder, lineWidth: 1))
+        .help(progress.current)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(label)
+    }
+
+    private var label: String {
+        progress.total > 0
+            ? CommonStrings.scanProgress.f(progress.done, progress.total)
+            : CommonStrings.scanning.s
+    }
+}
+
+private struct ProgressRing: View {
+    let fraction: Double?
+    @State private var spin = false
+
+    var body: some View {
+        ZStack {
+            Circle().stroke(Theme.hairline, lineWidth: 2)
+            if let fraction {
+                Circle()
+                    .trim(from: 0, to: fraction)
+                    .stroke(Theme.light, style: StrokeStyle(lineWidth: 2, lineCap: .round))
+                    .rotationEffect(.degrees(-90))
+                    .animation(Theme.hoverAnimation, value: fraction)
+            } else {
+                Circle()
+                    .trim(from: 0, to: 0.28)
+                    .stroke(Theme.light, style: StrokeStyle(lineWidth: 2, lineCap: .round))
+                    .rotationEffect(.degrees(spin ? 360 : 0))
+                    .animation(.linear(duration: 1).repeatForever(autoreverses: false), value: spin)
+                    .onAppear { spin = true }
+            }
+        }
     }
 }

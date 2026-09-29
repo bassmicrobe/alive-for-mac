@@ -15,6 +15,11 @@ public struct LiveInstall: Equatable, Sendable {
 public struct LivePlace: Equatable, Sendable {
     public var name: String
     public var path: String
+
+    public init(name: String, path: String) {
+        self.name = name
+        self.path = path
+    }
 }
 
 /// Where THIS machine keeps the roots Live measures its references from. Absolute paths inside

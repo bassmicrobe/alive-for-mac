@@ -1,6 +1,7 @@
 // Port of src/SettingsDialog.cs, reduced to the Mac settings: language, transparency, plugin
 // source, data folder. Update controls come from `UpdatesSection` (S5).
 import SwiftUI
+import AliveCore
 
 struct SettingsView: View {
     var body: some View {
@@ -42,7 +43,7 @@ private struct GeneralSettingsView: View {
                 LabeledContent {
                     Button(SettingsStrings.openDataFolder.s, action: openDataFolder)
                 } label: {
-                    Text(DataFolder.url.path)
+                    Text(AppHome.path)
                         .font(Theme.fSmall).foregroundStyle(Theme.textDim)
                         .lineLimit(2).truncationMode(.middle)
                         .textSelection(.enabled)
@@ -55,7 +56,7 @@ private struct GeneralSettingsView: View {
 
     private func openDataFolder() {
         do {
-            try Finder.openFolder(path: DataFolder.ensureExists().path)
+            try Finder.openFolder(path: AppHome.ensure(app.dataDir))
         } catch {
             app.toast(CommonStrings.folderOpenFailed.f(error.localizedDescription), kind: .error)
         }

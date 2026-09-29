@@ -17,7 +17,11 @@ enum CommonStrings: LocalizedStrings {
     case comingSoonTitle, comingSoonBody
     // Toasts
     case liveNotFound, liveOpenFailed, liveLaunchFailed, audioFailed, folderOpenFailed
-    case pathMissing
+    case pathMissing, settingsSaveFailed, rootAdded, rootsAdded, alreadyWatching, notAFolder
+    // Scan status and first run
+    case scanning, scanProgress
+    case emptyRootsTitle, emptyRootsBody, addProjectsFolder, chooseFolderPrompt, chooseFolderMessage
+    case suggestionsTitle, addSuggestion, noSetsTitle, noSetsBody
 
     var en: String { text.en }
     var ja: String { text.ja }
@@ -69,6 +73,25 @@ enum CommonStrings: LocalizedStrings {
         case .audioFailed: return ("Playback failed: %@", "再生に失敗しました: %@")
         case .folderOpenFailed: return ("Could not open the folder: %@", "フォルダを開けませんでした: %@")
         case .pathMissing: return ("The file no longer exists: %@", "ファイルが見つかりません: %@")
+        case .settingsSaveFailed: return ("Could not save settings: %@", "設定を保存できませんでした: %@")
+        case .rootAdded: return ("Added %@", "%@を追加しました")
+        case .rootsAdded: return ("Added %lld folders", "%lld 個のフォルダを追加しました")
+        case .alreadyWatching: return ("Already watching that folder", "そのフォルダはすでに監視しています")
+        case .notAFolder: return ("Not a folder: %@", "フォルダではありません: %@")
+
+        case .scanning: return ("Scanning…", "スキャン中…")
+        case .scanProgress: return ("Scanning %1$lld / %2$lld", "スキャン中 %1$lld / %2$lld")
+        case .emptyRootsTitle: return ("Nothing to show yet", "まだ表示するものがありません")
+        case .emptyRootsBody: return ("Alive reads your Live sets from the folders you point it at. It only reads; it never changes a set.",
+                                      "Alive は指定したフォルダの Live セットを読み込みます。読み取り専用で、セットは変更しません。")
+        case .addProjectsFolder: return ("Add the folder with your Live projects", "Live プロジェクトのフォルダを追加")
+        case .chooseFolderPrompt: return ("Add", "追加")
+        case .chooseFolderMessage: return ("Choose the folders that contain your Live projects", "Live プロジェクトが入っているフォルダを選択")
+        case .suggestionsTitle: return ("Found on this Mac", "この Mac で見つかりました")
+        case .addSuggestion: return ("Add", "追加")
+        case .noSetsTitle: return ("No sets found", "セットが見つかりません")
+        case .noSetsBody: return ("There are no .als files in the folders being scanned. Check them with Scan Folders (⇧⌘O).",
+                                  "スキャン対象のフォルダに .als ファイルがありません。スキャンするフォルダ（⇧⌘O）を確認してください。")
         }
     }
 }

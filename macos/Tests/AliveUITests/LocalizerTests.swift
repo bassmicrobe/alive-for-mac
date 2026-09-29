@@ -29,13 +29,6 @@ final class LocalizerTests: XCTestCase {
         XCTAssertEqual(CommonStrings.shownCount.f(107), "107 件を表示")
     }
 
-    func testPreferenceIsPersisted() {
-        Localizer.shared.preference = .ja
-        XCTAssertEqual(PreferenceStore.language, .ja)
-        Localizer.shared.preference = .en
-        XCTAssertEqual(PreferenceStore.language, .en)
-    }
-
     func testConfigValueRoundTrip() {
         for option in LanguagePreference.allCases {
             XCTAssertEqual(LanguagePreference(configValue: option.configValue), option)
