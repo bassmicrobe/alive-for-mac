@@ -67,6 +67,30 @@ final class PluginsModelTests: XCTestCase {
         app.searchText = ""
     }
 
+    private func replaceSets(_ index: ProjectIndex, _ sets: [SetEntry]) {
+        index.lock.lock()
+        index._sets = sets
+        index._generation += 1
+        index.lock.unlock()
+    }
+
+    func testASnapshotOfAnOlderCoreGenerationIsNotKept() async throws {
+        let app = try await makeApp(inventory: standardMachine)
+        let index = app.catalog.index
+        XCTAssertEqual(app.plugins.snapshot?.generation, index.generation)
+        // The core publishes again without the UI revision moving: the snapshot is derived anew.
+        replaceSets(index, [set("z", [("Zed", "vst3:z")], modified: 50)])
+        await app.plugins.settle()
+        XCTAssertEqual(app.plugins.snapshot?.generation, index.generation)
+        XCTAssertTrue(app.plugins.rows.contains { $0.name == "Zed" })
+        XCTAssertFalse(app.plugins.rows.contains { $0.name == "Ghost" })
+    }
+
+    func testACancelledSnapshotDerivationYieldsNothing() async throws {
+        let app = try await makeApp(inventory: standardMachine)
+        XCTAssertNil(PluginsModel.Snapshot.make(revision: 1, index: app.catalog.index, isCancelled: { true }))
+    }
+
     func testSortingToggles() async throws {
         let app = try await makeApp(inventory: standardMachine)
         let m = app.plugins

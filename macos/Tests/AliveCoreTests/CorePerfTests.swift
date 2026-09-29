@@ -25,7 +25,7 @@ final class CorePerfTests: XCTestCase {
     }
 
     func testInflateCapIsSane() {
-        XCTAssertEqual(Gzip.maxInflatedBytes, 1 << 30)
+        XCTAssertEqual(Gzip.maxInflatedBytes, 256 << 20)
     }
 
     // MARK: byte budget and workers

@@ -57,7 +57,10 @@ public struct SampleUsage: Sendable {
     /// The library samples one set uses — the other way round from `of(file:)`.
     public func files(ofSet path: String) -> [Int] { bySet[path] ?? [] }
 
-    public static func compute(index: SampleIndex, sets: [SetEntry]) -> SampleUsage {
+    /// `isCancelled` is polled between sets and every few thousand files; once it is true the
+    /// (partial) result is returned at once, for the caller to discard.
+    public static func compute(index: SampleIndex, sets: [SetEntry],
+                               isCancelled: () -> Bool = { false }) -> SampleUsage {
         var u = SampleUsage()
         guard !index.files.isEmpty, !sets.isEmpty else { return u }
 
@@ -70,7 +73,10 @@ public struct SampleUsage: Sendable {
         // Sizes of audio files are nearly unique, so a list is made only where two files do
         // share one — a list per file would cost a few hundred thousand objects.
         var bySize: [Int64: [Int]] = [:]
-        for (i, f) in index.files.enumerated() { bySize[f.size, default: []].append(i) }
+        for (i, f) in index.files.enumerated() {
+            if i % 8192 == 0, isCancelled() { return u }
+            bySize[f.size, default: []].append(i)
+        }
 
         // A folder's names are indexed only once somebody lands in it.
         var names: [Int: [String: Int]] = [:]
@@ -81,6 +87,7 @@ public struct SampleUsage: Sendable {
         var pathIds: [String: Int] = [:]
 
         for s in sets {
+            if isCancelled() { return u }
             let pathId = pathIds[s.path] ?? { let n = pathIds.count; pathIds[s.path] = n; return n }()
             let project = s.projectDir.lowercased()
             for (i, raw) in s.samples.enumerated() {
@@ -102,7 +109,10 @@ public struct SampleUsage: Sendable {
         // Up the folders, from every used file to its root. Sets of projects are made only on the
         // folders of these chains.
         var folderProjects: [Int: Set<String>] = [:]
+        var walked = 0
         for (f, use) in u.byFile {
+            walked += 1
+            if walked % 2048 == 0, isCancelled() { return u }
             let mine = projects[f] ?? []
             u.byFile[f]?.projects = mine.count
             var d: Int? = index.files[f].folder
