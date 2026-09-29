@@ -71,7 +71,7 @@ final report (the orchestrator edits the file; don't edit it yourself in paralle
 ## 4. Layout
 
 ```
-.github/README.md, README.ja.md        Mac README (GitHub shows .github/README.md first)
+.github/README.md (ja), README.en.md   Mac README, Japanese primary (GitHub shows .github/README.md first)
 .github/workflows/macos-ci.yml         build + test on macOS runner
 .github/workflows/upstream-watch.yml   weekly upstream report issue
 macos/

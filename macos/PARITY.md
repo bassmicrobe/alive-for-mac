@@ -166,9 +166,9 @@ Legend: **Done** = same behaviour · **Simplified** = works, but less than upstr
 - Search is narrower than upstream's (names only). No column search.
 - VST2 plugins are matched by name only; no architecture (arm64/x86_64) check.
 - Live 12's plugin database (SQLite) is not read; on Live 12 the list relies on the bundle scan.
-- No notarization: the app is ad-hoc signed, so first launch needs right-click → Open (see the README).
+- No notarization: the app is ad-hoc signed, so first launch needs System Settings → Privacy & Security → Open Anyway on macOS 15+ (see the README).
   Sparkle-style in-app updating is not implemented; the update check only opens the release page.
 - The Home overview and the Stat window are drawn with Canvas; very large libraries (10,000+ sets) are
   untested.
 - `tests` run without a display; the SwiftUI layouts are checked by hand (screenshots) only.
-- Screenshots for the README are still to be taken (none are committed: they would show a real library).
+- No screenshots are committed to the README: they would show a real library.

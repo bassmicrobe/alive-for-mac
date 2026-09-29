@@ -69,7 +69,7 @@ nebula/Channels.cs	Sources/AliveUI/Stat/StatChannels.swift;Sources/AliveUI/Stat/
 nebula/Cloud.cs	Sources/AliveUI/Stat/CloudCamera.swift;Sources/AliveUI/Stat/CloudScene.swift;Sources/AliveUI/Stat/CloudAxisLabels.swift;Sources/AliveUI/Stat/CloudCanvas.swift;Sources/AliveUI/Stat/CloudInputView.swift	S5	
 nebula/NebulaForm.cs	Sources/AliveUI/Stat/StatWindow.swift;Sources/AliveUI/Stat/StatModel.swift;Sources/AliveUI/Stat/StatMappingPanel.swift;Sources/AliveUI/Stat/NebulaConfig.swift;Sources/AliveUI/Stat/StatLegend.swift	S5	
 FORMAT.md	-	-	reference; read before touching Als/
-README.md	../.github/README.md	docs	Mac README lives in .github/
+README.md	../.github/README.md	docs	Mac README lives in .github/ (README.md = Japanese, README.en.md = English)
 README.ru.md	-	-	not ported
 build.cmd	scripts/build-app.sh	1A	
 tools/	-	-	Windows test harnesses; Swift tests live in Tests/
