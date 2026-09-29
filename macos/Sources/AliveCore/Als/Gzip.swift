@@ -12,9 +12,10 @@ public enum GzipError: Error, Equatable {
 /// gzip container helpers for .als files (gzip over XML).
 public enum Gzip {
     private static let chunk = 256 * 1024
-    /// The largest real set seen inflates to ~92 MB (a library of 750 sets); anything past this
-    /// is not a set, and is recorded as unreadable.
-    public static let maxInflatedBytes = 256 * 1024 * 1024
+    /// Decompression-bomb guard, not a memory budget (that is `AlsFile.inflateBudget`). The largest
+    /// real set seen inflates to ~92 MB, big orchestral templates reach a few hundred MB; anything
+    /// past this is not a set, and is recorded as unreadable.
+    public static let maxInflatedBytes = 512 * 1024 * 1024
 
     public static func isGzip(_ data: Data) -> Bool {
         data.count >= 2 && data[data.startIndex] == 0x1F && data[data.startIndex + 1] == 0x8B

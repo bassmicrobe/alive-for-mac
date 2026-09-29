@@ -15,7 +15,7 @@ final class FinalHardeningTests: XCTestCase {
 
     func testTheCeilingSitsAboveTheLargestRealSetAndBelowAGigabyte() {
         // The biggest of 750 real sets inflates to ~92 MB.
-        XCTAssertEqual(Gzip.maxInflatedBytes, 256 << 20)
+        XCTAssertEqual(Gzip.maxInflatedBytes, 512 << 20)
         XCTAssertGreaterThan(Gzip.maxInflatedBytes, 2 * (92 << 20))
     }
 
