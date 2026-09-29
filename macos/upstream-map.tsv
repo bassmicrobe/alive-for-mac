@@ -2,72 +2,72 @@
 src/Activity.cs	Sources/AliveCore/Catalog/Activity.swift;Sources/AliveCore/Catalog/DotNetBinary.swift	1B	
 src/AiffReader.cs	Sources/AliveCore/Samples/AiffReader.swift	S4	may be replaced by AVFoundation metadata
 src/AlsFile.cs	Sources/AliveCore/Als/AlsFile.swift;Sources/AliveCore/Als/ElementStream.swift	1B	+AU fields (Mac)
-src/AlsPatch.cs	Sources/AliveCore/Rescue/AlsPatch.swift	S6	+AuPluginInfo (Mac)
+src/AlsPatch.cs	Sources/AliveCore/Rescue/AlsPatch.swift;Sources/AliveCore/Rescue/GzipLineStream.swift	S6	+AuPluginInfo (Mac)
 src/AlsSamplePatch.cs	Sources/AliveCore/Rescue/AlsSamplePatch.swift	S6	
 src/app.manifest	scripts/build-app.sh	1A	Info.plist equivalent
 src/Arrangement.cs	Sources/AliveCore/Als/Arrangement.swift;Sources/AliveCore/Als/ArrangementParser.swift	1B	
 src/ArrangementLoader.cs	Sources/AliveCore/Als/ArrangementLoader.swift	1B	UI-free part only
 src/ArrangementRender.cs	Sources/AliveUI/Home/ArrangementRender.swift	S2	CoreGraphics / Canvas
 src/AssemblyInfo.cs	scripts/build-app.sh	1A	version -> Info.plist
-src/AudioPlayer.cs	Sources/AliveUI/Services/AudioPlayback.swift;Sources/AliveUI/Home/PlayerModel.swift	1A;S2	AVFoundation
-src/CollectAll.cs	Sources/AliveCore/Export/CollectAll.swift	S6	zip via /usr/bin/ditto
-src/CollectDialog.cs	Sources/AliveUI/Export/ExportSheet.swift	S6	
+src/AudioPlayer.cs	Sources/AliveUI/Services/AudioPlayback.swift;Sources/AliveUI/Home/Waveform.swift	1A;S2	AVFoundation
+src/CollectAll.cs	Sources/AliveCore/Export/CollectAll.swift;Sources/AliveCore/Export/CollectPlan.swift	S6	zip via /usr/bin/ditto
+src/CollectDialog.cs	Sources/AliveUI/Export/ExportSheet.swift;Sources/AliveUI/Export/ExportModel.swift;Sources/AliveUI/Export/ExportText.swift	S6	
 src/Controls.cs	Sources/AliveUI/Theme/Components.swift	1A	shared SwiftUI components
-src/DetailPanel.cs	Sources/AliveUI/Sets/DetailPanel.swift	S1	
+src/DetailPanel.cs	Sources/AliveUI/Sets/DetailPanel.swift;Sources/AliveUI/Sets/DetailSections.swift;Sources/AliveUI/Sets/SampleFolderGroups.swift;Sources/AliveUI/Plugins/PluginDetailPanel.swift;Sources/AliveUI/Samples/SamplesPanel.swift;Sources/AliveUI/Samples/SamplesPanelParts.swift;Sources/AliveUI/Samples/SampleInfoLoader.swift;Sources/AliveCore/Samples/SampleMonths.swift;Sources/AliveUI/Stat/StatInspector.swift	S1	
 src/Diag.cs	Sources/AliveCore/Infra/Diag.swift	1B	
-src/FiltersDialog.cs	Sources/AliveUI/Sets/FiltersSheet.swift	S1	
+src/FiltersDialog.cs	Sources/AliveUI/Sets/FiltersSheet.swift;Sources/AliveUI/Sets/FilterControls.swift;Sources/AliveCore/Catalog/SetFilter.swift	S1	
 src/FolderScan.cs	Sources/AliveCore/Catalog/FolderScan.swift	1B	
-src/FolderWatch.cs	Sources/AliveCore/Catalog/FolderWatch.swift	S1	FSEvents
+src/FolderWatch.cs	Sources/AliveCore/Catalog/FolderWatch.swift;Sources/AliveUI/Sets/CatalogWatcher.swift	S1	FSEvents
 src/Glass.cs	Sources/AliveUI/Theme/Glass.swift	1A	NSVisualEffectView
 src/GlassDialog.cs	Sources/AliveUI/Theme/Components.swift	1A	
 src/HelpOverlay.cs	Sources/AliveUI/Help/HelpSheet.swift	1A	
-src/HomeStore.cs	Sources/AliveCore/Catalog/HomeStore.swift	1B	
-src/HomeView.cs	Sources/AliveUI/Home/HomeView.swift	S2	
+src/HomeStore.cs	Sources/AliveCore/Catalog/HomeStore.swift;Sources/AliveUI/Home/HomeModel.swift	1B	
+src/HomeView.cs	Sources/AliveUI/Home/HomeView.swift;Sources/AliveUI/Home/ProjectTile.swift;Sources/AliveUI/Home/HomeModel.swift;Sources/AliveUI/Home/ThumbnailPipeline.swift;Sources/AliveUI/Home/HomeKeyMonitor.swift	S2	
 src/Icons.cs	Sources/AliveUI/Theme/Icons.swift	1A	SF Symbols
 src/LiveColors.cs	Sources/AliveCore/Als/LiveColors.swift	1B	RGB only, no AppKit
-src/LiveEnvironment.cs	Sources/AliveCore/Live/LiveEnvironment.swift;Sources/AliveCore/Live/LiveVersion.swift	1B	Mac paths, no Registry
+src/LiveEnvironment.cs	Sources/AliveCore/Live/LiveEnvironment.swift;Sources/AliveCore/Live/LiveVersion.swift;Sources/AliveUI/Services/LiveLauncher.swift	1B	Mac paths, no Registry
 src/LiveLog.cs	Sources/AliveCore/Live/LiveLog.swift	S6	Mac Log.txt
-src/MainForm.cs	Sources/AliveUI/App/MainWindow.swift;Sources/AliveUI/App/AppModel.swift;Sources/AliveUI/App/AppCommands.swift;Sources/AliveUI/Catalog/CatalogModel.swift;Sources/AliveUI/Catalog/OpenPathPlan.swift	1A;W1.5	
+src/MainForm.cs	Sources/AliveUI/App/MainWindow.swift;Sources/AliveUI/App/AppModel.swift;Sources/AliveUI/App/AppCommands.swift;Sources/AliveUI/Catalog/CatalogModel.swift;Sources/AliveUI/Catalog/OpenPathPlan.swift;Sources/AliveUI/Sets/SetColumns.swift;Sources/AliveUI/Sets/SetsPipeline.swift;Sources/AliveUI/Sets/SetsModel.swift;Sources/AliveCore/Plugins/PluginTable.swift;Sources/AliveUI/Plugins/PluginsModel.swift;Sources/AliveUI/Plugins/PluginsView.swift;Sources/AliveUI/Plugins/PluginListView.swift;Sources/AliveCore/Update/UpdateSchedule.swift;Sources/AliveUI/Settings/UpdateModel.swift	1A;W1.5	
 src/MediaDecoder.cs	-	-	N/A: AVFoundation decodes
 src/MediaKeys.cs	Sources/AliveUI/Home/MediaKeys.swift	S2	MPRemoteCommandCenter
 src/MfInterop.cs	-	-	N/A: Media Foundation
 src/NotesDialog.cs	Sources/AliveUI/Sets/TagsSheet.swift	S1	
-src/OverviewPanel.cs	Sources/AliveUI/Home/OverviewPanel.swift	S2	
-src/PlayerDialog.cs	Sources/AliveUI/Home/PlayerWindow.swift	S2	
+src/OverviewPanel.cs	Sources/AliveUI/Home/OverviewPanel.swift;Sources/AliveUI/Home/ActivityHeatmap.swift	S2	
+src/PlayerDialog.cs	Sources/AliveUI/Home/PlayerWindow.swift;Sources/AliveUI/Home/PlayerModel.swift;Sources/AliveUI/Home/PlayerControls.swift	S2	
 src/PluginFilter.cs	Sources/AliveCore/Plugins/PluginFilter.swift	S3	
-src/PluginFiltersDialog.cs	Sources/AliveUI/Plugins/PluginFiltersSheet.swift	S3	
-src/PluginInventory.cs	Sources/AliveCore/Plugins/PluginInventory.swift	1B stub;S3	AU/VST/VST3 bundles
-src/PluginSummary.cs	Sources/AliveUI/Plugins/PluginSummary.swift	S3	
+src/PluginFiltersDialog.cs	Sources/AliveUI/Plugins/PluginFiltersSheet.swift;Sources/AliveUI/Plugins/PluginFilterControls.swift;Sources/AliveCore/Plugins/PluginFilter.swift	S3	
+src/PluginInventory.cs	Sources/AliveCore/Plugins/PluginInventory.swift;Sources/AliveCore/Plugins/PluginInventory+Load.swift;Sources/AliveCore/Plugins/PluginScanDb.swift;Sources/AliveCore/Plugins/PluginBundleScanner.swift;Sources/AliveCore/Plugins/PluginBundleReader.swift	1B stub;S3	AU/VST/VST3 bundles
+src/PluginSummary.cs	Sources/AliveUI/Plugins/PluginSummaryBar.swift	S3	
 src/PreviewDialog.cs	Sources/AliveUI/Home/PreviewSheet.swift	S2	
 src/Program.cs	Sources/AliveUI/App/AliveApp.swift;Sources/AliveUI/App/AppDelegate.swift;Sources/AliveUI/App/Startup.swift	1A	
-src/ProjectIndex.cs	Sources/AliveCore/Catalog/ProjectIndex.swift;Sources/AliveCore/Catalog/ProjectIndex+Plugins.swift;Sources/AliveCore/Catalog/SetEntry.swift;Sources/AliveCore/Catalog/SetBuilder.swift;Sources/AliveCore/Catalog/IndexCache.swift;Sources/AliveCore/Catalog/DotNetBinary.swift	1B	
+src/ProjectIndex.cs	Sources/AliveCore/Catalog/ProjectIndex.swift;Sources/AliveCore/Catalog/ProjectIndex+Plugins.swift;Sources/AliveCore/Catalog/SetEntry.swift;Sources/AliveCore/Catalog/SetBuilder.swift;Sources/AliveCore/Catalog/IndexCache.swift;Sources/AliveCore/Catalog/DotNetBinary.swift;Sources/AliveUI/Catalog/CatalogModel.swift	1B	
 src/ProjectMeta.cs	Sources/AliveCore/Catalog/ProjectMeta.swift	1B	
 src/RefResolver.cs	Sources/AliveCore/Als/RefResolver.swift	1B	
 src/RenderIndex.cs	Sources/AliveCore/Catalog/RenderIndex.swift	1B	
-src/RescueDialog.cs	Sources/AliveUI/Rescue/RescueSheet.swift	S6	
-src/RescueSession.cs	Sources/AliveCore/Rescue/RescueSession.swift	S6	launches Live via NSWorkspace from UI side
-src/RootsDialog.cs	Sources/AliveUI/Sets/RootsSheet.swift;Sources/AliveUI/Catalog/RootSuggestions.swift	S1	projects + samples pages
-src/RowListView.cs	Sources/AliveUI/Sets/SetsView.swift;Sources/AliveUI/Sets/SetFormat.swift	S1	SwiftUI Table
-src/SampleIndex.cs	Sources/AliveCore/Samples/SampleIndex.swift	S4	
-src/SampleScan.cs	Sources/AliveCore/Samples/SampleScan.swift	S4	
-src/SamplesTab.cs	Sources/AliveUI/Samples/SamplesView.swift	S4	
-src/SampleUsage.cs	Sources/AliveCore/Samples/SampleUsage.swift	S4	
+src/RescueDialog.cs	Sources/AliveUI/Rescue/RescueSheet.swift;Sources/AliveUI/Rescue/PluginCheckRow.swift;Sources/AliveUI/Rescue/RescueModel.swift;Sources/AliveUI/Rescue/RescueText.swift	S6	
+src/RescueSession.cs	Sources/AliveCore/Rescue/RescueSession.swift;Sources/AliveCore/Rescue/RescueProbe.swift	S6	launches Live via NSWorkspace from UI side
+src/RootsDialog.cs	Sources/AliveUI/Sets/RootsSheet.swift;Sources/AliveUI/Sets/RootsDraft.swift;Sources/AliveUI/Sets/RootCounter.swift;Sources/AliveUI/Catalog/RootSuggestions.swift;Sources/AliveUI/Samples/SampleRootSuggestions.swift	S1	projects + samples pages
+src/RowListView.cs	Sources/AliveUI/Sets/SetsView.swift;Sources/AliveUI/Sets/SetsTable.swift;Sources/AliveUI/Sets/SetsCells.swift;Sources/AliveUI/Sets/TableScrollBridge.swift;Sources/AliveUI/Sets/SetFormat.swift	S1	SwiftUI Table
+src/SampleIndex.cs	Sources/AliveCore/Samples/SampleIndex.swift;Sources/AliveCore/Samples/SampleWalk.swift;Sources/AliveCore/Samples/SamplePrints.swift;Sources/AliveCore/Samples/SampleCache.swift	S4	
+src/SampleScan.cs	Sources/AliveCore/Samples/SampleScan.swift;Sources/AliveCore/Export/CollectScan.swift	S4	
+src/SamplesTab.cs	Sources/AliveUI/Samples/SamplesView.swift;Sources/AliveUI/Samples/SamplesModel.swift;Sources/AliveUI/Samples/SamplesModel+Scan.swift;Sources/AliveUI/Samples/SamplesModel+Audition.swift;Sources/AliveUI/Samples/SamplesListArea.swift;Sources/AliveUI/Samples/SampleRowView.swift;Sources/AliveUI/Samples/SamplesEmptyState.swift;Sources/AliveUI/Samples/SampleCells.swift;Sources/AliveCore/Samples/SampleColumns.swift;Sources/AliveCore/Samples/SampleListing.swift	S4	
+src/SampleUsage.cs	Sources/AliveCore/Samples/SampleUsage.swift;Sources/AliveCore/Samples/SampleCopies.swift	S4	
 src/Scales.cs	Sources/AliveCore/Als/Scales.swift	1B	
 src/SetFilter.cs	Sources/AliveCore/Catalog/SetFilter.swift	S1	
 src/Settings.cs	Sources/AliveCore/Infra/Settings.swift;Sources/AliveCore/Infra/AppHome.swift	1B	+Mac keys (lang)
-src/SettingsDialog.cs	Sources/AliveUI/Settings/SettingsView.swift;Sources/AliveUI/App/AppPreferences.swift	1A;S5	
+src/SettingsDialog.cs	Sources/AliveUI/Settings/SettingsView.swift;Sources/AliveUI/App/AppPreferences.swift;Sources/AliveUI/Settings/UpdatesSection.swift;Sources/AliveUI/Settings/UpdateModel.swift	1A;S5	
 src/SingleInstance.cs	-	-	N/A: LaunchServices is single-instance
 src/SmoothScrollEngine.cs	-	-	N/A: native macOS scrolling
-src/TagEditor.cs	Sources/AliveUI/Sets/TagsSheet.swift	S1	
-src/TagField.cs	Sources/AliveUI/Sets/TagsSheet.swift	S1	
+src/TagEditor.cs	Sources/AliveUI/Sets/TagsSheet.swift;Sources/AliveUI/Sets/TagInputField.swift	S1	
+src/TagField.cs	Sources/AliveUI/Sets/TagInputField.swift;Sources/AliveUI/Sets/FilterControls.swift	S1	
 src/Theme.cs	Sources/AliveUI/Theme/Theme.swift	1A	
-src/ThumbCache.cs	Sources/AliveUI/Home/ThumbCache.swift	S2	
+src/ThumbCache.cs	Sources/AliveUI/Home/ThumbCache.swift;Sources/AliveUI/Home/ThumbnailPipeline.swift;Sources/AliveUI/Home/ArrangementThumbnailView.swift	S2	
 src/Toast.cs	Sources/AliveUI/Theme/Toast.swift	1A	
-src/UpdateCheck.cs	Sources/AliveCore/Update/UpdateCheck.swift	S5	fork releases API
+src/UpdateCheck.cs	Sources/AliveCore/Update/UpdateCheck.swift;Sources/AliveCore/Update/UpdateSchedule.swift	S5	fork releases API
 src/icons/	scripts/build-app.sh	1A	icns from icon256.ico
-nebula/Channels.cs	Sources/AliveUI/Stat/StatChannels.swift	S5	
-nebula/Cloud.cs	Sources/AliveUI/Stat/CloudCanvas.swift	S5	
-nebula/NebulaForm.cs	Sources/AliveUI/Stat/StatWindow.swift	S5	
+nebula/Channels.cs	Sources/AliveUI/Stat/StatChannels.swift;Sources/AliveUI/Stat/StatPalette.swift;Sources/AliveUI/Stat/StatLegend.swift;Sources/AliveUI/Stat/StatControls.swift	S5	
+nebula/Cloud.cs	Sources/AliveUI/Stat/CloudCamera.swift;Sources/AliveUI/Stat/CloudScene.swift;Sources/AliveUI/Stat/CloudAxisLabels.swift;Sources/AliveUI/Stat/CloudCanvas.swift;Sources/AliveUI/Stat/CloudInputView.swift	S5	
+nebula/NebulaForm.cs	Sources/AliveUI/Stat/StatWindow.swift;Sources/AliveUI/Stat/StatModel.swift;Sources/AliveUI/Stat/StatMappingPanel.swift;Sources/AliveUI/Stat/NebulaConfig.swift;Sources/AliveUI/Stat/StatLegend.swift	S5	
 FORMAT.md	-	-	reference; read before touching Als/
 README.md	../.github/README.md	docs	Mac README lives in .github/
 README.ru.md	-	-	not ported
