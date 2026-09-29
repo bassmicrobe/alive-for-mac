@@ -4,15 +4,20 @@
 #   scripts/build-app.sh            universal (arm64 + x86_64) release build
 #   scripts/build-app.sh --native   host architecture only (faster)
 #   scripts/build-app.sh --zip      also write macos/dist/AliveForMac-<version>.zip
+#   scripts/build-app.sh --dmg      also write macos/dist/AliveForMac-<version>.dmg
+#                                   (app + Applications link + license files; no GUI needed)
+#   --zip and --dmg can be combined.
 set -euo pipefail
 
 NATIVE=0
 ZIP=0
+DMG=0
 for arg in "$@"; do
     case "$arg" in
         --native) NATIVE=1 ;;
         --zip) ZIP=1 ;;
-        -h|--help) sed -n '2,7p' "$0"; exit 0 ;;
+        --dmg) DMG=1 ;;
+        -h|--help) sed -n '2,10p' "$0"; exit 0 ;;
         *) echo "unknown option: $arg" >&2; exit 2 ;;
     esac
 done
@@ -145,6 +150,25 @@ if [[ $ZIP -eq 1 ]]; then
     rm -f "$ARCHIVE"
     ditto -c -k --keepParent "$APP" "$ARCHIVE"
     echo "==> $ARCHIVE"
+fi
+
+# ---------------------------------------------------------------- dmg
+if [[ $DMG -eq 1 ]]; then
+    mkdir -p "$MACOS_DIR/dist" "$MACOS_DIR/build"
+    DMG_PATH="$MACOS_DIR/dist/AliveForMac-$VERSION.dmg"
+    STAGE="$(mktemp -d "$MACOS_DIR/build/dmg-stage.XXXXXX")"
+    trap 'rm -rf "${WORK:-}" "$STAGE"' EXIT
+    ditto "$APP" "$STAGE/$APP_NAME.app"
+    ln -s /Applications "$STAGE/Applications"
+    # License texts sit next to the app: upstream's verbatim, the port's, the notice.
+    cp "$REPO_ROOT/LICENSE" "$STAGE/LICENSE"
+    cp "$MACOS_DIR/LICENSE" "$STAGE/LICENSE-macos"
+    cp "$MACOS_DIR/NOTICE.md" "$STAGE/NOTICE.md"
+    rm -f "$DMG_PATH"
+    hdiutil create -volname "$APP_NAME $VERSION" -srcfolder "$STAGE" \
+        -format UDZO -fs HFS+ -ov "$DMG_PATH" >/dev/null
+    rm -rf "$STAGE"
+    echo "==> $DMG_PATH"
 fi
 
 echo "==> built $APP ($VERSION, upstream ${UPSTREAM_COMMIT:0:7})"

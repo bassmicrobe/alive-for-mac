@@ -61,31 +61,38 @@ jobs:
       - name: Check packaging script exists
         run: |
           if [ ! -f macos/scripts/build-app.sh ]; then
-            echo "::error::macos/scripts/build-app.sh is missing; cannot build the release zip."
+            echo "::error::macos/scripts/build-app.sh is missing; cannot build the release assets."
             exit 1
           fi
 
-      - name: Build app zip
+      - name: Build app zip and dmg
         working-directory: macos
         run: |
           chmod +x scripts/build-app.sh
-          scripts/build-app.sh --zip
+          scripts/build-app.sh --zip --dmg
 
-      - name: Locate zip
-        id: zip
+      - name: Locate zip and dmg
+        id: pkg
         run: |
           zip="$(ls macos/dist/AliveForMac-*.zip 2>/dev/null | head -n 1 || true)"
+          dmg="$(ls macos/dist/AliveForMac-*.dmg 2>/dev/null | head -n 1 || true)"
           if [ -z "$zip" ]; then
             echo "::error::build-app.sh --zip did not produce macos/dist/AliveForMac-<version>.zip"
             exit 1
           fi
-          echo "path=$zip" >> "$GITHUB_OUTPUT"
-          echo "Built $zip"
+          if [ -z "$dmg" ]; then
+            echo "::error::build-app.sh --dmg did not produce macos/dist/AliveForMac-<version>.dmg"
+            exit 1
+          fi
+          echo "zip=$zip" >> "$GITHUB_OUTPUT"
+          echo "dmg=$dmg" >> "$GITHUB_OUTPUT"
+          echo "Built $zip and $dmg"
 
       - name: Publish GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
-          ZIP_PATH: ${{ steps.zip.outputs.path }}
+          ZIP_PATH: ${{ steps.pkg.outputs.zip }}
+          DMG_PATH: ${{ steps.pkg.outputs.dmg }}
           REF_NAME: ${{ github.ref_name }}
           IS_TAG: ${{ startsWith(github.ref, 'refs/tags/v') }}
         run: |
@@ -97,9 +104,9 @@ jobs:
             tag="v${version#AliveForMac-}"
           fi
           if gh release view "$tag" >/dev/null 2>&1; then
-            gh release upload "$tag" "$ZIP_PATH" --clobber
+            gh release upload "$tag" "$ZIP_PATH" "$DMG_PATH" --clobber
           else
-            gh release create "$tag" "$ZIP_PATH" \
+            gh release create "$tag" "$ZIP_PATH" "$DMG_PATH" \
               --target "$GITHUB_SHA" \
               --title "Alive for Mac $tag" \
               --generate-notes
