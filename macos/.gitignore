@@ -7,3 +7,7 @@ DerivedData/
 # App bundle and release archives produced by scripts/build-app.sh
 build/
 dist/
+
+# The root .gitignore (upstream) ignores `export/`; with core.ignorecase that also hides
+# the Swift feature folders named Export. Re-include them here.
+!Export/
