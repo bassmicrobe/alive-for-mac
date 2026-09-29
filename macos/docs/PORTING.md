@@ -45,6 +45,11 @@ native Swift rewrite of it for macOS that lives in `macos/`, next to the untouch
    data, never silently swallow errors that the user should know about (log them via `Diag`).
 10. Read `FORMAT.md` before touching anything under `Als/`. It documents traps such as
     `MasterTrack` vs `MainTrack` and the empty `<Name>` nested in `Vst3PluginInfo`.
+11. **Missing plugins are a state, not errors (user requirement).** Never show one error, toast,
+    alert or log line per plugin. Plugins that aren't installed get at most one aggregated indicator
+    per set / one summary per screen. When the installed-plugin list is empty or can't be read
+    (no plugins installed, or no `PluginScanDb.txt` as on Live 11 for Mac), plugin status is
+    *unknown*: nothing is flagged missing, and one calm notice explains why.
 
 ## 3. Taking in upstream updates
 
