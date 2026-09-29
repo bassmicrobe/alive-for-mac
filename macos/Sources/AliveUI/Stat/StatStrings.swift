@@ -17,6 +17,7 @@ enum StatStrings: LocalizedStrings {
     case spin, resetView, presetAngle, presetFront, presetSide, presetTop, presetHelp
     // Cloud
     case projectsCount, hintRotate, hintZoom, hintPan, hintOpen, hintNoFolders, hintNothing, cloudLabel
+    case cloudHelp, noProjectSelected, nextProject, previousProject
     // Inspector
     case inspectorEmptyTitle, inspectorEmptyBody, note, files, plugins, noPlugins, showInList
 
@@ -77,6 +78,11 @@ enum StatStrings: LocalizedStrings {
         case .hintNothing: return ("Nothing found. Add a folder with .als projects.",
                                    "何も見つかりません。.als プロジェクトのあるフォルダを追加してください。")
         case .cloudLabel: return ("Cloud of %lld projects", "%lld 件のプロジェクトの点群")
+        case .cloudHelp: return ("Arrow keys move the selection. Return opens the selected project in Live.",
+                                 "矢印キーで選択を移動します。Return で選択中のプロジェクトを Live で開きます。")
+        case .noProjectSelected: return ("No project selected", "プロジェクトが選択されていません")
+        case .nextProject: return ("Next project", "次のプロジェクト")
+        case .previousProject: return ("Previous project", "前のプロジェクト")
         case .inspectorEmptyTitle: return ("No set selected", "セットが選択されていません")
         case .inspectorEmptyBody: return ("Click a dot to see the set here.", "点をクリックすると、ここにセットが表示されます。")
         case .note: return ("Note", "メモ")

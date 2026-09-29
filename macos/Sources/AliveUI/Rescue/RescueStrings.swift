@@ -12,7 +12,7 @@ enum RescueStrings: LocalizedStrings {
     // Checklist
     case listLabel, listUnidentified, allOff, allOn, suggested, noteSuspect, noteBreaks
     // Buttons
-    case openProbe, nextProbe, probeAgain, waiting, close, saveRescued, didOpen, didNotOpen
+    case deselectFirst, openProbe, nextProbe, probeAgain, waiting, close, saveRescued, didOpen, didNotOpen
     // Hints
     case hintWaiting, hintCloseLive, hintUntick, hintProbe
     // Progress
@@ -37,8 +37,8 @@ enum RescueStrings: LocalizedStrings {
         case .titleFor: return ("Rescue: %@", "レスキュー: %@")
         case .loading: return ("Reading the set and Live's log…", "セットと Live のログを読み込み中…")
         case .readError:
-            return ("This .als cannot be read at all: %@. That is damage to the file itself, not a plugin problem.",
-                    "この .als は読み込めません: %@。プラグインではなく、ファイル自体の破損です。")
+            return ("This .als cannot be read at all. That is damage to the file itself, not a plugin problem. See alive.log for details.",
+                    "この .als は読み込めません。プラグインではなく、ファイル自体の破損です。詳細は alive.log を確認してください。")
         case .noPlugins:
             return ("This set has no third-party plugins — there is nothing here to switch off. Whatever stops it from opening is somewhere else.",
                     "このセットにはサードパーティ製プラグインがないため、オフにできるものがありません。開けない原因は別の場所にあります。")
@@ -68,6 +68,7 @@ enum RescueStrings: LocalizedStrings {
         case .suggested: return ("Suggested", "おすすめ")
         case .noteSuspect: return ("suspect", "疑わしい")
         case .noteBreaks: return ("BREAKS THE SET", "原因")
+        case .deselectFirst: return ("Deselect a plugin first", "まずプラグインのチェックを外す")
         case .openProbe: return ("Open probe in Live", "プローブを Live で開く")
         case .nextProbe: return ("Next probe", "次のプローブ")
         case .probeAgain: return ("Probe again", "もう一度プローブ")

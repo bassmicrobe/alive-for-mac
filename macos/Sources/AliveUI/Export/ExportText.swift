@@ -35,6 +35,9 @@ enum ExportText {
         guard let plan else { return ("", false) }
         if destinationExists { return (ExportStrings.errDestinationExists.f((outputPath as NSString).lastPathComponent), true) }
         if !plan.fits { return (ExportStrings.notEnoughSpace.s, true) }
+        // Nothing outside the project to bring along: the four rows all read "—", and Export is
+        // still allowed, so say what it will do instead of "0 files, 0 bytes".
+        if plan.copy.isEmpty { return (ExportStrings.nothingToCopy.s, false) }
         return (ExportStrings.willCopy.f(ExportStrings.files(plan.copy.count), bytes(plan.totalBytes)), false)
     }
 

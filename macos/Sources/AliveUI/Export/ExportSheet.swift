@@ -32,7 +32,7 @@ struct ExportSheet: View {
     private var counting: some View {
         HStack(spacing: 10) {
             ProgressView().controlSize(.small)
-            Text(ExportStrings.counting.s).font(Theme.fBody).foregroundStyle(Theme.textDim)
+            Text(ExportStrings.counting.s).font(Theme.fBody).foregroundStyle(Theme.secondaryText)
         }
         .frame(maxWidth: .infinity, minHeight: 150)
     }
@@ -40,7 +40,7 @@ struct ExportSheet: View {
     @ViewBuilder
     private func choosing(_ model: ExportModel) -> some View {
         if let error = model.readError {
-            Text(ExportStrings.cannotRead.f(error)).font(Theme.fBody).foregroundStyle(Theme.red)
+            Text(ReadErrorLog.note(error, of: path)).font(Theme.fBody).foregroundStyle(Theme.errorText)
                 .frame(maxWidth: .infinity, minHeight: 80, alignment: .topLeading)
             HStack { Spacer(); PillButton(title: ExportStrings.close.s) { app.sheet = nil } }
         } else {
@@ -53,7 +53,7 @@ struct ExportSheet: View {
                 ExtraLine(label: ExportText.label(.inProject), value: ExportText.groupNumbers(project))
             }
             if model.options.fromElsewhere, let line = ExportText.elsewhereFolders(model.elsewhereFolders) {
-                Text(line).font(Theme.fSmall).foregroundStyle(Theme.textDim)
+                Text(line).font(Theme.fSmall).foregroundStyle(Theme.secondaryText)
                     .lineLimit(2).truncationMode(.middle)
                     .padding(.horizontal, 4)
                     .help(model.elsewhereFolders.joined(separator: "\n"))
@@ -72,7 +72,7 @@ struct ExportSheet: View {
 
     private func destinationRow(_ model: ExportModel) -> some View {
         HStack(spacing: 10) {
-            Text(ExportStrings.destination.s).font(Theme.fLabel).foregroundStyle(Theme.textDim)
+            Text(ExportStrings.destination.s).font(Theme.fLabel).foregroundStyle(Theme.secondaryText)
             Text(model.outputPath)
                 .font(Theme.fLabel)
                 .foregroundStyle(Theme.text)
@@ -91,7 +91,7 @@ struct ExportSheet: View {
         return HStack(spacing: 14) {
             Text(s.text)
                 .font(Theme.fLabel)
-                .foregroundStyle(s.isError ? Theme.red : Theme.text)
+                .foregroundStyle(s.isError ? Theme.errorText : Theme.text)
                 .lineLimit(2)
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -113,7 +113,7 @@ struct ExportSheet: View {
             Text(ExportText.progress(model.progress)).font(Theme.fBody).foregroundStyle(Theme.text)
             ProgressBar(fraction: fraction(model.progress))
             Text(model.progress?.current ?? "")
-                .font(Theme.fLabel).foregroundStyle(Theme.textDim)
+                .font(Theme.fLabel).foregroundStyle(Theme.secondaryText)
                 .lineLimit(1).truncationMode(.middle)
                 .frame(minHeight: 18, alignment: .leading)
             Divider().overlay(Theme.hairline)
@@ -187,7 +187,7 @@ private struct OriginRow: View {
             Text(ExportText.groupNumbers(group))
                 .font(Theme.fLabel)
                 .monospacedDigit()
-                .foregroundStyle(group.included ? Theme.text : Theme.textDim)
+                .foregroundStyle(group.included ? Theme.text : Theme.secondaryText)
         }
         .padding(.horizontal, 4)
         .frame(height: 34)
@@ -204,9 +204,9 @@ private struct ExtraLine: View {
 
     var body: some View {
         HStack {
-            Text(label).font(Theme.fLabel).foregroundStyle(Theme.textDim)
+            Text(label).font(Theme.fLabel).foregroundStyle(Theme.secondaryText)
             Spacer()
-            Text(value).font(Theme.fLabel).monospacedDigit().foregroundStyle(Theme.textDim)
+            Text(value).font(Theme.fLabel).monospacedDigit().foregroundStyle(Theme.secondaryText)
         }
         .padding(.horizontal, 4)
         .frame(height: 24)
@@ -226,24 +226,24 @@ private struct DisclosureLine: View {
                 withAnimation(Theme.hoverAnimation) { expanded.toggle() }
             } label: {
                 HStack(spacing: 8) {
-                    IconView(icon: .warning, size: 11).foregroundStyle(Theme.textDim)
+                    IconView(icon: .warning, size: 11).foregroundStyle(Theme.secondaryText)
                     Text(summary).font(Theme.fLabel)
                     Text(expanded ? ExportStrings.hideList.s : ExportStrings.showList.s)
-                        .font(Theme.fLabel).foregroundStyle(Theme.textDim).underline()
+                        .font(Theme.fLabel).foregroundStyle(Theme.secondaryText).underline()
                     Spacer(minLength: 0)
                 }
-                .foregroundStyle(hovering ? Color.white : Theme.textDim)
+                .foregroundStyle(hovering ? Color.white : Theme.secondaryText)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .onHover { hovering = $0 }
-            .accessibilityValue(expanded ? "expanded" : "collapsed")
+            .accessibilityValue(expanded ? CommonStrings.stateExpanded.s : CommonStrings.stateCollapsed.s)
 
             if expanded {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 2) {
                         ForEach(Array(items.enumerated()), id: \.offset) { _, item in
-                            Text(item).font(Theme.fSmall).foregroundStyle(Theme.textDim)
+                            Text(item).font(Theme.fSmall).foregroundStyle(Theme.secondaryText)
                                 .lineLimit(1).truncationMode(.middle)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                         }
@@ -290,7 +290,7 @@ struct PillSwitch: View {
         .focusEffectDisabled()
         .onKeyPress(.space) { isEnabled ? { isOn.toggle(); return .handled }() : .ignored }
         .accessibilityAddTraits(.isButton)
-        .accessibilityValue(isOn ? "on" : "off")
+        .accessibilityValue(isOn ? CommonStrings.stateOn.s : CommonStrings.stateOff.s)
     }
 }
 

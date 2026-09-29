@@ -165,14 +165,64 @@ final class CloudInputNSView: NSView {
 
     // MARK: keys
 
+    /// Moves the selection to the next (`+1`) or previous (`-1`) project. The main window's
+    /// selection is the cloud's selection (`StatModel.followMainSelection`), so it goes through it.
+    @discardableResult
+    private func selectAdjacent(_ step: Int) -> Bool {
+        guard let model else { return false }
+        let sets = model.scene.sets
+        guard !sets.isEmpty else { return false }
+        let current = model.scene.selected
+        let next = current < 0 ? (step > 0 ? 0 : sets.count - 1) : (current + step + sets.count) % sets.count
+        model.app.selectedSetPath = sets[next].path
+        model.followMainSelection()
+        NSAccessibility.post(element: self, notification: .valueChanged)
+        return true
+    }
+
     override func keyDown(with event: NSEvent) {
         guard event.modifierFlags.isDisjoint(with: [.command, .control]) else { return super.keyDown(with: event) }
         switch event.keyCode {
+        case 123, 126: selectAdjacent(-1)      // left, up
+        case 124, 125: selectAdjacent(+1)      // right, down
         case 49: onKey(.toggleSpin)            // space
         case 15: onKey(.reset)                 // R
         case 36, 76: onKey(.openInLive)        // return, enter
         case 53: onKey(.deselect)              // escape
         default: super.keyDown(with: event)
         }
+    }
+
+    // MARK: accessibility
+    // The dots are drawn in one Canvas, so VoiceOver gets this view instead: a labelled group whose
+    // value is the selected project, with the actions the keys and the double click stand for.
+
+    override func isAccessibilityElement() -> Bool { true }
+    override func accessibilityRole() -> NSAccessibility.Role? { .group }
+
+    override func accessibilityLabel() -> String? {
+        StatStrings.cloudLabel.f(model?.visibleCount ?? 0)
+    }
+
+    override func accessibilityValue() -> Any? {
+        model?.selectedSet?.name ?? StatStrings.noProjectSelected.s
+    }
+
+    override func accessibilityHelp() -> String? { StatStrings.cloudHelp.s }
+
+    override func accessibilityCustomActions() -> [NSAccessibilityCustomAction]? {
+        var actions = [
+            NSAccessibilityCustomAction(name: StatStrings.nextProject.s) { [weak self] in self?.selectAdjacent(+1) ?? false },
+            NSAccessibilityCustomAction(name: StatStrings.previousProject.s) { [weak self] in self?.selectAdjacent(-1) ?? false },
+        ]
+        if model?.selectedSet != nil {
+            actions.insert(NSAccessibilityCustomAction(name: CommonStrings.openInLive.s) { [weak self] in
+                self?.onKey(.openInLive); return true
+            }, at: 0)
+            actions.insert(NSAccessibilityCustomAction(name: CommonStrings.showInFinder.s) { [weak self] in
+                self?.onDoubleClick(); return true
+            }, at: 1)
+        }
+        return actions
     }
 }
