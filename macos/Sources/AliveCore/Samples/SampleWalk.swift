@@ -72,9 +72,9 @@ extension SampleIndex {
         var all = [SampleFolder()]
         all[0].path = top
         all[0].name = top
-        let attrs = try? FileManager.default.attributesOfItem(atPath: top)
-        all[0].created = attrs?[.creationDate] as? Date
-        all[0].modified = attrs?[.modificationDate] as? Date
+        let attrs = FileStat.of(top)
+        all[0].created = attrs?.created
+        all[0].modified = attrs?.modified
 
         var files: [SampleFile] = []
         var todo = [Pending(path: top, folder: 0, own: true)]

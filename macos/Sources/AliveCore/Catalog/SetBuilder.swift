@@ -10,14 +10,9 @@ enum SetBuilder {
     }
 
     static func stamp(of path: String) -> FileStamp? {
-        guard let a = try? FileManager.default.attributesOfItem(atPath: path) else { return nil }
-        func quantized(_ d: Date?) -> Date {
-            guard let d else { return .distantPast }
-            return DotNetTicks.date(utc: DotNetTicks.utc(d))
-        }
-        return FileStamp(size: (a[.size] as? NSNumber)?.int64Value ?? 0,
-                         modified: quantized(a[.modificationDate] as? Date),
-                         created: quantized(a[.creationDate] as? Date))
+        guard let a = FileStat.of(path) else { return nil }
+        func quantized(_ d: Date) -> Date { DotNetTicks.date(utc: DotNetTicks.utc(d)) }
+        return FileStamp(size: a.size, modified: quantized(a.modified), created: quantized(a.created))
     }
 
     /// A row for a set that could not be read at all.
@@ -97,6 +92,6 @@ enum SetBuilder {
     }
 
     private static func lengthOf(_ path: String) -> Int64 {
-        ((try? FileManager.default.attributesOfItem(atPath: path))?[.size] as? NSNumber)?.int64Value ?? 0
+        FileStat.size(of: path)
     }
 }

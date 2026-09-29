@@ -394,12 +394,11 @@ public final class LiveLogFile {
     }
 
     public var written: Date {
-        (try? FileManager.default.attributesOfItem(atPath: path)[.modificationDate] as? Date) ?? .distantPast
+        FileStat.of(path)?.modified ?? .distantPast
     }
 
     public var length: Int64 {
-        let size = (try? FileManager.default.attributesOfItem(atPath: path))?[.size] as? NSNumber
-        return size?.int64Value ?? 0
+        FileStat.size(of: path)
     }
 
     /// Start watching from the current end — the past is of no interest in a probe.

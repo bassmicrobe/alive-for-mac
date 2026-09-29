@@ -66,9 +66,9 @@ final class ThumbCache: @unchecked Sendable {
     /// The cache file for a set, or nil when the set is not there right now.
     func keyFile(for setPath: String) -> String? {
         guard !setPath.isEmpty,
-              let attrs = try? FileManager.default.attributesOfItem(atPath: setPath),
-              let modified = attrs[.modificationDate] as? Date else { return nil }
-        let size = (attrs[.size] as? NSNumber)?.int64Value ?? 0
+              let attrs = FileStat.of(setPath) else { return nil }
+        let modified = attrs.modified
+        let size = attrs.size
         var h = Self.fnv(setPath.lowercased(), Self.fnvOffset)
         h = Self.fnv(String(Int64(modified.timeIntervalSince1970 * 1_000_000)), h)
         h = Self.fnv(String(size), h)
@@ -173,7 +173,7 @@ final class ThumbCache: @unchecked Sendable {
         guard let names = try? fm.contentsOfDirectory(atPath: dir) else { return 0 }
         let files = names.filter { $0.hasSuffix(".png") }.compactMap { name -> (path: String, date: Date)? in
             let path = (dir as NSString).appendingPathComponent(name)
-            guard let date = (try? fm.attributesOfItem(atPath: path))?[.modificationDate] as? Date else { return nil }
+            guard let date = FileStat.of(path)?.modified else { return nil }
             return (path, date)
         }
         guard files.count > limit else { return 0 }

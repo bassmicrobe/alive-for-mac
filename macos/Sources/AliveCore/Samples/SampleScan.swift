@@ -157,8 +157,7 @@ public enum SampleScan {
         var isDir: ObjCBool = false
         guard FileManager.default.fileExists(atPath: path, isDirectory: &isDir) else { return 0 }
         if !isDir.boolValue {
-            let size = (try? FileManager.default.attributesOfItem(atPath: path))?[.size] as? NSNumber
-            return size?.int64Value ?? 0
+            return FileStat.size(of: path)
         }
         return dirSize(path, depth: 0)
     }

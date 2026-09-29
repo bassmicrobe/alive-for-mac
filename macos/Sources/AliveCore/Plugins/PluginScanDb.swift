@@ -68,7 +68,7 @@ enum PluginScanDb {
         var t = Date.distantPast
         for name in ["PluginScanDb.txt", "PluginScanner.txt"] {
             for f in fileCandidates(in: dir, name) {
-                if let d = (try? FileManager.default.attributesOfItem(atPath: f))?[.modificationDate] as? Date, d > t { t = d }
+                if let d = FileStat.of(f)?.modified, d > t { t = d }
             }
         }
         return t
@@ -109,7 +109,7 @@ enum PluginScanDb {
     }
 
     private static func modified(_ path: String) -> Date {
-        ((try? FileManager.default.attributesOfItem(atPath: path))?[.modificationDate] as? Date) ?? .distantPast
+        FileStat.of(path)?.modified ?? .distantPast
     }
 
     private static func readLines(_ path: String) -> [String]? {

@@ -208,7 +208,7 @@ enum LegacyComponentResource {
         var out: [Component] = []
         for n in names.sorted() where n.lowercased().hasSuffix(".rsrc") {
             let path = dir + "/" + n
-            let size = (try? FileManager.default.attributesOfItem(atPath: path)[.size] as? Int) ?? nil
+            let size = FileStat.of(path).map { Int($0.size) }
             guard let size, size > 16, size <= maxFileSize,
                   let data = try? Data(contentsOf: URL(fileURLWithPath: path), options: .mappedIfSafe) else { continue }
             out.append(contentsOf: components(in: data))

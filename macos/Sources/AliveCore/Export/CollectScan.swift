@@ -161,8 +161,7 @@ public enum CollectScan {
         var isDir: ObjCBool = false
         guard FileManager.default.fileExists(atPath: path, isDirectory: &isDir) else { return 0 }
         if !isDir.boolValue {
-            let size = (try? FileManager.default.attributesOfItem(atPath: path))?[.size] as? NSNumber
-            return size?.int64Value ?? 0
+            return FileStat.size(of: path)
         }
         return dirSize(path, depth: 0)
     }
@@ -177,7 +176,7 @@ public enum CollectScan {
             var isDir: ObjCBool = false
             guard FileManager.default.fileExists(atPath: p, isDirectory: &isDir) else { continue }
             if isDir.boolValue { total += dirSize(p, depth: depth + 1); continue }
-            total += ((try? FileManager.default.attributesOfItem(atPath: p))?[.size] as? NSNumber)?.int64Value ?? 0
+            total += FileStat.size(of: p)
         }
         return total
     }
