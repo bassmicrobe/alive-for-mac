@@ -22,6 +22,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // ALIVE_NO_ACTIVATE=1 keeps the app in the background: automated test runs must not
+        // steal keyboard focus from whoever is using the machine.
+        guard ProcessInfo.processInfo.environment["ALIVE_NO_ACTIVATE"] != "1" else { return }
         NSApp.activate(ignoringOtherApps: true)
     }
 
