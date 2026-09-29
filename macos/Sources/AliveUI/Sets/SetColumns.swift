@@ -44,16 +44,16 @@ enum SetColumnID: String, CaseIterable, Identifiable, Codable, Sendable {
     var width: (min: CGFloat, ideal: CGFloat)? {
         switch self {
         case .set: return nil
-        case .place: return (90, 130)
-        case .modified, .created: return (80, 100)
-        case .live: return (50, 64)
-        case .bpm: return (50, 64)
-        case .key: return (80, 110)
-        case .tracks, .pluginCount, .fileCount: return (56, 76)
-        case .pluginsMissed: return (90, 120)
-        case .filesMissed: return (90, 110)
-        case .tags: return (110, 170)
-        case .size: return (70, 100)
+        case .place: return (80, 110)
+        case .modified, .created: return (76, 92)
+        case .live: return (44, 56)
+        case .bpm: return (44, 56)
+        case .key: return (72, 96)
+        case .tracks, .pluginCount, .fileCount: return (50, 64)
+        case .pluginsMissed: return (80, 104)
+        case .filesMissed: return (80, 96)
+        case .tags: return (90, 130)
+        case .size: return (60, 84)
         }
     }
 

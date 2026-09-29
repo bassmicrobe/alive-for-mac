@@ -17,7 +17,7 @@ struct SetsTable: View {
                 TableColumn(SetColumnID.set.title.s, sortUsing: SetSortComparator(.set)) { set in
                     SetNameCell(set: set, isVersionRow: versionRows.contains(set.path))
                 }
-                .width(min: 200, ideal: 340)
+                .width(min: 160, ideal: 260)
                 .customizationID(SetColumnID.set.id)
                 .disabledCustomizationBehavior(.visibility)
 
