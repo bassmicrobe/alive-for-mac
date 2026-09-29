@@ -113,7 +113,7 @@ public struct SampleIndex: Sendable {
     // MARK: roots
 
     /// A path in comparable form: standardized, without a trailing slash.
-    static func norm(_ p: String) -> String {
+    public static func norm(_ p: String) -> String {
         var s = (p as NSString).standardizingPath
         while s.count > 1 && s.hasSuffix("/") { s.removeLast() }
         return s
