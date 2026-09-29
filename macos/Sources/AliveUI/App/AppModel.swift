@@ -2,6 +2,7 @@
 // model per feature; contextual actions used by menus and toolbar live here.
 import Foundation
 import Observation
+import SwiftUI
 import AliveCore
 
 enum MainTab: String, CaseIterable, Identifiable {
@@ -121,8 +122,16 @@ final class AppModel {
         }
     }
 
-    /// Overrides "N shown" in the toolbar (Samples: "12,923 samples · 23.7 GB"); nil: the plain count.
-    var shownLabel: String? { tab == .samples ? samples.shownLabel : nil }
+    /// Overrides "N shown" in the toolbar with a label that names its unit (Home: projects; Sets:
+    /// projects · sets; Samples: "12,923 samples · 23.7 GB"); nil: the plain count.
+    var shownLabel: String? {
+        switch tab {
+        case .home: return CommonStrings.shownProjects.f(home.shownCount)
+        case .sets: return sets.shownLabel
+        case .samples: return samples.shownLabel
+        case .plugins: return nil
+        }
+    }
 
     /// Number of filters that are on for the tab (badge on the Filters pill).
     var activeFilterCount: Int {
@@ -146,13 +155,23 @@ final class AppModel {
         }
     }
 
+    /// How long a toast stays: errors wait much longer (and can be dismissed), so they are not missed.
+    static let infoToastSeconds = 2.5
+    static let errorToastSeconds = 12.0
+
     func toast(_ text: String, kind: ToastMessage.Kind = .info) {
         let message = ToastMessage(text: text, kind: kind)
         toasts.append(message)
+        // VoiceOver reads the message aloud; a toast that fades unread would be lost to it.
+        AccessibilityNotification.Announcement(text).post()
         Task { [weak self] in
-            try? await Task.sleep(for: .seconds(kind == .error ? 4 : 2.5))
-            self?.toasts.removeAll { $0.id == message.id }
+            try? await Task.sleep(for: .seconds(kind == .error ? Self.errorToastSeconds : Self.infoToastSeconds))
+            self?.dismissToast(message.id)
         }
+    }
+
+    func dismissToast(_ id: UUID) {
+        toasts.removeAll { $0.id == id }
     }
 
     // MARK: - Contextual actions

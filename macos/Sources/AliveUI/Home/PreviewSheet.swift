@@ -38,12 +38,13 @@ enum PreviewSizing {
         return Plan(points: CGSize(width: cappedWidth, height: height), scale: scale)
     }
 
-    /// The header line: folder, tempo, key and the size of the arrangement.
-    static func subtitle(directory: String, key: String, arrangement a: Arrangement?) -> String {
+    /// The metrics line under the path: tempo, key and the size of the arrangement. Never contains
+    /// the path (that has its own line), so nothing can push these out through truncation.
+    static func metrics(path: String, key: String, arrangement a: Arrangement?) -> String {
         let sep = "   ·   "
-        guard let a else { return directory + sep + HomeStrings.previewReading.s }
-        if let error = a.error { return directory + sep + error }
-        var parts = [directory]
+        guard let a else { return HomeStrings.previewReading.s }
+        if let error = a.error { return ReadErrorLog.note(error, of: path) }
+        var parts: [String] = []
         if a.tempo > 0 { parts.append(HomeStrings.previewBPM.f(tempoText(a.tempo))) }
         if !key.isEmpty, a.tempo > 0 { parts.append(key) }
         parts.append(HomeStrings.previewBars.f(a.bars))
@@ -114,8 +115,12 @@ struct PreviewSheet: View {
         HStack(alignment: .top, spacing: 12) {
             VStack(alignment: .leading, spacing: 4) {
                 Text(title).font(Theme.fDialogTitle).foregroundStyle(Theme.text).lineLimit(1)
-                Text(PreviewSizing.subtitle(directory: directory, key: entry?.key ?? "", arrangement: arrangement))
-                    .font(Theme.fSmall).foregroundStyle(Theme.textDim).lineLimit(1).truncationMode(.middle)
+                Text(directory)
+                    .font(Theme.fSmall).foregroundStyle(Theme.secondaryText).lineLimit(1).truncationMode(.middle)
+                    .help(directory)
+                Text(PreviewSizing.metrics(path: path, key: entry?.key ?? "", arrangement: arrangement))
+                    .font(Theme.fSmall).foregroundStyle(Theme.secondaryText).monospacedDigit()
+                    .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 12)
             if arrangement?.hasContent == true { zoomControls }
@@ -127,7 +132,7 @@ struct PreviewSheet: View {
         HStack(spacing: 6) {
             CircleIconButton(icon: .viewList, help: HomeStrings.tallerTracks.s, isActive: taller) { taller.toggle() }
             Text(HomeStrings.zoomLevel.f(PreviewSizing.zoomSteps[zoomIndex]))
-                .font(Theme.fLabel).foregroundStyle(Theme.textDim).monospacedDigit().frame(width: 36)
+                .font(Theme.fLabel).foregroundStyle(Theme.secondaryText).monospacedDigit().frame(width: 36)
             CircleIconButton(icon: .minimize, help: HomeStrings.zoomOut.s) { zoom(by: -1) }
                 .disabled(zoomIndex == 0)
             CircleIconButton(icon: .plus, help: HomeStrings.zoomIn.s) { zoom(by: +1) }
@@ -173,7 +178,7 @@ struct PreviewSheet: View {
     @ViewBuilder private var content: some View {
         if let a = arrangement {
             if let error = a.error, !a.hasContent {
-                hint(error)
+                hint(ReadErrorLog.note(error, of: path))
             } else if !a.hasContent {
                 hint(HomeStrings.previewEmpty.s)
             } else if let picture {
@@ -195,7 +200,7 @@ struct PreviewSheet: View {
     }
 
     private func hint(_ text: String) -> some View {
-        Text(text).font(Theme.fBody).foregroundStyle(Theme.textDim)
+        Text(text).font(Theme.fBody).foregroundStyle(Theme.secondaryText)
     }
 
     // MARK: - Rendering

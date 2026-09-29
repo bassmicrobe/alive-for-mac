@@ -3,7 +3,7 @@ import Foundation
 
 enum SettingsStrings: LocalizedStrings {
     case tabGeneral, tabAbout
-    case language, languageSystem
+    case language, languageSystem, languageNote
     case transparency, transparencyHelp
     case pluginSource, pluginSourceLive, pluginSourceFolders, pluginSourceHelp
     case dataFolder, openDataFolder
@@ -22,6 +22,8 @@ enum SettingsStrings: LocalizedStrings {
         case .tabAbout: return ("About", "情報")
         case .language: return ("Language", "言語")
         case .languageSystem: return ("System", "システム")
+        case .languageNote: return ("Alive switches immediately. macOS menus and file dialogs follow after you relaunch the app.",
+                                    "Alive の表示はすぐに切り替わります。macOS のメニューとファイルダイアログは、アプリを再起動すると切り替わります。")
         case .transparency: return ("Transparent window", "ウィンドウを透明にする")
         case .transparencyHelp: return ("Blurs what is behind the window, like upstream's glass.",
                                         "ウィンドウの背後をぼかします（オリジナルのグラス効果）。")
@@ -34,7 +36,7 @@ enum SettingsStrings: LocalizedStrings {
         case .openDataFolder: return ("Open Data Folder", "データフォルダを開く")
         case .updatesTitle: return ("Updates", "アップデート")
         case .version: return ("Version %@", "バージョン %@")
-        case .versionDev: return ("dev", "dev")
+        case .versionDev: return ("development build", "開発版")
         case .upstreamCommit: return ("Based on upstream commit %@", "ベースとなるオリジナルのコミット: %@")
         case .unknown: return ("unknown", "不明")
         case .credit: return ("A macOS port of Alive by RueBlose", "RueBlose 作 Alive の macOS 版ポート")

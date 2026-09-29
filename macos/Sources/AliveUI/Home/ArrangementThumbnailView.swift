@@ -44,7 +44,7 @@ struct ArrangementThumbnailView: View {
     private func placeholder(_ text: String) -> some View {
         Text(text)
             .font(Theme.fSmall)
-            .foregroundStyle(Theme.textDim)
+            .foregroundStyle(Theme.secondaryText)
             .lineLimit(1)
             .minimumScaleFactor(0.7)
             .padding(.horizontal, 8)

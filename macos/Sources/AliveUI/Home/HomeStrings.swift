@@ -6,7 +6,7 @@ enum HomeStrings: LocalizedStrings {
     // Tab / sheet titles
     case title, previewTitle
     // Overview
-    case overview, activeDays, streak, record, peakHour, onDisk
+    case overview, activeDays, streak, noStreak, record, peakHour, onDisk
     case nothingSaved, saveOne, saveMany, daysShort, overviewCollapse, overviewExpand
     // Projects
     case projects, pinnedFirstOn, pinnedFirstOff, nothingIndexed, noMatches
@@ -35,6 +35,7 @@ enum HomeStrings: LocalizedStrings {
         case .overview: return ("Overview", "概要")
         case .activeDays: return ("Active days", "作業した日")
         case .streak: return ("Streak", "連続日数")
+        case .noStreak: return ("No streak", "連続記録なし")
         case .record: return ("Record", "最長記録")
         case .peakHour: return ("Peak hour", "ピーク時間帯")
         case .onDisk: return ("%@ on disk", "ディスク使用量 %@")
@@ -80,10 +81,10 @@ enum HomeStrings: LocalizedStrings {
         case .zoomLevel: return ("%lld×", "%lld×")
 
         case .playerEmptyTitle: return ("Nothing loaded", "何も読み込まれていません")
-        case .playerEmptyBody: return ("Press play on a project tile, or select a set and press Space.",
-                                       "プロジェクトのタイルで再生を押すか、セットを選んで Space を押します。")
-        case .noRenders: return ("No renders next to this project (Samples are skipped)",
-                                 "このプロジェクトの近くにレンダーがありません（Samples は除外）")
+        case .playerEmptyBody: return ("Press Play on a project tile, or select a set and press the Space bar.",
+                                       "プロジェクトタイルの再生ボタンを押すか、セットを選んでスペースキーを押してください。")
+        case .noRenders: return ("No renders were found near this project (the Samples folder is skipped).",
+                                 "このプロジェクトの近くにレンダーがありません（サンプルフォルダは除外します）。")
         case .colFile: return ("File", "ファイル")
         case .colFolder: return ("Folder", "フォルダ")
         case .colModified: return ("Modified", "更新日")

@@ -31,16 +31,16 @@ struct AboutView: View {
                 .resizable().frame(width: 72, height: 72)
             Text(CommonStrings.appName.s).font(Theme.fHead).foregroundStyle(Theme.text)
             Text(SettingsStrings.version.f(AboutInfo.version))
-                .font(Theme.fSmall).foregroundStyle(Theme.textDim)
+                .font(Theme.fSmall).foregroundStyle(Theme.secondaryText)
             Text(SettingsStrings.upstreamCommit.f(AboutInfo.upstreamCommit))
-                .font(Theme.fSmall).foregroundStyle(Theme.textDim)
+                .font(Theme.fSmall).foregroundStyle(Theme.secondaryText)
         }
     }
 
     private var notes: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(SettingsStrings.disclaimer.s)
-            Text(SettingsStrings.trademarks.s).foregroundStyle(Theme.textDim)
+            Text(SettingsStrings.trademarks.s).foregroundStyle(Theme.secondaryText)
         }
         .font(Theme.fSmall)
         .foregroundStyle(Theme.text)
@@ -80,7 +80,7 @@ private struct LicenseBox: View {
             ScrollView {
                 Text(licenseText)
                     .font(.system(size: 11, design: .monospaced))
-                    .foregroundStyle(Theme.textDim)
+                    .foregroundStyle(Theme.secondaryText)
                     .textSelection(.enabled)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(10)

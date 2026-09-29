@@ -42,7 +42,9 @@ enum ArrangementRender {
         var top: Int
     }
 
-    static func layout(area: CGRect, trackCount n: Int, options o: RenderOptions) -> Layout {
+    /// `wantedNameW` (pixels) is the width the longest track name needs; the name column grows to
+    /// it (up to two fifths of the picture and 320 pt) instead of clipping names at a fixed 170 pt.
+    static func layout(area: CGRect, trackCount n: Int, options o: RenderOptions, wantedNameW: Int = 0) -> Layout {
         let height = Int(area.height), width = Int(area.width)
         let gap = n > 0 && height / n >= 8 ? px(o, 2) : 1
         let rulerH = o.showRuler ? px(o, 24) : 0
@@ -51,7 +53,10 @@ enum ArrangementRender {
         if laneH < px(o, o.minLane) { laneH = max(1, px(o, o.minLane)) }
         // The name column is only worth having when the rows are tall enough to hold a name.
         var nameW = 0
-        if o.showNames, width > px(o, 420), laneH >= px(o, 9) { nameW = min(px(o, 170), width / 5) }
+        if o.showNames, width > px(o, 420), laneH >= px(o, 9) {
+            let base = min(px(o, 170), width / 5)
+            nameW = max(base, min(wantedNameW, min(px(o, 320), width * 2 / 5)))
+        }
         // Few tracks: centre the block rather than pushing it to the top.
         let totalH = n * laneH + gap * (n - 1)
         let top = Int(area.minY) + rulerH + max(0, (height - rulerH - totalH) / 2)
@@ -81,7 +86,8 @@ enum ArrangementRender {
     static func draw(_ g: CGContext, area: CGRect, arrangement a: Arrangement, options o: RenderOptions) {
         let n = a.tracks.count
         guard n > 0 else { return }
-        let lay = layout(area: area, trackCount: n, options: o)
+        let lay = layout(area: area, trackCount: n, options: o,
+                         wantedNameW: o.showNames ? nameColumnWidth(a.tracks, o) : 0)
         let totalH = n * lay.laneH + lay.gap * (n - 1)
         let plot = CGRect(x: area.minX + CGFloat(lay.nameW), y: CGFloat(lay.top),
                           width: max(1, area.width - CGFloat(lay.nameW)), height: CGFloat(max(1, totalH)))
@@ -204,6 +210,15 @@ enum ArrangementRender {
         g.setShouldAntialias(false)
     }
 
+    /// Pixels the longest of the first tracks' names needs, with its indent and the gap to the plot.
+    static func nameColumnWidth(_ tracks: [TrackLane], _ o: RenderOptions) -> Int {
+        var widest = 0.0
+        for t in tracks.prefix(400) {
+            widest = max(widest, ChartText.width(t.name, size: 11 * o.scale) + Double(t.indent * px(o, 8)))
+        }
+        return Int(widest.rounded(.up)) + px(o, 12)
+    }
+
     private static func drawName(_ g: CGContext, _ r: CGRect, track t: TrackLane, laneH: Int, o: RenderOptions) {
         guard laneH >= px(o, 9), r.width > 0 else { return }
         // A row can be exactly the font's height: captions get a little more room than the track.
@@ -247,6 +262,15 @@ enum ArrangementRender {
 
 /// One line of text vertically centred in a rectangle of a y-down CoreGraphics context.
 enum ChartText {
+    /// The advance width of `text` in the system font at `size`.
+    static func width(_ text: String, size: Double) -> Double {
+        guard !text.isEmpty else { return 0 }
+        let font = CTFontCreateUIFontForLanguage(.system, size, nil) ?? CTFontCreateWithName("Helvetica" as CFString, size, nil)
+        let attrs: [NSAttributedString.Key: Any] = [NSAttributedString.Key(kCTFontAttributeName as String): font]
+        let line = CTLineCreateWithAttributedString(NSAttributedString(string: text, attributes: attrs))
+        return CTLineGetTypographicBounds(line, nil, nil, nil)
+    }
+
     static func draw(_ g: CGContext, _ text: String, in rect: CGRect, size: Double, color: CGColor, clip: Bool = true) {
         guard !text.isEmpty, rect.width > 0, rect.height > 0 else { return }
         let font = CTFontCreateUIFontForLanguage(.system, size, nil) ?? CTFontCreateWithName("Helvetica" as CFString, size, nil)
