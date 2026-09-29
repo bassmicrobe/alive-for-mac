@@ -2,7 +2,7 @@
 // without anyone clicking. Used together with ALIVE_NO_ACTIVATE=1 and `screencapture -l`.
 //
 //   ALIVE_DEBUG_TAB     home | sets | plugins | samples
-//   ALIVE_DEBUG_SELECT  first | <path of an .als in the catalog>
+//   ALIVE_DEBUG_SELECT  first | last | <path of an .als in the catalog>
 //   ALIVE_DEBUG_SHEET   help | filters | pluginFilters | roots-projects | roots-samples |
 //                       tags | preview | rescue | export   (the last four act on the selected set)
 //   ALIVE_DEBUG_PLUGIN  <plugin name>  (selects it on the Plugins tab, once the catalog is ready)
@@ -40,12 +40,17 @@ enum DebugLaunch {
         }
     }
 
+    /// Goes through `SetsModel.select(path:)`, the same path "Show in list" and Finder-open use,
+    /// so a screenshot also proves the table scrolls to the row.
     private static func select(_ target: String, in app: AppModel) {
-        if target == "first" {
-            app.selectedSetPath = app.catalog.projects.first?.path
-        } else if app.catalog.sets.contains(where: { $0.path == target }) {
-            app.selectedSetPath = target
+        let path: String?
+        switch target {
+        case "first": path = app.catalog.projects.first?.path
+        case "last": path = app.catalog.projects.last?.path
+        default: path = app.catalog.sets.contains(where: { $0.path == target }) ? target : nil
         }
+        guard let path else { return }
+        if app.tab == .sets { app.sets.select(path: path) } else { app.selectedSetPath = path }
     }
 
     static func sheet(named name: String, selected: String?) -> AppSheet? {
