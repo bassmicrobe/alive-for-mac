@@ -1,0 +1,64 @@
+name: Upstream watch
+
+on:
+  schedule:
+    - cron: "0 3 * * 1" # Mondays 03:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  report:
+    name: Report unported upstream commits
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      LABEL: upstream-sync
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Build report
+        id: report
+        run: |
+          chmod +x macos/scripts/upstream-sync.sh
+          macos/scripts/upstream-sync.sh --report-only --markdown > "$RUNNER_TEMP/report.md"
+          cat "$RUNNER_TEMP/report.md"
+          if head -n 1 "$RUNNER_TEMP/report.md" | grep -q '^Up to date with upstream'; then
+            echo "uptodate=true" >> "$GITHUB_OUTPUT"
+          else
+            since="$(tr -d '[:space:]' < macos/UPSTREAM_SYNC)"
+            echo "uptodate=false" >> "$GITHUB_OUTPUT"
+            echo "count=$(git rev-list --count "$since..upstream/main")" >> "$GITHUB_OUTPUT"
+            echo "head=$(git rev-parse --short upstream/main)" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Ensure label exists
+        run: |
+          gh label create "$LABEL" --color 5319e7 \
+            --description "Upstream commits waiting to be ported" 2>/dev/null || true
+
+      - name: Create or update issue
+        if: steps.report.outputs.uptodate == 'false'
+        env:
+          COUNT: ${{ steps.report.outputs.count }}
+          HEAD_SHA: ${{ steps.report.outputs.head }}
+        run: |
+          title="Upstream: ${COUNT} unported commits (${HEAD_SHA})"
+          existing="$(gh issue list --label "$LABEL" --state open --json number --jq '.[0].number // empty')"
+          if [ -n "$existing" ]; then
+            gh issue edit "$existing" --title "$title" --body-file "$RUNNER_TEMP/report.md"
+            echo "Updated issue #$existing"
+          else
+            gh issue create --title "$title" --label "$LABEL" --body-file "$RUNNER_TEMP/report.md"
+          fi
+
+      - name: Close issue when up to date
+        if: steps.report.outputs.uptodate == 'true'
+        run: |
+          for n in $(gh issue list --label "$LABEL" --state open --json number --jq '.[].number'); do
+            gh issue close "$n" --comment "All upstream commits are ported (macos/UPSTREAM_SYNC is current). Closing."
+          done
