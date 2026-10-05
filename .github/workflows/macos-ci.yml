@@ -81,7 +81,13 @@ jobs:
 
       - name: Verify universal app and signature
         run: |
-          lipo "macos/build/Alive for Mac.app/Contents/MacOS/AliveForMac" -verify_arch arm64 x86_64
+          architectures="$(lipo -archs "macos/build/Alive for Mac.app/Contents/MacOS/AliveForMac")"
+          for arch in arm64 x86_64; do
+            if [[ " $architectures " != *" $arch "* ]]; then
+              echo "::error::Release app is missing architecture $arch."
+              exit 1
+            fi
+          done
           codesign --verify --deep --strict "macos/build/Alive for Mac.app"
 
       - name: Locate zip and dmg
