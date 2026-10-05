@@ -24,7 +24,7 @@ wrapper. The original C# sources stay in this repository untouched, as the refer
 
 ### [0.2.1](https://github.com/bassmicrobe/alive-for-mac/releases/tag/v0.2.1) — 2026-10-05 performance and UI/UX improvements
 
-- **Preserve the catalog when a drive is unavailable.** Unreadable project roots keep the previous list and caches. Home and Sets explain the failure, link to folder settings, and identify previously scanned entries that may be outdated.
+- **Preserve the catalog when a drive is unavailable.** Unreadable project roots keep the previous list and caches. Home and Sets explain the failure, link to folder settings, and clearly indicate when the displayed catalog may be outdated.
 - **Faster sample analysis.** Copied-sample matching and folder navigation avoid repeated searches across the library. Duplicate checks respond to rescan cancellation while reading large files.
 - **Improve memory use.** Revisiting thumbnails preserves cache memory accounting. Large arrangement previews reduce bitmap resolution while keeping the final tracks visible.
 - **Home keyboard navigation.** Arrow keys move selection and focus together. Tile shortcuts respect other buttons and player controls; holding Return or Space avoids repeated actions.
