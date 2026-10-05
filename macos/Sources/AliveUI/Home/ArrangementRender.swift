@@ -79,7 +79,18 @@ enum ArrangementRender {
         // y down, like GDI: the port keeps upstream's arithmetic.
         g.translateBy(x: 0, y: CGFloat(height))
         g.scaleBy(x: 1, y: -1)
-        draw(g, area: CGRect(x: 0, y: 0, width: width, height: height), arrangement: a, options: options)
+        if options.scale > 0, options.scale < 1 {
+            // Budget-limited previews retain their logical track geometry. Rounding every
+            // lane/gap separately at sub-1x would accumulate and cut off the final tracks.
+            g.scaleBy(x: options.scale, y: options.scale)
+            var logicalOptions = options
+            logicalOptions.scale = 1
+            draw(g, area: CGRect(x: 0, y: 0, width: Double(width) / options.scale,
+                                 height: Double(height) / options.scale),
+                 arrangement: a, options: logicalOptions)
+        } else {
+            draw(g, area: CGRect(x: 0, y: 0, width: width, height: height), arrangement: a, options: options)
+        }
         return g.makeImage()
     }
 

@@ -85,6 +85,19 @@ final class ArrangementThumbCacheTests: XCTestCase {
         XCTAssertNil(ThumbCache(dataDir: t.sub("d")).loadFromMemory(set))
     }
 
+    func testRevisitedThumbnailsStillEvictUnderMemoryPressure() throws {
+        let t = makeHomeScratch()
+        let image = try picture()
+        let cache = ThumbCache(dataDir: t.sub("d"), memoryLimit: 2 * image.bytesPerRow * image.height)
+        let sets = (0..<8).map { makeSet(t, "\($0).als") }
+        for set in sets {
+            cache.save(set, image: image)
+            XCTAssertNotNil(cache.load(set), "revisit a decoded tile before the next image arrives")
+        }
+        XCTAssertLessThan(sets.filter { cache.loadFromMemory($0) != nil }.count, sets.count,
+                          "refreshing a cache hit must not retain every image outside its cost budget")
+    }
+
     func testMemoryLookupNeedsNoStatAndLoadDropsAStaleDraft() throws {
         let t = makeHomeScratch()
         let set = makeSet(t)

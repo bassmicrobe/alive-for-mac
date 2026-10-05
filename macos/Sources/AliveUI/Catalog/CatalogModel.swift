@@ -138,12 +138,13 @@ final class CatalogModel {
     private func finishScan(_ gen: Int, _ stats: ScanStats) {
         guard gen == generation else { return }   // superseded: the newer scan reports
         lastScanStats = stats
-        if !stats.cancelled { fullPending = false }
+        if !stats.cancelled && !stats.retainedPreviousCatalog { fullPending = false }
         isScanning = false
         progress = CatalogProgress()
         publish()
         Diag.info("catalog: \(stats.total) sets (\(stats.parsed) parsed, \(stats.reused) cached) in "
-                  + String(format: "%.1f", stats.seconds) + " s" + (stats.cancelled ? ", cancelled" : ""))
+                  + String(format: "%.1f", stats.seconds) + " s" + (stats.cancelled ? ", cancelled" : "")
+                  + (stats.retainedPreviousCatalog ? ", previous catalog retained" : ""))
         app.catalogDidBecomeReady()
     }
 

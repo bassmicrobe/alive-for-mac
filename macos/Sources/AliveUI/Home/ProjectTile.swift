@@ -9,13 +9,16 @@ struct ProjectTile: View {
     let isKeyboardFocused: Bool
     let isPinned: Bool
     let isPlaying: Bool
+    let focus: FocusState<String?>.Binding
     let onSelect: () -> Void
+    let onFocus: () -> Void
+    let onKey: (KeyPress) -> KeyPress.Result
     let onOpen: () -> Void
     let onPlay: () -> Void
     let onTogglePin: () -> Void
 
     @State private var hovering = false
-    @FocusState private var isFocused: Bool
+    private var isFocused: Bool { focus.wrappedValue == set.path }
 
     private static let corner = Theme.cardR
 
@@ -54,18 +57,19 @@ struct ProjectTile: View {
         .onHover { inside in withAnimation(Theme.hoverAnimation) { hovering = inside } }
         .onTapGesture(count: 2, perform: onOpen)
         .simultaneousGesture(TapGesture().onEnded(onSelect))
-        // Reachable with Tab (the arrow keys come from HomeKeyMonitor); focusing selects, so the
-        // two never disagree about which tile is current.
+        // Reachable with Tab; arrow navigation moves both focus and selection to the next tile.
         .focusable()
-        .focused($isFocused)
+        .focused(focus, equals: set.path)
         .focusEffectDisabled()
-        .onChange(of: isFocused) { _, focused in if focused { onSelect() } }
+        .onChange(of: isFocused) { _, focused in if focused { onFocus() } }
+        .onKeyPress(keys: HomeGridKeyboard.keys, action: onKey)
         // The pin and play buttons stay their own elements inside the tile instead of being
         // folded into one; the tile itself carries the name and the Open action.
         .accessibilityElement(children: .contain)
         .accessibilityAddTraits(isSelected ? .isSelected : [])
         .accessibilityLabel(set.name)
         .accessibilityValue(HomeModel.subtitle(for: set))
+        .accessibilityAction(.default, onSelect)
         .accessibilityAction(named: CommonStrings.openInLive.s, onOpen)
     }
 

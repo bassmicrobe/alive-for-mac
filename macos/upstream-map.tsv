@@ -22,7 +22,7 @@ src/Glass.cs	Sources/AliveUI/Theme/Glass.swift	1A	NSVisualEffectView
 src/GlassDialog.cs	Sources/AliveUI/Theme/Components.swift	1A	
 src/HelpOverlay.cs	Sources/AliveUI/Help/HelpSheet.swift	1A	
 src/HomeStore.cs	Sources/AliveCore/Catalog/HomeStore.swift;Sources/AliveUI/Home/HomeModel.swift	1B	
-src/HomeView.cs	Sources/AliveUI/Home/HomeView.swift;Sources/AliveUI/Home/ProjectTile.swift;Sources/AliveUI/Home/HomeModel.swift;Sources/AliveUI/Home/ThumbnailPipeline.swift;Sources/AliveUI/Home/HomeKeyMonitor.swift	S2	
+src/HomeView.cs	Sources/AliveUI/Home/HomeView.swift;Sources/AliveUI/Home/ProjectTile.swift;Sources/AliveUI/Home/HomeModel.swift;Sources/AliveUI/Home/ThumbnailPipeline.swift;Sources/AliveUI/Home/HomeGridKeyboard.swift	S2
 src/Icons.cs	Sources/AliveUI/Theme/Icons.swift	1A	SF Symbols
 src/LiveColors.cs	Sources/AliveCore/Als/LiveColors.swift	1B	RGB only, no AppKit
 src/LiveEnvironment.cs	Sources/AliveCore/Live/LiveEnvironment.swift;Sources/AliveCore/Live/LiveVersion.swift;Sources/AliveUI/Services/LiveLauncher.swift	1B	Mac paths, no Registry

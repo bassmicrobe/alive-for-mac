@@ -26,6 +26,8 @@ enum CommonStrings: LocalizedStrings {
     case scanning, scanProgress
     case emptyRootsTitle, emptyRootsBody, addProjectsFolder, chooseFolderPrompt, chooseFolderMessage
     case suggestionsTitle, addSuggestion, noSetsTitle, noSetsBody
+    case catalogReadFailedTitle, catalogReadFailedBody, catalogUnreadableFolders
+    case catalogRetainedNotice, catalogPartialNotice
 
     var en: String { text.en }
     var ja: String { text.ja }
@@ -107,8 +109,19 @@ enum CommonStrings: LocalizedStrings {
         case .suggestionsTitle: return ("Found on this Mac", "この Mac で見つかりました")
         case .addSuggestion: return ("Add", "追加")
         case .noSetsTitle: return ("No sets found", "セットが見つかりません")
-        case .noSetsBody: return ("There are no .als files in the folders being scanned. Check them with Scan Folders (⇧⌘O).",
-                                  "スキャン対象のフォルダに .als ファイルがありません。スキャンするフォルダ（⇧⌘O）を確認してください。")
+        case .noSetsBody: return ("No Live sets were found in the configured folders. Choose the folders that contain your .als files with Scan Folders (⇧⌘O).",
+                                  "設定したフォルダから Live セットが見つかりませんでした。スキャンするフォルダ（⇧⌘O）で .als ファイルが入ったフォルダを指定してください。")
+        case .catalogReadFailedTitle: return ("Some folders could not be read", "読み込めないフォルダがあります")
+        case .catalogReadFailedBody:
+            return ("Check that these folders are available and readable, then rescan. You can change the project folders with Scan Folders (⇧⌘O).",
+                    "フォルダの接続状態と読み取り権限を確認して、再スキャンしてください。スキャンするフォルダ（⇧⌘O）でプロジェクトのフォルダを変更できます。")
+        case .catalogUnreadableFolders: return ("%lld folders could not be read", "%lld 個のフォルダを読み込めませんでした")
+        case .catalogRetainedNotice:
+            return ("Some project folders could not be read. Showing the previous catalog; it may be outdated.",
+                    "一部のプロジェクトフォルダを読み込めませんでした。前回のカタログを表示しています（最新の状態とは異なる場合があります）。")
+        case .catalogPartialNotice:
+            return ("Some project folders could not be read. The catalog may be incomplete.",
+                    "一部のプロジェクトフォルダを読み込めませんでした。カタログに含まれていないセットがある可能性があります。")
         }
     }
 }

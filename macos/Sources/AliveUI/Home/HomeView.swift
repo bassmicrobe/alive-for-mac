@@ -8,10 +8,12 @@ struct HomeView: View {
     @Environment(AppModel.self) private var app
 
     var body: some View {
-        if app.catalog.hasEnabledRoots {
-            HomeContent()
-        } else {
+        if !app.catalog.hasEnabledRoots {
             RootsEmptyState()
+        } else if app.catalog.sets.isEmpty {
+            CatalogEmptyState()
+        } else {
+            HomeContent()
         }
     }
 }
@@ -31,7 +33,7 @@ private struct HomeContent: View {
     @Environment(AppModel.self) private var app
     /// True while the person is using the keyboard on the grid (the selection ring turns blue).
     @State private var keyboardActive = false
-    @State private var keys = HomeKeyMonitor()
+    @FocusState private var focusedPath: String?
 
     private static let gap = HomeContentColumns.gap
 
@@ -47,15 +49,12 @@ private struct HomeContent: View {
                     .padding(.top, 4)
                     .padding(.bottom, app.player.isStripVisible ? 96 : Theme.pad)
                 }
-                // Not `.focusable()`, and no GeometryReader: both made AppKit's window structural-region
-                // pass abort at start-up. Keys come from a local event monitor; the column count
-                // is read from the window when a key arrives.
+                // Only the tiles are focusable: making the whole scroll view focusable caused
+                // AppKit's structural-region pass to abort. Other controls keep their own keys.
                 .onChange(of: app.selectedSetPath) { _, path in
                     if let path { scroller.scrollTo(path) }
                 }
-                .onAppear { keys.start { key in handle(key) } }
-                .onDisappear { keys.stop() }
-                            }
+            }
             if app.player.isStripVisible {
                 NowPlayingStrip().transition(.move(edge: .bottom).combined(with: .opacity))
             }
@@ -76,6 +75,7 @@ private struct HomeContent: View {
             }
             if rows.isEmpty, !app.catalog.sets.isEmpty {
                 Text(HomeStrings.noMatches.s).font(Theme.fBody).foregroundStyle(Theme.secondaryText)
+                PillButton(title: CommonStrings.clearSearch.s, icon: .close) { app.searchText = "" }
             }
         }
     }
@@ -107,7 +107,10 @@ private struct HomeContent: View {
             isKeyboardFocused: keyboardActive,
             isPinned: app.home.isPinned(path),
             isPlaying: app.player.isPlaying(setPath: path),
-            onSelect: { app.selectedSetPath = path; keyboardActive = false },
+            focus: $focusedPath,
+            onSelect: { app.selectedSetPath = path; keyboardActive = false; focusedPath = path },
+            onFocus: { app.selectedSetPath = path; keyboardActive = true },
+            onKey: { handle($0, from: path) },
             onOpen: { app.openInLive(path: path) },
             onPlay: { app.selectedSetPath = path; app.player.playRender(forSetAt: path) },
             onTogglePin: { app.togglePin(path: path) }
@@ -141,26 +144,26 @@ private struct HomeContent: View {
 
     // MARK: - Keyboard
 
-    /// Returns true when the key was ours.
-    private func handle(_ key: HomeKeyMonitor.Key) -> Bool {
+    private func handle(_ press: KeyPress, from path: String) -> KeyPress.Result {
         let columns = HomeContentColumns.count(for: (NSApp.keyWindow?.contentView?.bounds.width ?? 1200) - Theme.pad * 2)
-        guard app.sheet == nil, app.tab == .home else { return false }
+        guard app.sheet == nil, app.tab == .home, focusedPath == path,
+              let action = HomeGridKeyboard.action(for: press.key, modifiers: press.modifiers, phase: press.phase)
+        else { return .ignored }
         let rows = app.home.rows
-        let current = app.selectedSetPath.flatMap { path in rows.firstIndex { $0.path == path } }
-        switch key {
-        case .return:
-            guard let path = app.selectedSetPath else { return false }
+        guard let current = rows.firstIndex(where: { $0.path == path }) else { return .ignored }
+        switch action {
+        case .open:
             app.openInLive(path: path)
-        case .space:
-            guard let path = app.selectedSetPath,
-                  rows.first(where: { $0.path == path })?.hasRenders == true else { return false }
+        case .play:
+            guard rows[current].hasRenders else { return .ignored }
             app.player.playRender(forSetAt: path)
         case .move(let direction):
             keyboardActive = true
-            guard let next = TileNavigation.move(from: current, direction, columns: columns, count: rows.count) else { return true }
+            guard let next = TileNavigation.move(from: current, direction, columns: columns, count: rows.count) else { return .handled }
             app.selectedSetPath = rows[next].path
+            focusedPath = rows[next].path
         }
-        return true
+        return .handled
     }
 }
 

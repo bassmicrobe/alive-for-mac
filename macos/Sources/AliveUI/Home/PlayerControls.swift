@@ -160,8 +160,8 @@ struct VolumeControl: View {
             }
             .buttonStyle(.plain)
             .foregroundStyle(Theme.secondaryText)
-            .help(HomeStrings.mute.s)
-            .accessibilityLabel(HomeStrings.mute.s)
+            .help(volume > 0 ? HomeStrings.mute.s : HomeStrings.unmute.s)
+            .accessibilityLabel(volume > 0 ? HomeStrings.mute.s : HomeStrings.unmute.s)
             ScrubBar(value: Double(volume), label: HomeStrings.volume.s) { volume = Float($0) }
                 .frame(width: 96)
         }

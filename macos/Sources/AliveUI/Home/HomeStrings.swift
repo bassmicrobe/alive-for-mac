@@ -20,7 +20,7 @@ enum HomeStrings: LocalizedStrings {
     // Player window
     case playerEmptyTitle, playerEmptyBody, noRenders, colFile, colFolder, colModified
     case showInFolder, setAsPreview, clearPreview, playFile
-    case previousSet, nextSet, previousRender, nextRender, volume, mute
+    case previousSet, nextSet, previousRender, nextRender, volume, mute, unmute
     case waveReading, waveFailed, playerLoading
 
     var en: String { text.en }
@@ -98,6 +98,7 @@ enum HomeStrings: LocalizedStrings {
         case .nextRender: return ("Next render", "次のレンダー")
         case .volume: return ("Volume", "音量")
         case .mute: return ("Mute", "ミュート")
+        case .unmute: return ("Unmute", "ミュートを解除")
         case .waveReading: return ("reading…", "読み込み中…")
         case .waveFailed: return ("Could not read the waveform", "波形を読み込めません")
         case .playerLoading: return ("Looking for renders…", "レンダーを検索中…")

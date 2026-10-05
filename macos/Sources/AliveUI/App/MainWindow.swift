@@ -13,6 +13,11 @@ struct MainWindow: View {
             background
             VStack(spacing: 0) {
                 TopBar()
+                if (app.tab == .home || app.tab == .sets), !app.catalog.sets.isEmpty,
+                   let stats = app.catalog.lastScanStats, stats.unreadableFolders > 0 {
+                    CatalogReadNotice(retainedPreviousCatalog: stats.retainedPreviousCatalog,
+                                      failedRoots: stats.failedRoots)
+                }
                 content
             }
             ToastOverlay(app: app)

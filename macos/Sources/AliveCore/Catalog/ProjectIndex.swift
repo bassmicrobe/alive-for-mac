@@ -9,6 +9,12 @@ public typealias ScanProgress = @Sendable (_ done: Int, _ total: Int, _ current:
 /// What one scan did — useful for the UI's status line and for tests.
 public struct ScanStats: Equatable, Sendable {
     public var total = 0
+    /// Enabled roots whose top-level directory could not be listed (not readable empty roots).
+    public var failedRoots: [String] = []
+    /// Unreadable directories found while walking the roots, including failed roots.
+    public var unreadableFolders = 0
+    /// Discovery could not read an enabled root; the previous catalog and caches were kept.
+    public var retainedPreviousCatalog = false
     /// Sets parsed from the .als this time.
     public var parsed = 0
     /// Sets taken from the cache because size and mtime were unchanged.
@@ -145,10 +151,26 @@ public final class ProjectIndex: @unchecked Sendable {
         let env = LiveEnvironment.detect(home: home, applicationsDirs: applicationsDirs)
         lock.lock(); _env = env; lock.unlock()
 
-        let files = collectFiles(roots: roots, disabledRoots: disabledRoots, progress: progress, isCancelled: isCancelled)
-        let cache = cachedEntries()
         var stats = ScanStats()
+        let files = collectFiles(roots: roots, disabledRoots: disabledRoots, progress: progress,
+                                 stats: &stats, isCancelled: isCancelled)
         stats.total = files.count
+        // An offline drive or denied directory is not evidence that its sets were deleted.
+        // Keep the last complete catalog and both caches until every enabled root is readable.
+        // A readable root with no sets still follows the normal path and clears old rows.
+        if !stats.failedRoots.isEmpty {
+            stats.retainedPreviousCatalog = true
+            stats.cancelled = isCancelled()
+            // Plug-ins can still be discovered when the project drive is offline. This only
+            // refreshes derived health on the retained rows; it never writes catalog caches.
+            if !stats.cancelled { refreshInstalled() }
+            stats.cancelled = isCancelled()
+            stats.seconds = Date().timeIntervalSince(started)
+            lock.lock(); _lastStats = stats; lock.unlock()
+            Diag.info("scan: retained previous catalog; \(stats.failedRoots.count) roots unreadable")
+            return stats
+        }
+        let cache = cachedEntries()
 
         let counters = Counters()
         let built: [(entry: SetEntry, reused: Bool)?] = Parallel.map(count: files.count, isCancelled: isCancelled) { i in
@@ -209,17 +231,20 @@ public final class ProjectIndex: @unchecked Sendable {
     /// Walks each enabled root. One and the same .als turns up twice easily when roots are
     /// nested ("~/Music" and "~/Music/Ableton"): without the `seen` filter the set would double.
     private func collectFiles(roots: [String], disabledRoots: [String], progress: ScanProgress?,
-                              isCancelled: () -> Bool) -> [String] {
+                              stats: inout ScanStats, isCancelled: () -> Bool) -> [String] {
         let disabled = Set(disabledRoots.map { $0.lowercased() })
         var files: [String] = []
         var seen = Set<String>()
         for root in roots where !disabled.contains(root.lowercased()) {   // temporarily off: stays in the list
+            if isCancelled() { break }
             let before = files.count
             let r = FolderScan.find(root: root, ext: ".als", includeBackups: false, onFile: { f in
                 guard seen.insert(f.lowercased()).inserted else { return }
                 files.append(f)
                 if files.count % 16 == 0 { progress?(files.count, 0, f) }
             }, isCancelled: isCancelled)
+            stats.unreadableFolders += r.unreadable
+            if r.rootFailed { stats.failedRoots.append(root) }
             Diag.info("scan: \(root) -> \(files.count - before) sets in \(r.dirs) folders"
                       + (r.unreadable > 0 ? ", \(r.unreadable) folders unreadable" : "")
                       + (r.rootFailed ? "  ROOT NOT READABLE" : ""))

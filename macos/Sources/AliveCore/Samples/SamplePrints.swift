@@ -12,12 +12,14 @@ enum SamplePrints {
     static func take(_ idx: inout SampleIndex, known: [String: SampleFile], isCancelled: () -> Bool) {
         var groups: [String: [Int]] = [:]
         for (i, f) in idx.files.enumerated() {
+            if i % 8192 == 0, isCancelled() { return }
             groups[String(f.size) + "|" + f.name.lowercased(), default: []].append(i)
         }
         var reused: [(Int, UInt64)] = []
         var todo: [Int] = []
         for g in groups.values where g.count > 1 {
             for i in g {
+                if isCancelled() { return }
                 let f = idx.files[i]
                 if let was = known[idx.path(of: i).lowercased()], was.print != 0, was.size == f.size,
                    sameDate(was.modified, f.modified) {
@@ -31,7 +33,7 @@ enum SamplePrints {
 
         let paths = todo.map { idx.path(of: $0) }
         let prints = Parallel.map(count: todo.count, workers: readers, isCancelled: isCancelled) { k in
-            SamplePrints.print(path: paths[k])
+            SamplePrints.print(path: paths[k], isCancelled: isCancelled)
         }
         for (k, i) in todo.enumerated() { idx.files[i].print = prints[k] ?? 0 }
     }
@@ -48,15 +50,26 @@ enum SamplePrints {
     /// enough: the Dry and Wet takes of one guitar in one pack have the same silence at the start
     /// and the same tail, and part only in the middle. FNV rather than a cryptographic hash — no
     /// cryptography needed. 0 — the file would not open (a real hash of 0 becomes 1).
-    static func print(path: String) -> UInt64 {
+    /// Polls between 1 MB blocks so cancelling a rescan does not wait for a whole recording.
+    /// A partial hash is never published as a valid fingerprint.
+    static func print(path: String, isCancelled: () -> Bool = { false }) -> UInt64 {
+        guard !isCancelled() else { return 0 }
         guard let h = FileHandle(forReadingAtPath: path) else { return 0 }
         defer { try? h.close() }
         var hash: UInt64 = 14_695_981_039_346_656_037
         do {
-            while let chunk = try h.read(upToCount: 1 << 20), !chunk.isEmpty {
-                chunk.withUnsafeBytes { raw in
-                    for b in raw { hash = (hash ^ UInt64(b)) &* 1_099_511_628_211 }
+            while true {
+                if isCancelled() { return 0 }
+                // FileHandle's Foundation buffers must die per block, even when the enclosing
+                // scan worker's autorelease pool lasts for the whole multi-GB file.
+                let read = try autoreleasepool { () throws -> Bool in
+                    guard let chunk = try h.read(upToCount: 1 << 20), !chunk.isEmpty else { return false }
+                    chunk.withUnsafeBytes { raw in
+                        for b in raw { hash = (hash ^ UInt64(b)) &* 1_099_511_628_211 }
+                    }
+                    return true
                 }
+                if !read { break }
             }
         } catch { return 0 }
         return hash == 0 ? 1 : hash

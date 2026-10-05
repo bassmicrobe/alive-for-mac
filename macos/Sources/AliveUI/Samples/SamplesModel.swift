@@ -79,7 +79,10 @@ final class SamplesModel {
     @ObservationIgnored private var copiesDemandedGeneration = -1
     /// A scroll asked for before the rows it points at have been built; done when they arrive.
     @ObservationIgnored private var deferredScroll: String?
-    @ObservationIgnored private var lookupMemo: (gen: Int, folders: [String: Int], files: [String: Int])?
+    @ObservationIgnored private var lookupGeneration = -1
+    @ObservationIgnored private var folderLookup: [String: Int] = [:]
+    @ObservationIgnored private var folderGroups: [String: [Int]] = [:]
+    @ObservationIgnored private var fileLookups: [Int: [String: Int]] = [:]
 
     init(app: AppModel) {
         self.app = app
@@ -254,22 +257,38 @@ final class SamplesModel {
 
     // MARK: - Lookups
 
-    private var lookups: (folders: [String: Int], files: [String: Int]) {
-        if let m = lookupMemo, m.gen == indexGeneration { return (m.folders, m.files) }
-        var files: [String: Int] = [:]
-        files.reserveCapacity(index.files.count)
-        for i in index.files.indices { files[index.path(of: i).lowercased()] = i }
-        let folders = index.folderLookup()
-        lookupMemo = (indexGeneration, folders, files)
-        return (folders, files)
+    private func prepareFolderLookup() {
+        guard lookupGeneration != indexGeneration else { return }
+        folderLookup = index.folderLookup()
+        folderGroups = Dictionary(grouping: index.folders.indices) { index.folders[$0].path.lowercased() }
+        fileLookups = [:]
+        lookupGeneration = indexGeneration
     }
 
     func kind(ofRow id: String?) -> SampleRow.Kind? {
         guard let id else { return nil }
         let key = id.lowercased()
-        let l = lookups
-        if let f = l.folders[key] { return .folder(f) }
-        if let f = l.files[key] { return .file(f) }
+        prepareFolderLookup()
+        if let f = folderLookup[key] { return .folder(f) }
+        let parent = (key as NSString).deletingLastPathComponent
+        guard let folder = folderLookup[parent] else { return nil }
+        // Opening one folder must not build full paths for every sample in the library.
+        // File selection only needs names in its containing folder; retain a small working set.
+        if fileLookups[folder] == nil {
+            var names: [String: Int] = [:]
+            names.reserveCapacity(index.folders[folder].files.count)
+            // A case-sensitive volume can contain both Kicks/ and kicks/. Preserve the old
+            // case-insensitive full-path lookup, including its last-file-index tie break.
+            for samePath in folderGroups[parent] ?? [folder] {
+                for f in index.folders[samePath].files {
+                    let name = index.files[f].name.lowercased()
+                    names[name] = max(names[name] ?? f, f)
+                }
+            }
+            if fileLookups.count >= Self.summaryCapacity { fileLookups = [:] }
+            fileLookups[folder] = names
+        }
+        if let f = fileLookups[folder]?[(key as NSString).lastPathComponent] { return .file(f) }
         return nil
     }
 

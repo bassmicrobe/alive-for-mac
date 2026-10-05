@@ -56,6 +56,10 @@ Published: `sets: [SetEntry]` (all), `projects` (folded per folder when `setting
 `env: LiveEnvironment`, `history: Activity`, `isScanning`, `progress: CatalogProgress`
 (`done,total,current,fraction?`), `lastScanStats`, `isLoaded`, `isReady` (= loaded and not scanning),
 `revision` (bumped on each publish; memoize on it), `hasEnabledRoots`.
+`lastScanStats.failedRoots` / `unreadableFolders` expose access failures. If an enabled root is
+unreadable, the previous catalog and disk caches are retained (`retainedPreviousCatalog`); Home
+and Sets show recovery actions and a persistent notice when older rows remain visible. New
+partial updates wait for a complete scan, while a readable empty root still clears deleted rows.
 Actions: `rescan()` (cancels and restarts; a no-op before `start()`, so root edits in tests never scan), `addRoots([String])` / `addRoot(_)` (a file counts as its
 folder; toasts; saves; rescans), `removeRoot(_)`, `setRoot(_:enabled:)`, `settingsDidChange()`.
 `index: ProjectIndex` is exposed for what the model does not wrap (`inSameFolder`, `inventory`,
@@ -121,6 +125,16 @@ Cross-feature calls go through these entry points, not through views: `app.sets.
 `app.plugins.show(pluginNamed:)`, `app.samples.showFolder(_:)`, `app.home.togglePin(path:)`.
 
 ## Things that bite
+
+- **Home grid keys belong to focused tiles** (`HomeGridKeyboard`), not a window-wide event monitor.
+  Keep toolbar buttons, search, and player controls free to process their own keys.
+- **Thumbnail cache costs must survive cache hits.** Both NSCaches have independent 64 MiB
+  budgets; a replacement wrapper without its decoded image cost defeats eviction.
+- **Large previews reduce resolution below 1x to honor the pixel budget.** At that scale,
+  `ArrangementRender` downsamples logical geometry uniformly; rounding each track separately
+  would crop the final tracks.
+- **Sample row lookup is local to its containing folder.** Folder operations must not build
+  full paths for every sample. Case-only folder names still share the case-insensitive lookup.
 
 - **Table cells must not read `@Environment(AppModel.self)`.** When the rows shrink, NSTableView keeps
   cells alive outside the environment and SwiftUI aborts with "No Observable object of type AppModel

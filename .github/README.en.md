@@ -10,7 +10,7 @@ An **unofficial macOS port** of [Alive](https://github.com/rueblose/alive) by Ru
 ![arch](https://img.shields.io/badge/Apple%20Silicon%20%7C%20Intel-universal-555555)
 ![license](https://img.shields.io/badge/license-MIT-blue)
 
-[**Download**](https://github.com/bassmicrobe/alive-for-mac/releases/latest) · [Install](#install) · [Features](#features) · [Shortcuts](#keyboard-shortcuts) · [Build](#building-from-source) · [License](#license) · [Parity with upstream](../macos/PARITY.md) · [日本語](README.md) | **English**
+[**Download**](https://github.com/bassmicrobe/alive-for-mac/releases/latest) · [Install](#install) · [Features](#features) · [Release notes](#release-notes) · [Shortcuts](#keyboard-shortcuts) · [Build](#building-from-source) · [License](#license) · [Parity with upstream](../macos/PARITY.md) · [日本語](README.md) | **English**
 
 </div>
 
@@ -19,6 +19,24 @@ An **unofficial macOS port** of [Alive](https://github.com/rueblose/alive) by Ru
 Alive for Mac reads your Live sets (`.als`) and shows what is inside: tempo, key, plugins, samples,
 which version is the latest. It is a Swift/SwiftUI rewrite of the Windows-only original, not a
 wrapper. The original C# sources stay in this repository untouched, as the reference for the port.
+
+## Release notes
+
+### [0.2.1](https://github.com/bassmicrobe/alive-for-mac/releases/tag/v0.2.1) — 2026-10-05 performance and UI/UX improvements
+
+- **Preserve the catalog when a drive is unavailable.** Unreadable project roots keep the previous list and caches. Home and Sets explain the failure, link to folder settings, and identify previously scanned entries that may be outdated.
+- **Faster sample analysis.** Copied-sample matching and folder navigation avoid repeated searches across the library. Duplicate checks respond to rescan cancellation while reading large files.
+- **Improve memory use.** Revisiting thumbnails preserves cache memory accounting. Large arrangement previews reduce bitmap resolution while keeping the final tracks visible.
+- **Home keyboard navigation.** Arrow keys move selection and focus together. Tile shortcuts respect other buttons and player controls; holding Return or Space avoids repeated actions.
+- **Recover from empty search results.** Home, Sets and Plugins provide actions to clear the search or reset filters.
+- **Accessibility.** Export switches expose standard actions, clear names and state. Sample and plugin rows, spoken hints, and the Unmute label have also been improved.
+- **Plugin discovery and display.** Skip redundant metadata reads for known plugins and keep the final heatmap month caption inside the calendar.
+
+Verified on Apple Silicon / macOS 27.0.1 with 813 tests (zero failures, 10 skipped), a native build,
+and Japanese UI checks. In a synthetic fixture with 12,000 equal-size files and 600 copied references,
+the previous matching loop took about 2.13 seconds; the new complete usage computation took about
+0.013 seconds. This does not measure the improvement for an entire real library.
+See the [audit report](../macos/docs/PERFORMANCE_UIUX_AUDIT_2026-10-05.md) for details.
 
 ## Requirements
 

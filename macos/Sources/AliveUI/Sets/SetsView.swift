@@ -11,7 +11,7 @@ struct SetsView: View {
         if !app.catalog.hasEnabledRoots {
             RootsEmptyState()
         } else if app.catalog.sets.isEmpty {
-            emptyCatalog
+            CatalogEmptyState()
         } else {
             HStack(alignment: .top, spacing: Theme.panelGap) {
                 listColumn
@@ -37,18 +37,13 @@ struct SetsView: View {
         }
     }
 
-    @ViewBuilder private var emptyCatalog: some View {
-        if app.catalog.isScanning || !app.catalog.isLoaded {
-            EmptyState(icon: .refresh, title: CommonStrings.scanning.s)
-        } else {
-            EmptyState(icon: .folder, title: CommonStrings.noSetsTitle.s, message: CommonStrings.noSetsBody.s)
-        }
-    }
-
     /// Everything was filtered or searched away: say so, and offer the way back.
     private var noMatches: some View {
         VStack(spacing: 14) {
             EmptyState(icon: .magnifier, title: SetsStrings.noMatchesTitle.s, message: SetsStrings.noMatchesBody.s)
+            if !app.searchText.isEmpty {
+                PillButton(title: CommonStrings.clearSearch.s, icon: .close) { app.searchText = "" }
+            }
             if !app.sets.filter.isEmpty {
                 PillButton(title: SetsStrings.clearFilters.s, icon: .filters) { app.sets.filter.clear() }
             }

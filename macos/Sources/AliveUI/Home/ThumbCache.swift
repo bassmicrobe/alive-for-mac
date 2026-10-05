@@ -45,14 +45,17 @@ final class ThumbCache: @unchecked Sendable {
     private final class Box {
         let entry: ThumbEntry
         let file: String
-        init(_ entry: ThumbEntry, file: String = "") { self.entry = entry; self.file = file }
+        let cost: Int
+        init(_ entry: ThumbEntry, file: String = "", cost: Int) {
+            self.entry = entry; self.file = file; self.cost = cost
+        }
     }
 
     /// `dataDir` is the app's data folder; the pictures live in its `thumbs` subfolder.
-    init(dataDir: String) {
+    init(dataDir: String, memoryLimit: Int = ThumbCache.memoryLimit) {
         dir = (dataDir as NSString).appendingPathComponent("thumbs")
-        memory.totalCostLimit = Self.memoryLimit
-        latest.totalCostLimit = Self.memoryLimit
+        memory.totalCostLimit = memoryLimit
+        latest.totalCostLimit = memoryLimit
     }
 
     // MARK: key
@@ -107,7 +110,9 @@ final class ThumbCache: @unchecked Sendable {
             latest.removeObject(forKey: setPath as NSString)
         }
         if let hit = memory.object(forKey: file as NSString) {
-            latest.setObject(Box(hit.entry, file: file), forKey: setPath as NSString)
+            // Revisiting a tile must retain its decoded image cost in both caches.
+            latest.setObject(Box(hit.entry, file: file, cost: hit.cost),
+                             forKey: setPath as NSString, cost: hit.cost)
             return hit.entry
         }
         // Read fully into memory: a file kept open by a lazy decoder could not be swept.
@@ -125,8 +130,8 @@ final class ThumbCache: @unchecked Sendable {
 
     @discardableResult
     private func remember(_ entry: ThumbEntry, setPath: String, file: String, cost: Int) -> ThumbEntry {
-        memory.setObject(Box(entry), forKey: file as NSString, cost: cost)
-        latest.setObject(Box(entry, file: file), forKey: setPath as NSString, cost: cost)
+        memory.setObject(Box(entry, cost: cost), forKey: file as NSString, cost: cost)
+        latest.setObject(Box(entry, file: file, cost: cost), forKey: setPath as NSString, cost: cost)
         return entry
     }
 

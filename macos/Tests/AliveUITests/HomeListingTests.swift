@@ -1,4 +1,5 @@
 import XCTest
+import SwiftUI
 @testable import AliveCore
 @testable import AliveUI
 
@@ -110,11 +111,22 @@ final class HomeTileNavigationTests: XCTestCase {
         XCTAssertEqual(HomeContentColumns.count(for: 9000), 33)
     }
 
-    func testKeyCodesMapToGridKeys() {
-        XCTAssertEqual(HomeKeyMonitor.key(forCode: 36), .return)
-        XCTAssertEqual(HomeKeyMonitor.key(forCode: 49), .space)
-        XCTAssertEqual(HomeKeyMonitor.key(forCode: 123), .move(.left))
-        XCTAssertEqual(HomeKeyMonitor.key(forCode: 126), .move(.up))
-        XCTAssertNil(HomeKeyMonitor.key(forCode: 0), "letters are not ours")
+    func testGridKeysLeaveModifiedShortcutsAlone() {
+        XCTAssertEqual(HomeGridKeyboard.action(for: .return), .open)
+        XCTAssertEqual(HomeGridKeyboard.action(for: .space), .play)
+        XCTAssertEqual(HomeGridKeyboard.action(for: .leftArrow), .move(.left))
+        XCTAssertEqual(HomeGridKeyboard.action(for: .upArrow), .move(.up))
+        XCTAssertNil(HomeGridKeyboard.action(for: "a"))
+        for modifier in [EventModifiers.command, .control, .option, .shift] {
+            for key in HomeGridKeyboard.keys {
+                XCTAssertNil(HomeGridKeyboard.action(for: key, modifiers: modifier))
+            }
+        }
+    }
+
+    func testOnlyNavigationRepeatsWhenAKeyIsHeld() {
+        XCTAssertNil(HomeGridKeyboard.action(for: .return, phase: .repeat))
+        XCTAssertNil(HomeGridKeyboard.action(for: .space, phase: .repeat))
+        XCTAssertEqual(HomeGridKeyboard.action(for: .rightArrow, phase: .repeat), .move(.right))
     }
 }

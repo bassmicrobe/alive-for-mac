@@ -38,6 +38,23 @@ final class ArrangementPreviewTests: XCTestCase {
         XCTAssertEqual(few.points.height, 400)
     }
 
+    func testTallZoomedArrangementsStayWithinBitmapBudget() {
+        for count in [400, 1_000, 10_000] {
+            for zoom in PreviewSizing.zoomSteps.indices {
+                let plan = PreviewSizing.plan(view: CGSize(width: 1000, height: 600),
+                                              zoomIndex: zoom, trackCount: count,
+                                              taller: true, backingScale: 2)
+                XCTAssertLessThanOrEqual(plan.pixelWidth, PreviewSizing.maxPixelWidth)
+                XCTAssertLessThanOrEqual(plan.pixelWidth * plan.pixelHeight, PreviewSizing.maxPixels)
+                XCTAssertGreaterThan(plan.points.height, Double(count) * PreviewSizing.tallLane,
+                                     "resolution limits must not cut off the last tracks")
+            }
+        }
+        let plan = PreviewSizing.plan(view: CGSize(width: 1000, height: 600), zoomIndex: 5,
+                                      trackCount: 400, taller: true, backingScale: 2)
+        XCTAssertLessThan(plan.scale, 1, "the budget also applies below native resolution")
+    }
+
     func testMetricsLine() {
         Localizer.shared.preference = .en
         defer { Localizer.shared.preference = .system }

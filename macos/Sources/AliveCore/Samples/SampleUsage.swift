@@ -80,6 +80,9 @@ public struct SampleUsage: Sendable {
 
         // A folder's names are indexed only once somebody lands in it.
         var names: [Int: [String: Int]] = [:]
+        // Fixed-length one-shots often share a size. Index their names once per queried size,
+        // rather than lowercasing and checking the whole group for every copied reference.
+        var copyNames: [Int64: [String: [Int]]] = [:]
         var projects: [Int: Set<String>] = [:]
         var hits: [Int] = []
         // (sample, set path) pairs already recorded: the duplicate check in O(1).
@@ -91,12 +94,14 @@ public struct SampleUsage: Sendable {
             let pathId = pathIds[s.path] ?? { let n = pathIds.count; pathIds[s.path] = n; return n }()
             let project = s.projectDir.lowercased()
             for (i, raw) in s.samples.enumerated() {
+                if i % 256 == 0, isCancelled() { return u }
                 hits.removeAll(keepingCapacity: true)
                 let p = raw.lowercased()
                 if rootPrefixes.contains(where: { p.hasPrefix($0) }) {
                     direct(p, index, folderByPath, &names, &hits)
                 } else {
-                    copies(p, i < s.sampleSizes.count ? s.sampleSizes[i] : 0, index, bySize, &hits)
+                    guard copies(p, i < s.sampleSizes.count ? s.sampleSizes[i] : 0, index, bySize,
+                                 &copyNames, &hits, isCancelled: isCancelled) else { return u }
                 }
                 for f in hits {
                     let isNew = recorded.insert(UsePair(file: f, set: pathId)).inserted
@@ -143,10 +148,20 @@ public struct SampleUsage: Sendable {
     }
 
     private static func copies(_ p: String, _ size: Int64, _ index: SampleIndex, _ bySize: [Int64: [Int]],
-                               _ hits: inout [Int]) {
-        guard size > 0, let same = bySize[size] else { return }
+                               _ names: inout [Int64: [String: [Int]]], _ hits: inout [Int],
+                               isCancelled: () -> Bool) -> Bool {
+        guard size > 0, let same = bySize[size] else { return true }
+        if names[size] == nil {
+            var map: [String: [Int]] = [:]
+            for (i, f) in same.enumerated() {
+                if i % 8192 == 0, isCancelled() { return false }
+                map[index.files[f].name.lowercased(), default: []].append(f)
+            }
+            names[size] = map
+        }
         let name = p.lastIndex(of: "/").map { String(p[p.index(after: $0)...]) } ?? p
-        for f in same where index.files[f].name.lowercased() == name { hits.append(f) }
+        hits.append(contentsOf: names[size]?[name] ?? [])
+        return true
     }
 
     // MARK: views

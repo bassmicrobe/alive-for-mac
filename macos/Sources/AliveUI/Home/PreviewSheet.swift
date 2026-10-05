@@ -15,10 +15,10 @@ enum PreviewSizing {
     struct Plan: Equatable {
         /// Size of the picture on screen, in points.
         var points: CGSize
-        /// Pixels per point of the bitmap (2 on a retina screen while it fits).
+        /// Pixels per point (2 on Retina while it fits; below 1 for very large arrangements).
         var scale: Double
-        var pixelWidth: Int { Int((points.width * scale).rounded()) }
-        var pixelHeight: Int { Int((points.height * scale).rounded()) }
+        var pixelWidth: Int { max(1, Int((points.width * scale).rounded(.down))) }
+        var pixelHeight: Int { max(1, Int((points.height * scale).rounded(.down))) }
     }
 
     static func plan(view: CGSize, zoomIndex: Int, trackCount: Int, taller: Bool, backingScale: Double) -> Plan {
@@ -35,6 +35,9 @@ enum PreviewSizing {
         }
         // Even at 1x a very wide picture is cut down instead of allocating gigabytes.
         let cappedWidth = min(width, Double(maxPixelWidth))
+        // Tall arrangements can exceed the area budget even at 1x. Keep their scrollable
+        // point size, reducing bitmap resolution uniformly so every track remains reachable.
+        scale = min(scale, sqrt(Double(maxPixels) / (cappedWidth * height)))
         return Plan(points: CGSize(width: cappedWidth, height: height), scale: scale)
     }
 

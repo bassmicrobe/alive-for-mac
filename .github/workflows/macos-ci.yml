@@ -59,9 +59,17 @@ jobs:
           xcode-version: latest-stable
 
       - name: Check packaging script exists
+        env:
+          REF_NAME: ${{ github.ref_name }}
+          IS_TAG: ${{ startsWith(github.ref, 'refs/tags/v') }}
         run: |
           if [ ! -f macos/scripts/build-app.sh ]; then
             echo "::error::macos/scripts/build-app.sh is missing; cannot build the release assets."
+            exit 1
+          fi
+          version="$(tr -d '[:space:]' < macos/VERSION)"
+          if [ "$IS_TAG" = "true" ] && [ "$REF_NAME" != "v$version" ]; then
+            echo "::error::Release tag does not match macos/VERSION."
             exit 1
           fi
 
@@ -70,6 +78,11 @@ jobs:
         run: |
           chmod +x scripts/build-app.sh
           scripts/build-app.sh --zip --dmg
+
+      - name: Verify universal app and signature
+        run: |
+          lipo -verify_arch arm64 x86_64 "macos/build/Alive for Mac.app/Contents/MacOS/AliveForMac"
+          codesign --verify --deep --strict "macos/build/Alive for Mac.app"
 
       - name: Locate zip and dmg
         id: pkg

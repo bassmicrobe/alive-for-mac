@@ -42,11 +42,11 @@ extension PluginInventory {
         var records: [InstalledPlugin] = []
 
         if !settings.pluginsFromFolders { records = loadLive(settings, locations, paths, into: &inv) }
-        let known = Set(records.map { $0.path + "\u{0}" + $0.kind.rawValue })
+        let known = Set(records.map { PluginRoot(path: $0.path, kind: $0.kind) })
 
         var folderCount = 0
         for group in folderGroups(settings, locations) {
-            let read = PluginBundleScanner.scan(group.roots).filter { !known.contains($0.path + "\u{0}" + $0.kind.rawValue) }
+            let read = PluginBundleScanner.scan(group.roots, excluding: known)
             folderCount += read.count
             records.append(contentsOf: read)
             if !read.isEmpty { inv.sources.append("\(group.label) · \(read.count)") }

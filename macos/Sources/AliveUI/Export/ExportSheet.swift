@@ -96,9 +96,11 @@ struct ExportSheet: View {
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity, alignment: .leading)
             HStack(spacing: 10) {
-                PillSwitch(isOn: Binding(get: { model.options.toZip }, set: { model.setZip($0) }),
+                PillSwitch(label: ExportStrings.addToZip.s,
+                           isOn: Binding(get: { model.options.toZip }, set: { model.setZip($0) }),
                            isEnabled: model.canEditOptions)
                 Text(ExportStrings.addToZip.s).font(Theme.fBody).foregroundStyle(Theme.text)
+                    .accessibilityHidden(true) // The switch already names this action.
             }
             PillButton(title: ExportStrings.cancel.s) { app.sheet = nil }
                 .keyboardShortcut(.cancelAction)
@@ -181,8 +183,10 @@ private struct OriginRow: View {
 
     var body: some View {
         HStack(spacing: 14) {
-            PillSwitch(isOn: Binding(get: { group.included }, set: onChange), isEnabled: isEnabled)
+            PillSwitch(label: ExportText.label(group.origin),
+                       isOn: Binding(get: { group.included }, set: onChange), isEnabled: isEnabled)
             Text(ExportText.label(group.origin)).font(Theme.fBody).foregroundStyle(Theme.text)
+                .accessibilityHidden(true) // Avoid repeating the switch's label in the combined row.
             Spacer(minLength: 8)
             Text(ExportText.groupNumbers(group))
                 .font(Theme.fLabel)
@@ -261,6 +265,7 @@ private struct DisclosureLine: View {
 
 /// The pill switch of the upstream dialog: a capsule track and a sliding light knob.
 struct PillSwitch: View {
+    let label: String
     @Binding var isOn: Bool
     var isEnabled = true
 
@@ -268,28 +273,30 @@ struct PillSwitch: View {
     @FocusState private var focused: Bool
 
     var body: some View {
-        ZStack(alignment: isOn ? .trailing : .leading) {
-            Capsule().fill(isOn ? Theme.surfacePressed : Theme.surface)
-            Capsule().strokeBorder(Theme.cardBorder, lineWidth: 1)
-            Circle()
-                .fill(LinearGradient(colors: isOn ? [Theme.lightTop, Theme.light] : [Theme.textDim, Theme.textDim],
-                                     startPoint: .top, endPoint: .bottom))
-                .padding(3)
-                .frame(width: 24, height: 24)
+        Button { isOn.toggle() } label: {
+            ZStack(alignment: isOn ? .trailing : .leading) {
+                Capsule().fill(isOn ? Theme.surfacePressed : Theme.surface)
+                Capsule().strokeBorder(Theme.cardBorder, lineWidth: 1)
+                Circle()
+                    .fill(LinearGradient(colors: isOn ? [Theme.lightTop, Theme.light] : [Theme.textDim, Theme.textDim],
+                                         startPoint: .top, endPoint: .bottom))
+                    .padding(3)
+                    .frame(width: 24, height: 24)
+            }
+            .frame(width: 42, height: 24)
+            .contentShape(Capsule())
         }
-        .frame(width: 42, height: 24)
+        .buttonStyle(.plain)
+        .disabled(!isEnabled)
         .brightness(hovering && isEnabled ? 0.08 : 0)
         .opacity(isEnabled ? 1 : 0.4)
         .animation(Theme.selectAnimation, value: isOn)
         .focusRing(focused && isEnabled, cornerRadius: 12)
-        .contentShape(Capsule())
-        .onTapGesture { if isEnabled { isOn.toggle() } }
         .onHover { hovering = $0 }
-        .focusable(isEnabled)
         .focused($focused)
         .focusEffectDisabled()
-        .onKeyPress(.space) { isEnabled ? { isOn.toggle(); return .handled }() : .ignored }
-        .accessibilityAddTraits(.isButton)
+        .accessibilityLabel(label)
+        .accessibilityAddTraits(.isToggle)
         .accessibilityValue(isOn ? CommonStrings.stateOn.s : CommonStrings.stateOff.s)
     }
 }

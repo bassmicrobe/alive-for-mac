@@ -4,7 +4,7 @@
 import Foundation
 
 /// One folder to walk and the format of the bundles expected in it.
-struct PluginRoot: Equatable, Sendable {
+struct PluginRoot: Hashable, Sendable {
     var path: String
     var kind: PluginKind
 
@@ -48,13 +48,17 @@ enum PluginBundleScanner {
 
     /// Reads all bundles of all roots, in parallel; the result keeps the order of the roots and
     /// of the bundles within them, and holds one entry per plugin class (a bundle can hold several).
-    static func scan(_ roots: [PluginRoot]) -> [InstalledPlugin] {
+    /// Bundles covered by Live's records are excluded before their plist/moduleinfo is read;
+    /// their fallback records would be discarded by the inventory merger anyway.
+    static func scan(_ roots: [PluginRoot], excluding known: Set<PluginRoot> = []) -> [InstalledPlugin] {
         var jobs: [(bundle: String, kind: PluginKind)] = []
         for root in roots {
             let fm = FileManager.default
             var isDir: ObjCBool = false
             guard fm.fileExists(atPath: root.path, isDirectory: &isDir), isDir.boolValue else { continue }
-            jobs.append(contentsOf: findBundles(in: root).map { ($0, root.kind) })
+            jobs.append(contentsOf: findBundles(in: root)
+                .filter { !known.contains(PluginRoot(path: $0, kind: root.kind)) }
+                .map { ($0, root.kind) })
         }
         let work = jobs
         let read: [[InstalledPlugin]?] = Parallel.map(count: work.count) { i in

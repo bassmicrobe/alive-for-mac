@@ -43,7 +43,12 @@ struct SampleRowView: View {
         .help(isFile ? SamplesStrings.dragHelp.s : "")
         .accessibilityElement(children: .combine)
         .accessibilityLabel(cells.text(.name, row))
+        .accessibilityHint(isFile ? SamplesStrings.dragHelp.s : "")
         .accessibilityAddTraits(selected ? [.isSelected, .isButton] : .isButton)
+        .accessibilityAction {
+            model.select(row.id)
+            model.activate(row)
+        }
         .accessibilityActions {
             if childCount != nil {
                 Button(model.isOpen(row.id) ? SamplesStrings.collapse.s : SamplesStrings.expand.s) {

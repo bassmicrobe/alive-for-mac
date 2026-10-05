@@ -175,7 +175,10 @@ struct ActivityHeatmap: View {
     private func draw(_ context: inout GraphicsContext, _ m: HeatmapMetrics) {
         for label in grid.monthLabels {
             let text = context.resolve(Text(monthName(label.month)).font(Self.monthFont).foregroundStyle(Theme.secondaryText))
-            context.draw(text, at: CGPoint(x: CGFloat(label.col) * m.step, y: 0), anchor: .topLeading)
+            let width = m.width(cols: grid.cols)
+            let labelWidth = text.measure(in: CGSize(width: width, height: HeatmapFit.monthH)).width
+            let x = max(0, min(CGFloat(label.col) * m.step, width - labelWidth))
+            context.draw(text, at: CGPoint(x: x, y: 0), anchor: .topLeading)
         }
         let radius = m.cell * 0.3
         for cell in grid.cells {

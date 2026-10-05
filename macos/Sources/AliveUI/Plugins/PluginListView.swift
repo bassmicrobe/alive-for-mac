@@ -40,7 +40,18 @@ struct PluginListView: View {
                 EmptyState(icon: .nebula, title: PluginsStrings.noPluginsTitle.s, message: PluginsStrings.noPluginsBody.s)
             }
         } else {
-            EmptyState(icon: .magnifier, title: PluginsStrings.noMatchTitle.s, message: PluginsStrings.noMatchBody.s)
+            VStack(spacing: 14) {
+                EmptyState(icon: .magnifier, title: PluginsStrings.noMatchTitle.s, message: PluginsStrings.noMatchBody.s)
+                HStack(spacing: 10) {
+                    if !app.searchText.isEmpty {
+                        PillButton(title: CommonStrings.clearSearch.s, icon: .close) { app.searchText = "" }
+                    }
+                    if !model.filter.isEmpty || model.card != nil {
+                        PillButton(title: PluginsStrings.filterReset.s, icon: .filters) { model.resetFilters() }
+                    }
+                }
+            }
+            .frame(maxHeight: .infinity)
         }
     }
 
@@ -53,6 +64,7 @@ struct PluginListView: View {
                             .id(row.id)
                             .onTapGesture(count: 2) { model.selectedID = row.id; model.reveal(row) }
                             .onTapGesture { model.selectedID = row.id; focused = true }
+                            .accessibilityAction { model.selectedID = row.id; focused = true }
                             .contextMenu { PluginRowMenu(row: row) }
                     }
                 }
