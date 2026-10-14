@@ -36,6 +36,19 @@ final class CatalogModel {
     /// Bumped on every publish; lets dependants memoize.
     private(set) var revision = 0
 
+    /// Readiness facts by set path (see `status(for:)`); replaced whole on every publish.
+    private(set) var statuses: [String: SetStatus] = [:]
+    /// Set path to the references it lost to a disconnected drive (they still count as sample use).
+    private(set) var offlineReferences: [String: [String]] = [:]
+    /// Names of the volumes mounted now; changes when one is mounted or unmounted.
+    private(set) var mountedVolumes: Set<String> = VolumeState.mountedVolumeNames()
+
+    @ObservationIgnored private var volumeWatcher: VolumeWatcher?
+    /// The launch scan may be a diff against the file system's event journal; ⌘R and every later
+    /// scan are not.
+    @ObservationIgnored private var diffPending = true
+    /// A volume came or went while a scan was running: look again when it is done.
+    @ObservationIgnored private var volumesDirty = false
     @ObservationIgnored private var started = false
     @ObservationIgnored private var generation = 0
     @ObservationIgnored private var scanTask: Task<Void, Never>?
@@ -65,6 +78,10 @@ final class CatalogModel {
     func start() {
         guard !started else { return }
         started = true
+        let watcher = VolumeWatcher()
+        watcher.onChange = { [weak self] in self?.volumesChanged() }
+        watcher.start()
+        volumeWatcher = watcher
         let index = index
         Task { [weak self] in
             // The catalog is published straight from the cache; plug-in discovery comes after it
@@ -79,7 +96,7 @@ final class CatalogModel {
             self.publish(fallbackEnv: detected)
             if self.hasEnabledRoots || self.rescanAfterLoad {
                 self.rescanAfterLoad = false
-                self.rescan()
+                self.rescan(fromHistory: true)
             } else {
                 await Task.detached(priority: .userInitiated) { index.refreshInstalled() }.value
                 self.publish(fallbackEnv: detected)
@@ -92,13 +109,16 @@ final class CatalogModel {
 
     /// Cancels a running scan and starts a new one over the current roots. `full: false` (a
     /// folder-watch rescan) skips walking the weight and Backup history of projects whose sets
-    /// did not change; every other rescan reads them all.
-    func rescan(full: Bool = true) {
+    /// did not change; every other rescan reads them all. `fromHistory` (the launch scan only):
+    /// ask the file system's event journal what changed instead of walking the folders, when the
+    /// last scan left a usable position in it.
+    func rescan(full: Bool = true, fromHistory: Bool = false) {
         guard started else { return }
         guard isLoaded else {
             rescanAfterLoad = true
             return
         }
+        let useHistory = fromHistory && diffPending
         generation += 1
         let gen = generation
         let previous = scanTask
@@ -123,7 +143,7 @@ final class CatalogModel {
                         self.updateProgress(gen, CatalogProgress(done: done, total: total, current: current))
                     }
                 },
-                fullRescan: fullRescan)
+                fullRescan: fullRescan, useHistory: useHistory)
             self.finishScan(gen, stats)
         }
     }
@@ -139,6 +159,7 @@ final class CatalogModel {
         guard gen == generation else { return }   // superseded: the newer scan reports
         lastScanStats = stats
         if !stats.cancelled && !stats.retainedPreviousCatalog { fullPending = false }
+        if !stats.cancelled { diffPending = false }
         isScanning = false
         progress = CatalogProgress()
         publish()
@@ -146,6 +167,7 @@ final class CatalogModel {
                   + String(format: "%.1f", stats.seconds) + " s" + (stats.cancelled ? ", cancelled" : "")
                   + (stats.retainedPreviousCatalog ? ", previous catalog retained" : ""))
         app.catalogDidBecomeReady()
+        if volumesDirty { volumesChanged() }
     }
 
     /// Copies the index's snapshots into the published state.
@@ -156,17 +178,47 @@ final class CatalogModel {
         let scanned = index.env
         env = scanned.userLibrary.isEmpty ? (fallbackEnv ?? scanned) : scanned
         history = index.history
+        statuses = hasEnabledRoots ? index.statuses : [:]
+        offlineReferences = hasEnabledRoots ? index.offlineReferences() : [:]
         revision += 1
     }
 
     // MARK: - Set status (Mac-only)
 
-    /// Per-set readiness facts (offline volumes, plugin readiness, stale renders), keyed by set
-    /// path. Placeholder derived from upstream fields until the sidecar is wired in; views read
-    /// `status(for:)` and observe `revision`.
-    func status(for path: String) -> SetStatus? {
-        guard let entry = sets.first(where: { $0.path == path }) else { return nil }
-        return SetStatus.basic(entry, pluginsKnown: index.inventory.isAvailable)
+    /// Per-set readiness facts (offline volumes, plugin readiness, stale renders), by set path, in
+    /// O(1). Refreshed with every publish (`revision`), a scan, an inventory refresh, and a volume
+    /// coming or going. `missingPlugins` is nil while the installed-plugin list is unavailable
+    /// (PORTING rule 11).
+    func status(for path: String) -> SetStatus? { statuses[path] }
+
+    // MARK: - Volumes (Mac-only)
+
+    /// A volume was mounted or unmounted. On unmount the sets with files there turn offline at
+    /// once (no scan); on mount the sets that had lost files on it are read again, and a root
+    /// that lives there is scanned. Debounced by `VolumeWatcher`; one log line.
+    func volumesChanged() {
+        guard started, isLoaded else { return }
+        guard !isScanning else { volumesDirty = true; return }
+        volumesDirty = false
+        let index = index
+        Task { [weak self] in
+            let change = await Task.detached(priority: .utility) { index.volumesDidChange() }.value
+            guard let self else { return }
+            self.mountedVolumes = change.mounted
+            self.app.samples.volumesChanged(appeared: change.appeared)
+            guard !change.isEmpty else { return }
+            let read = change.recheck.isEmpty ? 0 : await Task.detached(priority: .utility) {
+                index.recheck(setPaths: change.recheck)
+            }.value
+            self.publish()
+            Diag.info("volumes: \(change.appeared.count) mounted, \(change.disappeared.count) unmounted; "
+                      + "\(read) sets read again")
+            let roots = self.app.settings.roots
+            if roots.contains(where: { root in
+                VolumeState.volumeName(of: root).map(change.appeared.contains) ?? false }) {
+                self.rescan(full: false)      // a root that was unreadable before is back
+            }
+        }
     }
 
     /// Re-derives `projects` after a setting such as `groupByFolder` changed.

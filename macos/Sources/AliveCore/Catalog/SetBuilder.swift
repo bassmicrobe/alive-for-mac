@@ -26,6 +26,14 @@ enum SetBuilder {
 
     static func build(path: String, stamp: FileStamp, env: LiveEnvironment, probe: ProbeCache,
                       isCancelled: () -> Bool = { false }) -> SetEntry {
+        built(path: path, stamp: stamp, env: env, probe: probe, mounted: nil, isCancelled: isCancelled).entry
+    }
+
+    /// `build` plus the Mac-only fact: the lost references whose volume is not in `mounted`
+    /// (nil: no volume knowledge, nothing is offline).
+    static func built(path: String, stamp: FileStamp, env: LiveEnvironment, probe: ProbeCache,
+                      mounted: Set<String>?,
+                      isCancelled: () -> Bool = { false }) -> (entry: SetEntry, offline: [String]) {
         var e = SetEntry()
         e.path = path
         e.name = ((path as NSString).lastPathComponent as NSString).deletingPathExtension
@@ -36,7 +44,7 @@ enum SetBuilder {
         e.projectName = e.projectNameFromPath
 
         let info = AlsFile.read(path: path, isCancelled: isCancelled)
-        if let err = info.error { e.error = err; return e }
+        if let err = info.error { e.error = err; return (e, []) }
 
         e.creator = info.creator
         e.tempo = info.tempo
@@ -45,8 +53,9 @@ enum SetBuilder {
         e.scaleIndex = info.scaleIndex
         e.tracks = info.totalTracks
         applyPlugins(info.plugins, to: &e)
-        applySamples(info.files, projectDir: e.directory, env: env, probe: probe, to: &e)
-        return e
+        let offline = applySamples(info.files, projectDir: e.directory, env: env, probe: probe,
+                                   mounted: mounted, to: &e)
+        return (e, offline)
     }
 
     /// One and the same plugin occurs in a set many times over, and not every copy has a browser
@@ -72,8 +81,13 @@ enum SetBuilder {
     /// We count DISTINCT files rather than occurrences (one sample chopped into a hundred clips
     /// gives a hundred FileRefs), and only clip samples: Live embeds presets and racks into the
     /// set, and their FileRef is only a memory of provenance.
+    ///
+    /// Returns the lost files that live on an unmounted volume (sorted): offline, not missing.
+    /// `e.missingFiles` still counts them, as upstream would; `SetStatus.derive` takes them off.
+    @discardableResult
     static func applySamples(_ files: [FileRefInfo], projectDir: String, env: LiveEnvironment,
-                             probe: ProbeCache, to e: inout SetEntry) {
+                             probe: ProbeCache, mounted: Set<String>? = nil, to e: inout SetEntry) -> [String] {
+        var offline: [String] = []
         var seen = Set<String>()
         var missing = 0, real = 0
         var found: [String] = [], sizes: [Int64] = []
@@ -82,7 +96,13 @@ enum SetBuilder {
             if rr.status == .empty { continue }
             if !seen.insert(rr.resolvedPath.lowercased()).inserted { continue }
             real += 1
-            if rr.status == .missing || rr.status == .missingPack { missing += 1; continue }
+            if rr.status == .missing || rr.status == .missingPack {
+                missing += 1
+                if rr.status == .missing, let mounted, VolumeState.isOffline(rr.resolvedPath, mounted: mounted) {
+                    offline.append(rr.resolvedPath)
+                }
+                continue
+            }
             found.append(rr.resolvedPath)
             sizes.append(fr.originalFileSize > 0 ? fr.originalFileSize : lengthOf(rr.resolvedPath))
         }
@@ -90,6 +110,7 @@ enum SetBuilder {
         e.missingFiles = missing
         e.samples = found
         e.sampleSizes = sizes
+        return offline.sorted()
     }
 
     private static func lengthOf(_ path: String) -> Int64 {

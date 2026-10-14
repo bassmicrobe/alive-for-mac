@@ -27,7 +27,13 @@ extension SampleIndex {
     /// kept while size and date stay the same: a file that has not changed has nothing new to say.
     /// (The walk itself is repeated in full — listing folders is cheap; that is the incremental
     /// part upstream has too.)
+    ///
+    /// `mounted` (Mac-only): the volumes mounted now. A root on a volume that is not among them is
+    /// not walked — an unplugged drive is not an empty one — and keeps its tree from `previous`
+    /// (or stands there empty if it was never walked), so its samples, and the sets' use of them,
+    /// survive until the drive is back. nil: no volume knowledge, every root is walked.
     public static func build(roots: [String], disabled: [String], previous: SampleIndex? = nil,
+                             mounted: Set<String>? = nil,
                              progress: ((Int) -> Void)? = nil,
                              isCancelled: @escaping () -> Bool = { false }) -> SampleIndex {
         let walk = effective(roots, disabled: disabled)
@@ -39,11 +45,31 @@ extension SampleIndex {
         }
         let counter = FoundCounter(progress)
         let trees = Parallel.map(count: walk.count, isCancelled: isCancelled) { i in
-            SampleIndex.walk(root: walk[i], known: known, found: counter.add, isCancelled: isCancelled)
+            if let mounted, VolumeState.isOffline(walk[i], mounted: mounted) {
+                return SampleIndex.kept(root: walk[i], from: previous)
+            }
+            return SampleIndex.walk(root: walk[i], known: known, found: counter.add, isCancelled: isCancelled)
         }
         var idx = SampleIndex.combining(trees.compactMap { $0 })
         if !isCancelled() { SamplePrints.take(&idx, known: known, isCancelled: isCancelled) }
         return idx
+    }
+
+    /// The tree of a root that cannot be walked right now: the one the previous index had, else an
+    /// empty root (so the folder is still listed, and can be marked offline).
+    static func kept(root: String, from previous: SampleIndex?) -> SampleIndex {
+        let top = norm(root)
+        if let previous,
+           let r = previous.roots.first(where: { norm(previous.folders[$0].path).lowercased() == top.lowercased() }) {
+            return previous.subtree(root: r)
+        }
+        var folder = SampleFolder()
+        folder.path = top
+        folder.name = top
+        var out = SampleIndex()
+        out.roots = [0]
+        out.folders = [folder]
+        return out
     }
 
     /// How many samples a folder holds, by the very rules of the walk — the number in a folders

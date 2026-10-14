@@ -59,7 +59,7 @@ public struct SampleUsage: Sendable {
 
     /// `isCancelled` is polled between sets and every few thousand files; once it is true the
     /// (partial) result is returned at once, for the caller to discard.
-    public static func compute(index: SampleIndex, sets: [SetEntry],
+    public static func compute(index: SampleIndex, sets: [SetEntry], offlineReferences: [String: [String]] = [:],
                                isCancelled: () -> Bool = { false }) -> SampleUsage {
         var u = SampleUsage()
         guard !index.files.isEmpty, !sets.isEmpty else { return u }
@@ -93,7 +93,8 @@ public struct SampleUsage: Sendable {
             if isCancelled() { return u }
             let pathId = pathIds[s.path] ?? { let n = pathIds.count; pathIds[s.path] = n; return n }()
             let project = s.projectDir.lowercased()
-            for (i, raw) in s.samples.enumerated() {
+            let extra = offlineReferences[s.path] ?? []        // lost to a disconnected drive, still used
+            for (i, raw) in (extra.isEmpty ? s.samples : s.samples + extra).enumerated() {
                 if i % 256 == 0, isCancelled() { return u }
                 hits.removeAll(keepingCapacity: true)
                 let p = raw.lowercased()

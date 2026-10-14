@@ -21,6 +21,12 @@ public struct ScanStats: Equatable, Sendable {
     public var reused = 0
     public var cancelled = false
     public var seconds = 0.0
+    /// Roots whose folders were not walked: the file system's event journal said what changed.
+    public var diffRoots = 0
+    /// Roots walked in full although a diff was asked for (and why, one entry per root).
+    public var fullFallbacks: [FullScanReason] = []
+    /// Directories read again by a diff scan.
+    public var diffRegions = 0
 }
 
 /// The catalog of sets. Parsing one set takes around 100 ms and there are thousands of them, so
@@ -40,6 +46,8 @@ public final class ProjectIndex: @unchecked Sendable {
     public let applicationsDirs: [String]?
 
     let lock = NSLock()
+    /// Held for the whole of a scan or a re-check: only one of them writes the caches at a time.
+    let writeGate = NSLock()
     var _sets: [SetEntry] = []
     var _env = LiveEnvironment()
     var _history = Activity.empty
@@ -55,6 +63,17 @@ public final class ProjectIndex: @unchecked Sendable {
     /// The weights of the last scan by lowercased project folder, with the sets they were taken
     /// for: a rescan that finds a folder's sets unchanged does not walk its tree again.
     var _weightMemo: [String: ProjectWeight] = [:]
+    // Mac-only facts (status.cache) and what is derived from them; see ProjectIndex+Status.swift.
+    var _facts: [String: SetFacts] = [:]
+    var _projectFacts: [String: ProjectFacts] = [:]
+    var _factsLoaded = false
+    var _mounted: Set<String>?
+    var _statuses: [String: SetStatus] = [:]
+
+    /// The volumes mounted right now; injectable for tests.
+    public var mountProvider: @Sendable () -> Set<String> = { VolumeState.mountedVolumeNames() }
+    /// What the diff scan asks the system; injectable for tests.
+    public var historyOps = ScanHistoryOps.live
 
     struct ProjectWeight {
         var weight: FolderScan.Weight
@@ -102,7 +121,8 @@ public final class ProjectIndex: @unchecked Sendable {
         lock.lock()
         _sets = list; _history = history; _generation += 1
         lock.unlock()
-        if refreshInventory { refreshInstalled() }
+        loadFacts()
+        if refreshInventory { refreshInstalled() } else { rebuildStatuses() }
         return true
     }
 
@@ -130,11 +150,11 @@ public final class ProjectIndex: @unchecked Sendable {
     /// stops the scan at the next set.
     @discardableResult
     public func scanAsync(roots: [String], disabledRoots: [String] = [], progress: ScanProgress? = nil,
-                          fullRescan: Bool = true) async -> ScanStats {
+                          fullRescan: Bool = true, useHistory: Bool = false) async -> ScanStats {
         // A dedicated queue, not the cooperative pool: the scan blocks for a long time.
         await BlockingWork.run { [self] isCancelled in
             scan(roots: roots, disabledRoots: disabledRoots, progress: progress,
-                 fullRescan: fullRescan, isCancelled: isCancelled)
+                 fullRescan: fullRescan, useHistory: useHistory, isCancelled: isCancelled)
         }
     }
 
@@ -143,17 +163,35 @@ public final class ProjectIndex: @unchecked Sendable {
     /// (they change without the .als changing). Project weights and Backup histories are walked
     /// for every project on a `fullRescan` (the default); otherwise only for projects whose sets
     /// changed since the previous scan of this index (the rest keep their last weight).
+    ///
+    /// `useHistory` (the launch scan): for a local root whose last scan left a usable position in
+    /// the file system's event journal, the folders are not walked at all — the journal says which
+    /// project folders changed, only those are read again, and the rest comes from the caches.
+    /// Anything doubtful falls back to the full walk of that root (see `DiffScan`).
     @discardableResult
     public func scan(roots: [String], disabledRoots: [String] = [], progress: ScanProgress? = nil,
-                     fullRescan: Bool = true, isCancelled: @escaping () -> Bool = { false }) -> ScanStats {
+                     fullRescan: Bool = true, useHistory: Bool = false,
+                     isCancelled: @escaping () -> Bool = { false }) -> ScanStats {
+        writeGate.lock(); defer { writeGate.unlock() }
+        return performScan(roots: roots, disabledRoots: disabledRoots, progress: progress,
+                           fullRescan: fullRescan, useHistory: useHistory, isCancelled: isCancelled)
+    }
+
+    private func performScan(roots: [String], disabledRoots: [String], progress: ScanProgress?,
+                             fullRescan: Bool, useHistory: Bool, isCancelled: @escaping () -> Bool) -> ScanStats {
         let started = Date()
         let probe = ProbeCache()          // lives for exactly one scan: "rescan" must check again
         let env = LiveEnvironment.detect(home: home, applicationsDirs: applicationsDirs)
         lock.lock(); _env = env; lock.unlock()
 
+        let mounted = mountProvider()
+        let known = loadedFacts()
+        let startEventId = historyOps.currentEventId()    // before anything is read: nothing slips between
         var stats = ScanStats()
-        let files = collectFiles(roots: roots, disabledRoots: disabledRoots, progress: progress,
-                                 stats: &stats, isCancelled: isCancelled)
+        let cache = cachedEntries()
+        let diff = useHistory ? planDiff(roots: Self.enabled(roots, disabledRoots), cache: cache, stats: &stats) : [:]
+        let files = collectFiles(roots: roots, disabledRoots: disabledRoots, cache: cache, diff: diff,
+                                 progress: progress, stats: &stats, isCancelled: isCancelled)
         stats.total = files.count
         // An offline drive or denied directory is not evidence that its sets were deleted.
         // Keep the last complete catalog and both caches until every enabled root is readable.
@@ -170,12 +208,11 @@ public final class ProjectIndex: @unchecked Sendable {
             Diag.info("scan: retained previous catalog; \(stats.failedRoots.count) roots unreadable")
             return stats
         }
-        let cache = cachedEntries()
 
         let counters = Counters()
-        let built: [(entry: SetEntry, reused: Bool)?] = Parallel.map(count: files.count, isCancelled: isCancelled) { i in
-            let r = self.entry(for: files[i], cache: cache, env: env, probe: probe, counters: counters,
-                               isCancelled: isCancelled)
+        let built: [Built?] = Parallel.map(count: files.count, isCancelled: isCancelled) { i in
+            let r = self.entry(for: files[i], cache: cache, facts: known.sets, mounted: mounted, env: env,
+                               probe: probe, counters: counters, isCancelled: isCancelled)
             let n = counters.done()
             if let progress, n % 8 == 0 || n == files.count { progress(n, files.count, r.entry.name) }
             return r
@@ -202,19 +239,28 @@ public final class ProjectIndex: @unchecked Sendable {
             stats.seconds = Date().timeIntervalSince(started)
             return true
         }
-        let known = history.total > 0 ? history : Activity.loadCache(dir: dir)
-        guard let walked = walkProjects(&fresh, changed: changed, full: fullRescan, isCancelled: isCancelled),
+        let previousActivity = history.total > 0 ? history : Activity.loadCache(dir: dir)
+        let regions = diff.values.flatMap { $0 }
+        let reusable = diff.isEmpty ? [:] : cleanProjects(known.projects, diffRoots: Array(diff.keys), regions: regions)
+        guard let walked = walkProjects(&fresh, changed: changed, full: fullRescan, reuse: reusable,
+                                        isCancelled: isCancelled),
               !abandoned() else {
             _ = abandoned()
             return stats
         }
-        let activity = Activity.build(dirs: walked.dirs, weights: walked.weights, sets: fresh, previous: known)
+        let activity = Activity.build(dirs: walked.dirs, weights: walked.weights, sets: fresh,
+                                      previous: previousActivity)
+        let newFacts = Self.facts(built: built, walked: walked)
 
         // Publish the catalog whole; readers saw the previous one until this moment.
         lock.lock()
         _sets = fresh; _history = activity; _generation += 1
         _weightMemo = walked.memo
+        _facts = newFacts.sets; _projectFacts = newFacts.projects; _mounted = mounted
         lock.unlock()
+        StatusCache.save(newFacts, dir: dir)
+        recordHistory(roots: Self.enabled(roots, disabledRoots), eventId: startEventId, diff: diff,
+                      failed: stats.failedRoots)
         activity.saveCache(dir: dir)
         // The reuse map follows the file on disk: a failed save leaves it as it was.
         if IndexCache.save(fresh, dir: dir) != .failed { rememberCache(fresh) }
@@ -224,25 +270,36 @@ public final class ProjectIndex: @unchecked Sendable {
         stats.seconds = Date().timeIntervalSince(started)
         lock.lock(); _lastStats = stats; lock.unlock()
         Diag.info("scan: \(stats.total) sets, \(stats.parsed) parsed, \(stats.reused) cached, "
-                  + String(format: "%.2fs", stats.seconds))
+                  + String(format: "%.2fs", stats.seconds)
+                  + (stats.diffRoots > 0 ? ", diff of \(stats.diffRoots) roots (\(stats.diffRegions) folders read)" : ""))
         return stats
     }
 
     /// Walks each enabled root. One and the same .als turns up twice easily when roots are
     /// nested ("~/Music" and "~/Music/Ableton"): without the `seen` filter the set would double.
-    private func collectFiles(roots: [String], disabledRoots: [String], progress: ScanProgress?,
+    private func collectFiles(roots: [String], disabledRoots: [String], cache: [String: SetEntry],
+                              diff: [String: [String]], progress: ScanProgress?,
                               stats: inout ScanStats, isCancelled: () -> Bool) -> [String] {
-        let disabled = Set(disabledRoots.map { $0.lowercased() })
         var files: [String] = []
         var seen = Set<String>()
-        for root in roots where !disabled.contains(root.lowercased()) {   // temporarily off: stays in the list
+        func add(_ f: String) {
+            guard seen.insert(f.lowercased()).inserted else { return }
+            files.append(f)
+            if files.count % 16 == 0 { progress?(files.count, 0, f) }
+        }
+        for root in Self.enabled(roots, disabledRoots) {   // temporarily off: stays in the list
             if isCancelled() { break }
             let before = files.count
-            let r = FolderScan.find(root: root, ext: ".als", includeBackups: false, onFile: { f in
-                guard seen.insert(f.lowercased()).inserted else { return }
-                files.append(f)
-                if files.count % 16 == 0 { progress?(files.count, 0, f) }
-            }, isCancelled: isCancelled)
+            if let regions = diff[Self.diffKey(root)] {
+                let r = collectDiffFiles(root: root, regions: regions, cache: cache, onFile: add,
+                                         isCancelled: isCancelled)
+                stats.unreadableFolders += r.unreadable
+                Diag.info("scan: \(root) -> \(files.count - before) sets, journal diff: \(regions.count) folders read"
+                          + (r.unreadable > 0 ? ", \(r.unreadable) folders unreadable" : ""))
+                continue
+            }
+            let r = FolderScan.find(root: root, ext: ".als", includeBackups: false, onFile: add,
+                                    isCancelled: isCancelled)
             stats.unreadableFolders += r.unreadable
             if r.rootFailed { stats.failedRoots.append(root) }
             Diag.info("scan: \(root) -> \(files.count - before) sets in \(r.dirs) folders"
@@ -252,8 +309,13 @@ public final class ProjectIndex: @unchecked Sendable {
         return files.sorted { $0.lowercased() < $1.lowercased() }
     }
 
+    static func enabled(_ roots: [String], _ disabledRoots: [String]) -> [String] {
+        let disabled = Set(disabledRoots.map { $0.lowercased() })
+        return roots.filter { !disabled.contains($0.lowercased()) }
+    }
+
     /// After a save the file on disk is what `fresh` says: keep it as the next scan's reuse map.
-    private func rememberCache(_ fresh: [SetEntry]) {
+    func rememberCache(_ fresh: [SetEntry]) {
         var map: [String: SetEntry] = [:]
         map.reserveCapacity(fresh.count)
         for e in fresh { map[e.path.lowercased()] = e }
@@ -261,20 +323,42 @@ public final class ProjectIndex: @unchecked Sendable {
         lock.lock(); _cacheMap = (stamp, map); lock.unlock()
     }
 
-    private func entry(for file: String, cache: [String: SetEntry], env: LiveEnvironment,
-                       probe: ProbeCache, counters: Counters,
-                       isCancelled: () -> Bool) -> (entry: SetEntry, reused: Bool) {
+    /// One set of a scan: the row, whether it came from the cache, and the references that were
+    /// lost because their volume is not mounted.
+    struct Built {
+        var entry: SetEntry
+        var reused: Bool
+        var offline: [String]
+    }
+
+    private func entry(for file: String, cache: [String: SetEntry], facts: [String: SetFacts],
+                       mounted: Set<String>, env: LiveEnvironment, probe: ProbeCache, counters: Counters,
+                       isCancelled: () -> Bool) -> Built {
         guard let stamp = SetBuilder.stamp(of: file) else {
             counters.failed()
-            return (SetBuilder.failed(path: file, error: "cannot read file attributes"), false)
+            return Built(entry: SetBuilder.failed(path: file, error: "cannot read file attributes"),
+                         reused: false, offline: [])
         }
         if let cached = cache[file.lowercased()], cached.size == stamp.size,
            DotNetTicks.sameInstant(cached.modified, stamp.modified) {
-            counters.reuse()
-            return (cached, true)                  // the file has not changed — take it from the cache
+            let recorded = facts[file.lowercased()].flatMap { $0.matches(cached) ? $0 : nil }
+            if Self.isStillValid(cached, recorded: recorded, mounted: mounted) {
+                counters.reuse()
+                return Built(entry: cached, reused: true, offline: recorded?.offline ?? [])  // unchanged: from the cache
+            }
         }
         counters.parse()
-        return (SetBuilder.build(path: file, stamp: stamp, env: env, probe: probe, isCancelled: isCancelled), false)
+        let r = SetBuilder.built(path: file, stamp: stamp, env: env, probe: probe, mounted: mounted,
+                                 isCancelled: isCancelled)
+        return Built(entry: r.entry, reused: false, offline: r.offline)
+    }
+
+    /// A cached row whose file did not change may still be out of date: its lost references were
+    /// recorded as offline and the volume is back (they may be found now), or it was cached before
+    /// offline references were told from missing ones and has lost references that need telling.
+    static func isStillValid(_ cached: SetEntry, recorded: SetFacts?, mounted: Set<String>) -> Bool {
+        guard let recorded else { return cached.missingFiles == 0 }
+        return !recorded.offline.contains { !VolumeState.isOffline($0, mounted: mounted) }
     }
 
     /// What the walk of the project folders brought in, in the order of `dirs`.
@@ -282,6 +366,8 @@ public final class ProjectIndex: @unchecked Sendable {
         var dirs: [String]
         var weights: [FolderScan.Weight]
         var memo: [String: ProjectWeight]
+        /// What each folder's walk found, by lowercased folder (the persisted form).
+        var projects: [String: ProjectFacts]
     }
 
     /// One walk per DISTINCT project folder (a project usually holds a dozen .als versions; per
@@ -292,8 +378,11 @@ public final class ProjectIndex: @unchecked Sendable {
     ///
     /// The weight (the expensive part: it reads Samples and Backup too) is taken from the
     /// previous scan for a folder whose sets are the same and unchanged, unless `full`.
+    ///
+    /// `reuse` (the diff scan): folders the event journal says nothing happened in, with what the
+    /// last walk found; such a folder is not walked at all.
     private func walkProjects(_ sets: inout [SetEntry], changed: Set<String>, full: Bool,
-                              isCancelled: () -> Bool) -> Walked? {
+                              reuse: [String: ProjectFacts], isCancelled: () -> Bool) -> Walked? {
         var dirs: [String] = []
         var slot: [String: Int] = [:]
         var pathsByDir: [String: Set<String>] = [:]
@@ -308,15 +397,19 @@ public final class ProjectIndex: @unchecked Sendable {
         }
         lock.lock(); let memo = full ? [:] : _weightMemo; lock.unlock()
         let pins = PreviewPins(dir: dir)
-        let walked: [(weight: FolderScan.Weight, renders: [String])?] =
+        let walked: [(weight: FolderScan.Weight, renders: [String], newest: Int64?)?] =
             Parallel.map(count: dirs.count, isCancelled: isCancelled) { i in
                 let key = dirs[i].lowercased()
+                if !changed.contains(key), let kept = reuse[key] {
+                    return (Self.weight(of: kept), kept.renders, kept.newestRenderTicks)
+                }
                 var known: FolderScan.Weight?
                 if !changed.contains(key), let m = memo[key], m.setPaths == pathsByDir[key] { known = m.weight }
                 let r = FolderScan.walkProject(root: dirs[i], weigh: known == nil, renders: true,
                                                isCancelled: isCancelled)
                 let names = RenderScan.finish(r.renders, root: dirs[i], pins: pins).map(\.name)
-                return (known ?? r.weight, names)
+                let newest = r.renders.map(\.modified).filter { $0 > .distantPast }.max().map(DotNetTicks.utc)
+                return (known ?? r.weight, names, newest)
             }
         if isCancelled() { return nil }
         let weights = walked.map { $0?.weight ?? FolderScan.Weight() }
@@ -332,11 +425,13 @@ public final class ProjectIndex: @unchecked Sendable {
             sets[i].hasRenders = !names.isEmpty
         }
         var newMemo: [String: ProjectWeight] = [:]
+        var projects: [String: ProjectFacts] = [:]
         for (i, d) in dirs.enumerated() {
             let key = d.lowercased()
             newMemo[key] = ProjectWeight(weight: weights[i], setPaths: pathsByDir[key] ?? [])
+            projects[key] = Self.projectFacts(weights[i], renders: walked[i]?.renders ?? [], newest: walked[i]?.newest)
         }
-        return Walked(dirs: dirs, weights: weights, memo: newMemo)
+        return Walked(dirs: dirs, weights: weights, memo: newMemo, projects: projects)
     }
 
     // MARK: grouping
