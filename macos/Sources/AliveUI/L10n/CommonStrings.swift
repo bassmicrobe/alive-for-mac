@@ -28,6 +28,7 @@ enum CommonStrings: LocalizedStrings {
     case suggestionsTitle, addSuggestion, noSetsTitle, noSetsBody
     case catalogReadFailedTitle, catalogReadFailedBody, catalogUnreadableFolders
     case catalogRetainedNotice, catalogPartialNotice
+    case rootMissingTitle, rootMissingBody, rootMissingLine, chooseAgain, removeFromList, replaceFolderPrompt
 
     var en: String { text.en }
     var ja: String { text.ja }
@@ -119,6 +120,16 @@ enum CommonStrings: LocalizedStrings {
         case .catalogRetainedNotice:
             return ("Some project folders could not be read. Showing the previous catalog; it may be outdated.",
                     "一部のプロジェクトフォルダを読み込めませんでした。前回のカタログを表示しています（最新の状態とは異なる場合があります）。")
+        case .rootMissingTitle: return ("Folder not found", "フォルダが見つかりません")
+        case .rootMissingBody:
+            return ("A project folder no longer exists. Choose it again, or remove it from the list.",
+                    "プロジェクトのフォルダが存在しません。選び直すか、登録から外してください。")
+        case .rootMissingLine:
+            return ("Folder not found: %@ — it may have been moved or deleted.",
+                    "フォルダが見つかりません: %@（移動または削除された可能性があります）")
+        case .chooseAgain: return ("Choose again…", "選び直す…")
+        case .removeFromList: return ("Remove", "登録から外す")
+        case .replaceFolderPrompt: return ("Choose", "選択")
         case .catalogPartialNotice:
             return ("Some project folders could not be read. The catalog may be incomplete.",
                     "一部のプロジェクトフォルダを読み込めませんでした。カタログに含まれていないセットがある可能性があります。")

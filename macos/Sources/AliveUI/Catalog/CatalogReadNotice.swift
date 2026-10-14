@@ -5,9 +5,27 @@ import SwiftUI
 struct CatalogReadNotice: View {
     let retainedPreviousCatalog: Bool
     let failedRoots: [String]
+    var missingRoots: [String] = []
+    /// Something besides the missing roots could not be read.
+    var showsGenericLine = true
     @Environment(AppModel.self) private var app
 
     var body: some View {
+        VStack(spacing: 8) {
+            if showsGenericLine { genericLine }
+            if !missingRoots.isEmpty { MissingRootRows(roots: missingRoots) }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.cardR, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: Theme.cardR, style: .continuous)
+            .strokeBorder(Theme.cardBorder, lineWidth: 1))
+        .padding(.horizontal, Theme.pad)
+        .padding(.bottom, 12)
+        .accessibilityElement(children: .contain)
+    }
+
+    private var genericLine: some View {
         HStack(spacing: 12) {
             IconView(icon: .warning, size: 13).foregroundStyle(Theme.secondaryText)
                 .accessibilityHidden(true)
@@ -19,13 +37,5 @@ struct CatalogReadNotice: View {
             PillButton(title: CommonStrings.scanFolders.s, icon: .folder) { app.presentScanFolders() }
                 .fixedSize()
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
-        .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.cardR, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: Theme.cardR, style: .continuous)
-            .strokeBorder(Theme.cardBorder, lineWidth: 1))
-        .padding(.horizontal, Theme.pad)
-        .padding(.bottom, 12)
-        .accessibilityElement(children: .contain)
     }
 }

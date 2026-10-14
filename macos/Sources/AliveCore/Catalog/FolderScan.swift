@@ -9,6 +9,8 @@ public enum FolderScan {
         public var files = 0         // files found
         public var unreadable = 0    // folders that would not open
         public var rootFailed = false
+        /// The root itself does not exist (moved or deleted) — as opposed to existing but not readable.
+        public var rootMissing = false
     }
 
     /// A probe copy from the rescue helper is an .als inside a project folder; without this
@@ -69,7 +71,10 @@ public enum FolderScan {
             res.dirs += 1
             guard let entries = list(dir) else {
                 res.unreadable += 1
-                if atRoot { res.rootFailed = true }
+                if atRoot {
+                    res.rootFailed = true
+                    res.rootMissing = !FileManager.default.fileExists(atPath: dir)
+                }
                 atRoot = false
                 continue
             }

@@ -10,9 +10,9 @@ enum SetFormat {
     }
 
     /// "1.4 GB"; empty for zero.
-    static func size(_ bytes: Int64) -> String {
+    static func size(_ bytes: Int64, locale: Locale = Localizer.shared.locale) -> String {
         guard bytes > 0 else { return "" }
-        return ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file)
+        return ByteSize.string(bytes, locale: locale)
     }
 
     /// Modified time in the UI language ("2025/03/07 21:14" / "Mar 7, 2025, 9:14 PM").

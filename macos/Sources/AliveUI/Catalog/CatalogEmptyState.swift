@@ -7,6 +7,12 @@ struct CatalogEmptyState: View {
 
     private var loading: Bool { !app.catalog.isLoaded || app.catalog.isScanning }
     private var failedRoots: [String] { app.catalog.lastScanStats?.failedRoots ?? [] }
+    private var missingRoots: [String] { app.catalog.lastScanStats?.missingRoots ?? [] }
+    /// Only missing roots failed: the generic "check the connection" advice would be wrong.
+    private var onlyMissing: Bool {
+        !missingRoots.isEmpty && failedRoots.count == missingRoots.count
+            && (app.catalog.lastScanStats?.unreadableFolders ?? 0) <= missingRoots.count
+    }
     private var unreadableFolders: Int { app.catalog.lastScanStats?.unreadableFolders ?? 0 }
     private var readFailed: Bool { !failedRoots.isEmpty || unreadableFolders > 0 }
 
@@ -17,21 +23,23 @@ struct CatalogEmptyState: View {
                 Text(CommonStrings.scanning.s).font(Theme.fHead).foregroundStyle(Theme.text)
             } else {
                 IconView(icon: .folder, size: 30, weight: .light).foregroundStyle(Theme.secondaryText)
-                Text(readFailed ? CommonStrings.catalogReadFailedTitle.s : CommonStrings.noSetsTitle.s)
+                Text(onlyMissing ? CommonStrings.rootMissingTitle.s : readFailed ? CommonStrings.catalogReadFailedTitle.s : CommonStrings.noSetsTitle.s)
                     .font(Theme.fHead).foregroundStyle(Theme.text)
-                Text(readFailed ? CommonStrings.catalogReadFailedBody.s : CommonStrings.noSetsBody.s)
+                Text(onlyMissing ? CommonStrings.rootMissingBody.s : readFailed ? CommonStrings.catalogReadFailedBody.s : CommonStrings.noSetsBody.s)
                     .font(Theme.fBody).foregroundStyle(Theme.secondaryText)
                     .multilineTextAlignment(.center)
                     .frame(maxWidth: 460)
-                if !failedRoots.isEmpty {
-                    Text(failedRoots.map(SetFormat.homeAbbreviated).joined(separator: "\n"))
+                if !missingRoots.isEmpty { MissingRootRows(roots: missingRoots).frame(maxWidth: 520) }
+                let others = failedRoots.filter { r in !missingRoots.contains(r) }
+                if !others.isEmpty {
+                    Text(others.map(SetFormat.homeAbbreviated).joined(separator: "\n"))
                         .font(Theme.fSmall).foregroundStyle(Theme.secondaryText)
                         .lineLimit(3).truncationMode(.middle)
                         .multilineTextAlignment(.center)
                         .frame(maxWidth: 460)
-                        .help(failedRoots.joined(separator: "\n"))
-                        .accessibilityLabel(failedRoots.joined(separator: "\n"))
-                } else if unreadableFolders > 0 {
+                        .help(others.joined(separator: "\n"))
+                        .accessibilityLabel(others.joined(separator: "\n"))
+                } else if missingRoots.isEmpty, unreadableFolders > 0 {
                     Text(CommonStrings.catalogUnreadableFolders.f(unreadableFolders))
                         .font(Theme.fSmall).foregroundStyle(Theme.secondaryText)
                 }

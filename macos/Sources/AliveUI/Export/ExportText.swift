@@ -5,11 +5,8 @@ import Foundation
 
 enum ExportText {
     /// "12 MB", "5.8 GB" in the UI language.
-    static func bytes(_ n: Int64) -> String {
-        let formatter = ByteCountFormatter()
-        formatter.countStyle = .file
-        formatter.allowsNonnumericFormatting = false      // "0 KB", not "Zero KB"
-        return formatter.string(fromByteCount: n)
+    static func bytes(_ n: Int64, locale: Locale = Localizer.shared.locale) -> String {
+        ByteSize.string(n, locale: locale)
     }
 
     /// "3 files    25 MB", or "0 files" for none.

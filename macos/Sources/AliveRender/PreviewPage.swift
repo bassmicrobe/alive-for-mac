@@ -210,7 +210,7 @@ public enum PreviewPage {
             parts.append(escape(f.string(from: modified)))
         }
         if m.fileSize > 0 {
-            parts.append(escape(ByteCountFormatter.string(fromByteCount: m.fileSize, countStyle: .file)))
+            parts.append(escape(ByteSize.string(m.fileSize, locale: language.locale)))
         }
         return parts.joined(separator: " &middot; ")
     }

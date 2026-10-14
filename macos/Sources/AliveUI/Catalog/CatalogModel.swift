@@ -267,6 +267,36 @@ final class CatalogModel {
         commit(settings)
     }
 
+    /// Swaps a root for another folder in the same place of the list (a moved project folder);
+    /// the old root's off-switch does not carry over. Returns false when the new folder is no
+    /// folder or already one of the roots.
+    @discardableResult
+    func replaceRoot(_ old: String, with picked: String) -> Bool {
+        let folder = Self.folder(of: picked)
+        guard RootSuggestions.directoryExists(folder) else {
+            app.toast(CommonStrings.notAFolder.f(picked), kind: .error)
+            return false
+        }
+        guard let next = Self.replacing(old, with: folder, in: app.settings) else {
+            app.toast(CommonStrings.alreadyWatching.s)
+            return false
+        }
+        commit(next)
+        app.toast(CommonStrings.rootAdded.f((folder as NSString).lastPathComponent))
+        return true
+    }
+
+    /// `settings` with `old` replaced by `new` at the same position; nil when `old` is not a root
+    /// or `new` is already one (replacing would duplicate it).
+    static func replacing(_ old: String, with new: String, in settings: AppSettings) -> AppSettings? {
+        guard let i = settings.roots.firstIndex(where: { same($0, old) }) else { return nil }
+        if !same(old, new), settings.roots.contains(where: { same($0, new) }) { return nil }
+        var out = settings
+        out.roots[i] = new
+        out.disabledRoots.removeAll { same($0, old) || same($0, new) }
+        return out
+    }
+
     /// Turns a root off without forgetting it (upstream: the checkbox in the folders window).
     func setRoot(_ path: String, enabled: Bool) {
         var settings = app.settings

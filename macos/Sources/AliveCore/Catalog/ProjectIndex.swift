@@ -11,6 +11,9 @@ public struct ScanStats: Equatable, Sendable {
     public var total = 0
     /// Enabled roots whose top-level directory could not be listed (not readable empty roots).
     public var failedRoots: [String] = []
+    /// The subset of `failedRoots` whose folder no longer exists (moved or deleted). An unmounted
+    /// `/Volumes/<X>` root is offline, not missing, and is not listed here.
+    public var missingRoots: [String] = []
     /// Unreadable directories found while walking the roots, including failed roots.
     public var unreadableFolders = 0
     /// Discovery could not read an enabled root; the previous catalog and caches were kept.
@@ -190,7 +193,7 @@ public final class ProjectIndex: @unchecked Sendable {
         var stats = ScanStats()
         let cache = cachedEntries()
         let diff = useHistory ? planDiff(roots: Self.enabled(roots, disabledRoots), cache: cache, stats: &stats) : [:]
-        let files = collectFiles(roots: roots, disabledRoots: disabledRoots, cache: cache, diff: diff,
+        let files = collectFiles(roots: roots, disabledRoots: disabledRoots, cache: cache, diff: diff, mounted: mounted,
                                  progress: progress, stats: &stats, isCancelled: isCancelled)
         stats.total = files.count
         // An offline drive or denied directory is not evidence that its sets were deleted.
@@ -278,7 +281,7 @@ public final class ProjectIndex: @unchecked Sendable {
     /// Walks each enabled root. One and the same .als turns up twice easily when roots are
     /// nested ("~/Music" and "~/Music/Ableton"): without the `seen` filter the set would double.
     private func collectFiles(roots: [String], disabledRoots: [String], cache: [String: SetEntry],
-                              diff: [String: [String]], progress: ScanProgress?,
+                              diff: [String: [String]], mounted: Set<String>, progress: ScanProgress?,
                               stats: inout ScanStats, isCancelled: () -> Bool) -> [String] {
         var files: [String] = []
         var seen = Set<String>()
@@ -301,10 +304,12 @@ public final class ProjectIndex: @unchecked Sendable {
             let r = FolderScan.find(root: root, ext: ".als", includeBackups: false, onFile: add,
                                     isCancelled: isCancelled)
             stats.unreadableFolders += r.unreadable
+            let missing = r.rootMissing && !VolumeState.isOffline(root, mounted: mounted)
             if r.rootFailed { stats.failedRoots.append(root) }
+            if missing { stats.missingRoots.append(root) }
             Diag.info("scan: \(root) -> \(files.count - before) sets in \(r.dirs) folders"
                       + (r.unreadable > 0 ? ", \(r.unreadable) folders unreadable" : "")
-                      + (r.rootFailed ? "  ROOT NOT READABLE" : ""))
+                      + (missing ? "  ROOT NOT FOUND" : r.rootFailed ? "  ROOT NOT READABLE" : ""))
         }
         return files.sorted { $0.lowercased() < $1.lowercased() }
     }
