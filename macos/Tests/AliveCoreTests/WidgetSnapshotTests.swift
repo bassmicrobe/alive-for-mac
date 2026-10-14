@@ -2,13 +2,15 @@ import XCTest
 @testable import AliveCore
 
 final class WidgetSnapshotTests: XCTestCase {
+    /// The machine's own time zone: `Activity` groups saves into days with the current calendar,
+    /// so the snapshot must use the same one (CI runs in UTC, developers elsewhere).
     private var cal: Calendar {
         var c = Calendar(identifier: .gregorian)
-        c.timeZone = TimeZone(identifier: "Asia/Tokyo")!
+        c.timeZone = .current
         return c
     }
 
-    /// Wednesday 2026-10-14, 15:00 Tokyo.
+    /// Wednesday 2026-10-14, 15:00 local time.
     private var now: Date { cal.date(from: DateComponents(year: 2026, month: 10, day: 14, hour: 15))! }
 
     private func day(_ offset: Int, hour: Int = 10) -> Date {
