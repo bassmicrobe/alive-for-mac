@@ -116,6 +116,7 @@ final class CatalogModel {
         guard started else { return }
         guard isLoaded else {
             rescanAfterLoad = true
+            if !fromHistory { diffPending = false }     // an explicit request stays a full scan
             return
         }
         let useHistory = fromHistory && diffPending

@@ -92,6 +92,12 @@ final class DiffScanDecisionTests: XCTestCase {
         XCTAssertTrue(DiffScan.isClean(projectDir: "/r/ab project", regions: ["/r/a"]))
     }
 
+    func testPathsAreSpelledAsTheFolderWalkSpellsThem() {
+        // NSString.standardizingPath would say "/tmp/x": the caches hold "/private/tmp/x".
+        XCTAssertEqual(DiffScan.norm("/private/tmp/x/"), "/private/tmp/x")
+        XCTAssertEqual(DiffScan.norm("/a/b/../c"), "/a/c")
+    }
+
     func testHistoryRoundTrip() throws {
         let t = makeTemp("hist")
         let h = history(id: 123_456_789_012)
@@ -252,11 +258,17 @@ final class DiffScanIndexTests: XCTestCase {
         Thread.sleep(forTimeInterval: 1.0)      // let the folder's own creation settle before the mark
         let mark = FSEventsGetCurrentEventId()
         t.als("music/N Project/N.als", Fx.simpleSet())
-        Thread.sleep(forTimeInterval: 1.0)
-        let outcome = FSEventsReplay.events(root: root, since: mark, timeout: 15)
-        guard case .events(let events) = outcome else { return XCTFail("replay failed: \(outcome)") }
-        let seen = events.contains { $0.path.hasSuffix("N Project/N.als") || $0.path.hasSuffix("N Project") }
-        XCTAssertTrue(seen, "events: \(events.map(\.path))")
+        // The journal is flushed with a delay of its own: ask again for a few seconds.
+        var outcome = ReplayOutcome.unusable(.replayFailed)
+        var seen = false
+        for _ in 0..<10 where !seen {
+            Thread.sleep(forTimeInterval: 0.5)
+            outcome = FSEventsReplay.events(root: root, since: mark, timeout: 15)
+            if case .events(let events) = outcome {
+                seen = events.contains { $0.path.hasSuffix("N Project/N.als") || $0.path.hasSuffix("N Project") }
+            }
+        }
+        XCTAssertTrue(seen, "outcome: \(outcome)")
         XCTAssertEqual(DiffScan.plan(for: outcome, root: root, projectDirs: []), .regions([t.sub("music/N Project")]))
     }
 }

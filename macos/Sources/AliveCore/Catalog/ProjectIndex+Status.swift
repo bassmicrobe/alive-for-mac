@@ -121,7 +121,7 @@ extension ProjectIndex {
     public func volumesDidChange(mounted now: Set<String>? = nil) -> VolumeChange {
         let mounted = now ?? mountProvider()
         lock.lock()
-        let before = _mounted ?? []
+        let before = _mounted ?? mounted      // never read yet: nothing "appeared"
         _mounted = mounted
         let sets = _sets, facts = _facts
         lock.unlock()
@@ -183,7 +183,7 @@ extension ProjectIndex {
         content.sets = facts
         content.projects = projects
         StatusCache.save(content, dir: dir)
-        refreshInstalled()
+        rebuildStatuses()       // plugins did not change: no inventory refresh
         return read
     }
 }

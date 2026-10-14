@@ -171,8 +171,10 @@ public enum DiffScan {
         return true
     }
 
+    /// Spelled as `FolderScan.find` spells the paths it hands out (which is how the caches have them):
+    /// `NSString.standardizingPath` would turn "/private/tmp/x" into "/tmp/x".
     static func norm(_ p: String) -> String {
-        var s = (p as NSString).standardizingPath
+        var s = URL(fileURLWithPath: p).standardized.path
         while s.count > 1, s.hasSuffix("/") { s.removeLast() }
         return s
     }
