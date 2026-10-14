@@ -4,22 +4,28 @@ import CoreGraphics
 import CoreText
 import Foundation
 
-struct RenderOptions: Equatable {
+public struct RenderOptions: Equatable, Sendable {
     /// The track name column on the left.
-    var showNames = false
+    public var showNames = false
     /// The bar ruler along the top.
-    var showRuler = false
+    public var showRuler = false
     /// Clip names inside the blocks.
-    var showClipNames = false
-    var minLane = 2.0
-    var maxLane = 26.0
+    public var showClipNames = false
+    public var minLane = 2.0
+    public var maxLane = 26.0
     /// Pixels per point (upstream `Dpi`): every size below is multiplied by it.
-    var scale = 1.0
+    public var scale = 1.0
+
+    public init(showNames: Bool = false, showRuler: Bool = false, showClipNames: Bool = false,
+                minLane: Double = 2.0, maxLane: Double = 26.0, scale: Double = 1.0) {
+        self.showNames = showNames; self.showRuler = showRuler; self.showClipNames = showClipNames
+        self.minLane = minLane; self.maxLane = maxLane; self.scale = scale
+    }
 
     /// Thumbnails on tiles and in the Sets inspector: no text, thin lanes.
-    static let thumbnail = RenderOptions(scale: 1.5)
+    public static let thumbnail = RenderOptions(scale: 1.5)
     /// The big preview: ruler, names, clip names, tall lanes.
-    static func preview(scale: Double, minLane: Double = 2) -> RenderOptions {
+    public static func preview(scale: Double, minLane: Double = 2) -> RenderOptions {
         RenderOptions(showNames: true, showRuler: true, showClipNames: true, minLane: minLane, maxLane: 40, scale: scale)
     }
 }
@@ -28,7 +34,7 @@ struct RenderOptions: Equatable {
 /// left to right, a clip as a rectangle in its own colour. A midi clip's body is muted and the
 /// notes are drawn over it — otherwise an empty clip is indistinguishable from a dense one in
 /// the preview. Pure CoreGraphics: safe to call from any thread.
-enum ArrangementRender {
+public enum ArrangementRender {
     /// Large sets have tens of thousands of notes and the eye is satisfied with a portion.
     static let maxNotesDrawn = 60_000
     static let maxLoopRepeats = 512
@@ -64,13 +70,13 @@ enum ArrangementRender {
     }
 
     /// The height at which every track gets `options.minLane` (for the "taller tracks" preview).
-    static func fullHeight(trackCount n: Int, options o: RenderOptions) -> Int {
+    public static func fullHeight(trackCount n: Int, options o: RenderOptions) -> Int {
         let gap = px(o, 2)
         return px(o, o.minLane) * n + gap * max(0, n - 1) + (o.showRuler ? px(o, 24) : 0)
     }
 
     /// A finished picture with a transparent background. `nil` for a zero size.
-    static func makeImage(_ a: Arrangement, width: Int, height: Int, options: RenderOptions) -> CGImage? {
+    public static func makeImage(_ a: Arrangement, width: Int, height: Int, options: RenderOptions) -> CGImage? {
         guard width > 0, height > 0,
               let g = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0,
                                 space: CGColorSpace(name: CGColorSpace.sRGB) ?? CGColorSpaceCreateDeviceRGB(),

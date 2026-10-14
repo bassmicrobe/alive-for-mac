@@ -198,6 +198,7 @@ final class AppModel {
         }
         flushPendingOpen()
         integration.catalogDidChange()
+        WidgetSnapshotWriter.publish(activity: catalog.history, sets: catalog.sets, dir: dataDir)
         UpdateModel.shared.dailyCheckIfDue(app: self)
     }
 

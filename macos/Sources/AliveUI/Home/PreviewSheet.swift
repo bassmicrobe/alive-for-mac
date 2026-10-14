@@ -1,6 +1,7 @@
 // Port of src/PreviewDialog.cs (PreviewDialog + ArrangementView): the whole arrangement large —
 // tracks, their colours and clips on a ruler — with zoom and scroll added for the Mac.
 import AliveCore
+import AliveRender
 import SwiftUI
 
 /// Sizes of the preview picture. Pure so the limits can be tested.

@@ -2,6 +2,7 @@ import AppKit
 import CoreGraphics
 import XCTest
 @testable import AliveCore
+@testable import AliveRender
 @testable import AliveUI
 
 /// Synthetic arrangements: two audio clips, one midi clip with notes, an empty group.

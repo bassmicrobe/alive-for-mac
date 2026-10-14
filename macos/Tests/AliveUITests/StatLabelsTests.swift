@@ -1,5 +1,6 @@
 import XCTest
 import AliveCore
+@testable import AliveRender
 @testable import AliveUI
 
 final class StatLabelsTests: XCTestCase {

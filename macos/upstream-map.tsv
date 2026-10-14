@@ -7,7 +7,7 @@ src/AlsSamplePatch.cs	Sources/AliveCore/Rescue/AlsSamplePatch.swift	S6
 src/app.manifest	scripts/build-app.sh	1A	Info.plist equivalent
 src/Arrangement.cs	Sources/AliveCore/Als/Arrangement.swift;Sources/AliveCore/Als/ArrangementParser.swift	1B	
 src/ArrangementLoader.cs	Sources/AliveCore/Als/ArrangementLoader.swift	1B	UI-free part only
-src/ArrangementRender.cs	Sources/AliveUI/Home/ArrangementRender.swift	S2	CoreGraphics / Canvas
+src/ArrangementRender.cs	Sources/AliveRender/ArrangementRender.swift	S2	CoreGraphics / Canvas
 src/AssemblyInfo.cs	scripts/build-app.sh	1A	version -> Info.plist
 src/AudioPlayer.cs	Sources/AliveUI/Services/AudioPlayback.swift;Sources/AliveUI/Home/Waveform.swift	1A;S2	AVFoundation
 src/CollectAll.cs	Sources/AliveCore/Export/CollectAll.swift;Sources/AliveCore/Export/CollectPlan.swift	S6	zip via /usr/bin/ditto

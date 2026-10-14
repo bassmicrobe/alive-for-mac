@@ -1,0 +1,4 @@
+    <key>NSExtension</key>
+    <dict>
+        <key>NSExtensionPointIdentifier</key><string>com.apple.widgetkit-extension</string>
+    </dict>
