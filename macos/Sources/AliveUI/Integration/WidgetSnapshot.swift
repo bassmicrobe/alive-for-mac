@@ -16,7 +16,8 @@ enum WidgetSnapshotWriter {
     /// no WidgetKit: tests call this directly.
     @discardableResult
     static func write(_ snapshot: WidgetSnapshot, dir: String) -> Outcome {
-        let path = AppHome.file(WidgetSnapshot.fileName, in: dir)
+        let path = WidgetSnapshot.appFileURL(dataDir: dir).path
+        removeLegacyFile(dir: dir)
         if let existing = WidgetSnapshot.load(from: URL(fileURLWithPath: path)), existing.sameContent(as: snapshot) {
             return .unchanged
         }
@@ -27,6 +28,12 @@ enum WidgetSnapshotWriter {
             Diag.fail("widget.json write", error)
             return .failed(error.localizedDescription)
         }
+    }
+
+    /// Earlier builds wrote widget.json straight into the data folder; the widget no longer reads it there.
+    private static func removeLegacyFile(dir: String) {
+        let legacy = AppHome.file(WidgetSnapshot.fileName, in: dir)
+        if FileManager.default.fileExists(atPath: legacy) { try? FileManager.default.removeItem(atPath: legacy) }
     }
 
     /// A custom ALIVE_HOME is invisible to the widget: nothing to reload then.

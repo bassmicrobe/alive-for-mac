@@ -17,6 +17,7 @@ public enum PreviewString: CaseIterable, Sendable {
     case tempo, key, tracks, length, bars, arrangement, plugins, noPlugins, moreSuffix
     case samples, otherFiles, noFiles, location, saved, size, readFailed, emptyArrangement
     case audio, midi, group, none, bpm, unknownKey
+    case failCannotOpen, failNotASet, failTooLarge, failDamaged
 
     public func text(_ language: PreviewLanguage) -> String {
         let pair = table
@@ -49,6 +50,21 @@ public enum PreviewString: CaseIterable, Sendable {
         case .none: return ("—", "—")
         case .bpm: return ("BPM", "BPM")
         case .unknownKey: return ("—", "—")
+        case .failCannotOpen: return ("The file could not be opened.", "ファイルを開けませんでした。")
+        case .failNotASet: return ("It does not look like a Live set.", "Live セットではないようです。")
+        case .failTooLarge: return ("It is too large to preview.", "大きすぎてプレビューできません。")
+        case .failDamaged: return ("The file may be damaged.", "ファイルが破損している可能性があります。")
+        }
+    }
+}
+
+extension PreviewFailure {
+    var message: PreviewString {
+        switch self {
+        case .cannotOpen: return .failCannotOpen
+        case .notASet: return .failNotASet
+        case .tooLarge: return .failTooLarge
+        case .damaged: return .failDamaged
         }
     }
 }

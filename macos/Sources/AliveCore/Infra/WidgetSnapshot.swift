@@ -7,6 +7,9 @@ public struct WidgetSnapshot: Codable, Equatable, Sendable {
     /// Bump when the shape changes incompatibly; a reader that does not know the version shows its placeholder.
     public static let currentVersion = 1
     public static let fileName = "widget.json"
+    /// The widget's sandbox may read only this subfolder of the data folder (see widget.entitlements),
+    /// so nothing else of the catalog (notes, logs, settings) is within its reach.
+    public static let folderName = "widget"
     /// How many weeks of activity the medium and large widgets draw.
     public static let heatmapWeeks = 12
     public static let recentCount = 5
@@ -102,7 +105,13 @@ public struct WidgetSnapshot: Codable, Equatable, Sendable {
     /// to it: the widget then shows its placeholder.
     public static func widgetFileURL(realHome: String) -> URL {
         URL(fileURLWithPath: realHome)
-            .appendingPathComponent("Library/Application Support/\(AppHome.defaultFolderName)/\(fileName)")
+            .appendingPathComponent("Library/Application Support/\(AppHome.defaultFolderName)/\(folderName)/\(fileName)")
+    }
+
+    /// Where the app writes the snapshot inside its data folder `dir`.
+    public static func appFileURL(dataDir dir: String) -> URL {
+        URL(fileURLWithPath: dir, isDirectory: true).appendingPathComponent(folderName, isDirectory: true)
+            .appendingPathComponent(fileName)
     }
 
     public static func load(from url: URL) -> WidgetSnapshot? {

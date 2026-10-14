@@ -108,9 +108,9 @@ final class WidgetSnapshotTests: XCTestCase {
         XCTAssertEqual(grid[0][0].saves, 0)
     }
 
-    func testWidgetFileLivesInTheDefaultDataFolder() {
+    func testWidgetFileLivesInItsOwnSubfolderOfTheDefaultDataFolder() {
         let url = WidgetSnapshot.widgetFileURL(realHome: "/Users/someone")
-        XCTAssertEqual(url.path, "/Users/someone/Library/Application Support/Alive for Mac/widget.json")
+        XCTAssertEqual(url.path, "/Users/someone/Library/Application Support/Alive for Mac/widget/widget.json")
     }
 
     func testOnlyRecentDaysAreKept() {

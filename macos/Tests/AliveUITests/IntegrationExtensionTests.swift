@@ -161,11 +161,21 @@ final class WidgetSnapshotWriterTests: XCTestCase {
         let dir = try scratch()
         let now = Date()
         XCTAssertEqual(WidgetSnapshotWriter.write(snapshot(streak: 3, at: now), dir: dir), .written)
-        let url = URL(fileURLWithPath: AppHome.file(WidgetSnapshot.fileName, in: dir))
+        let url = WidgetSnapshot.appFileURL(dataDir: dir)
+        XCTAssertEqual(url.deletingLastPathComponent().lastPathComponent, "widget")
         XCTAssertEqual(WidgetSnapshot.load(from: url)?.currentStreak, 3)
         XCTAssertEqual(WidgetSnapshotWriter.write(snapshot(streak: 3, at: now.addingTimeInterval(600)), dir: dir), .unchanged)
         XCTAssertEqual(WidgetSnapshotWriter.write(snapshot(streak: 4, at: now), dir: dir), .written)
         XCTAssertEqual(WidgetSnapshot.load(from: url)?.currentStreak, 4)
+    }
+
+    func testTheOldTopLevelFileIsRemoved() throws {
+        let dir = try scratch()
+        let legacy = AppHome.file(WidgetSnapshot.fileName, in: dir)
+        try AppHome.writeAtomically("{}", to: legacy)
+        WidgetSnapshotWriter.write(snapshot(streak: 1), dir: dir)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: legacy))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: WidgetSnapshot.appFileURL(dataDir: dir).path))
     }
 
     func testCreatesTheFolderAndReportsAnUnwritableOne() throws {

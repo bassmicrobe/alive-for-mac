@@ -6,6 +6,19 @@ import CoreGraphics
 import Foundation
 import ImageIO
 
+/// Why a set could not be shown, as a type: the page words it in the preview language, and the
+/// raw core diagnostics (English, for developers) go to the extension's log only.
+public enum PreviewFailure: Equatable, Sendable {
+    /// The file could not be opened or read (permissions, moved away).
+    case cannotOpen
+    /// Not a Live set: the gzip or XML structure is broken.
+    case notASet
+    /// Inflates past the safety limit.
+    case tooLarge
+    /// Read, but not completely (cut short or damaged).
+    case damaged
+}
+
 /// What the page shows about one set.
 public struct PreviewModel: Sendable {
     public var path: String
@@ -13,10 +26,32 @@ public struct PreviewModel: Sendable {
     public var modified: Date?
     public var info: AlsInfo
     public var arrangement: Arrangement
+    /// Set when reading failed; nil when the set was read. See `PreviewFailure`.
+    public var failure: PreviewFailure?
 
-    public init(path: String, fileSize: Int64 = 0, modified: Date? = nil, info: AlsInfo, arrangement: Arrangement) {
+    public init(path: String, fileSize: Int64 = 0, modified: Date? = nil, info: AlsInfo, arrangement: Arrangement,
+                failure: PreviewFailure? = nil) {
         self.path = path; self.fileSize = fileSize; self.modified = modified
         self.info = info; self.arrangement = arrangement
+        self.failure = failure
+    }
+
+    /// The failure to tell the person about: the typed one, or `damaged` when the parser reported
+    /// a problem on a set it could not show anything of.
+    var shownFailure: PreviewFailure? {
+        if let failure { return failure }
+        return info.error != nil && info.totalTracks == 0 ? .damaged : nil
+    }
+
+    /// Typed reason for a thrown read error.
+    static func failure(for error: Error) -> PreviewFailure {
+        if let gzip = error as? GzipError {
+            if case .tooLarge = gzip { return .tooLarge }
+            return .notASet
+        }
+        let ns = error as NSError
+        if ns.domain == NSCocoaErrorDomain || ns.domain == NSPOSIXErrorDomain { return .cannotOpen }
+        return .notASet
     }
 
     public var name: String { ((path as NSString).lastPathComponent as NSString).deletingPathExtension }
@@ -29,9 +64,10 @@ public struct PreviewModel: Sendable {
         let modified = attrs?[.modificationDate] as? Date
         do {
             let xml = try Gzip.readMaybeGzip(path: path)
-            return PreviewModel(path: path, fileSize: size, modified: modified,
-                                info: AlsFile.parse(xml: xml, path: path),
-                                arrangement: Arrangement.parse(xml: xml, path: path))
+            let info = AlsFile.parse(xml: xml, path: path)
+            return PreviewModel(path: path, fileSize: size, modified: modified, info: info,
+                                arrangement: Arrangement.parse(xml: xml, path: path),
+                                failure: info.error != nil && info.totalTracks == 0 ? .damaged : nil)
         } catch {
             var info = AlsInfo()
             info.path = path
@@ -39,7 +75,8 @@ public struct PreviewModel: Sendable {
             var arrangement = Arrangement()
             arrangement.path = path
             arrangement.error = info.error
-            return PreviewModel(path: path, fileSize: size, modified: modified, info: info, arrangement: arrangement)
+            return PreviewModel(path: path, fileSize: size, modified: modified, info: info, arrangement: arrangement,
+                                failure: failure(for: error))
         }
     }
 }
@@ -95,8 +132,9 @@ public enum PreviewPage {
 
         var body = "<header><h1>\(escape(m.name))</h1><p class=\"sub\">\(subtitle)</p></header>"
         body += "<section class=\"stats\">\(stats)</section>"
-        if let error = info.error, info.totalTracks == 0 {
-            body += "<p class=\"warn\">\(t(.readFailed)) <span>\(escape(error))</span></p>"
+        if let failure = m.shownFailure {
+            // Typed and localized; the parser's own wording stays out of the page (it goes to the log).
+            body += "<p class=\"warn\">\(t(.readFailed)) <span>\(t(failure.message))</span></p>"
         }
         body += pictureSection(a, source: pictureSource, language)
         body += pluginSection(info, language)

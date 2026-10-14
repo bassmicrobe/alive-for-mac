@@ -1,6 +1,6 @@
 // Mac-only: the desktop widget. It draws widget.json, which the app writes into its data folder
-// (WidgetSnapshot); the widget has no other data and no network. The sandbox lets it read only
-// ~/Library/Application Support/Alive for Mac/ (temporary-exception entitlement), so an app run
+// (WidgetSnapshot, in its `widget/` subfolder); the widget has no other data and no network. The
+// sandbox lets it read only ~/Library/Application Support/Alive for Mac/widget/ (temporary-exception entitlement), so an app run
 // with a custom ALIVE_HOME is invisible to it and the widget shows its placeholder.
 import AliveCore
 import Darwin

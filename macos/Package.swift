@@ -4,9 +4,14 @@
 import PackageDescription
 
 let extensionSwiftSettings: [SwiftSetting] = [.unsafeFlags(["-application-extension"])]
-let extensionLinkerSettings: [LinkerSetting] = [
+// Quick Look has no `@main`: its principal class is found by NSExtension, so the executable starts in
+// _NSExtensionMain.
+let quickLookLinkerSettings: [LinkerSetting] = [
     .unsafeFlags(["-Xlinker", "-e", "-Xlinker", "_NSExtensionMain", "-application-extension"]),
 ]
+// The widget is a SwiftUI `@main WidgetBundle`: its generated `_main` (WidgetBundle.main()) must run,
+// so the entry point is left alone.
+let widgetLinkerSettings: [LinkerSetting] = [.unsafeFlags(["-application-extension"])]
 
 let package = Package(
     name: "AliveForMac",
@@ -28,11 +33,12 @@ let package = Package(
         // Thin @main entry.
         .executableTarget(name: "AliveForMac", dependencies: ["AliveUI"], path: "Sources/AliveForMac"),
         // App extensions (packaged into Contents/PlugIns by scripts/build-app.sh). SwiftPM has no
-        // extension product type, so they are executables that start in _NSExtensionMain.
+        // extension product type, so they are executables (Quick Look starts in _NSExtensionMain, the
+        // widget in the `_main` its `@main WidgetBundle` generates).
         .executableTarget(name: "AliveQuickLook", dependencies: ["AliveCore", "AliveRender"], path: "Sources/AliveQuickLook",
-                          swiftSettings: extensionSwiftSettings, linkerSettings: extensionLinkerSettings),
+                          swiftSettings: extensionSwiftSettings, linkerSettings: quickLookLinkerSettings),
         .executableTarget(name: "AliveWidget", dependencies: ["AliveCore"], path: "Sources/AliveWidget",
-                          swiftSettings: extensionSwiftSettings, linkerSettings: extensionLinkerSettings),
+                          swiftSettings: extensionSwiftSettings, linkerSettings: widgetLinkerSettings),
         .testTarget(name: "AliveCoreTests", dependencies: ["AliveCore"], path: "Tests/AliveCoreTests"),
         .testTarget(name: "AliveRenderTests", dependencies: ["AliveRender", "AliveCore"], path: "Tests/AliveRenderTests"),
         .testTarget(name: "AliveUITests", dependencies: ["AliveUI", "AliveRender"], path: "Tests/AliveUITests"),
