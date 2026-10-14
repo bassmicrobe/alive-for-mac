@@ -30,6 +30,9 @@ struct MainWindow: View {
         .sheet(item: $app.sheet) { sheet in SheetHost(sheet: sheet) }
         .preferredColorScheme(.dark)
         .task {
+            // Before anything else: URL commands and the menu bar must be able to reopen this
+            // window after it was closed, whether or not the menu bar content ever appeared.
+            MainWindowPresenter.register { openWindow(id: "main") }
             AppDelegate.attach(app)
             app.start()
             await DebugLaunch.apply(to: app, openWindow: { openWindow(id: $0) },

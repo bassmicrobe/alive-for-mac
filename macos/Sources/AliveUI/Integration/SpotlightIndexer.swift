@@ -111,6 +111,8 @@ actor SpotlightIndexer {
     private let backend: SpotlightBackend
     private let file: SpotlightSnapshotFile
     private var snapshot: [String: String]
+    /// The domain was already emptied since the last `sync`: later "off" calls have nothing to do.
+    private var clearedSinceSync = false
 
     init(dataDir: String, backend: SpotlightBackend) {
         self.backend = backend
@@ -120,6 +122,7 @@ actor SpotlightIndexer {
 
     /// Brings the index in line with `documents`.
     func sync(_ documents: [SpotlightDocument]) async {
+        clearedSinceSync = false
         let plan = SpotlightPlan.make(previous: snapshot, current: documents)
         guard !plan.isEmpty else { return }
         do {
@@ -138,14 +141,17 @@ actor SpotlightIndexer {
         Diag.info("spotlight: \(plan.upserts.count) indexed, \(plan.deletes.count) removed")
     }
 
-    /// The toggle is off: removes everything Alive gave to Spotlight. Does nothing at all when
-    /// Alive never indexed (no snapshot), so a person who never used it is never touched.
+    /// The toggle is off: removes everything Alive gave to Spotlight. It does not depend on the
+    /// local snapshot (the data folder may have been deleted or switched, or Alive may have crashed
+    /// between indexing and saving it), so the domain is deleted once per launch whenever the
+    /// toggle is off; deleting an empty domain is harmless and touches nothing else.
     func removeEverything() async {
-        guard file.exists || !snapshot.isEmpty else { return }
+        guard !clearedSinceSync else { return }
         do {
             try await backend.deleteAll()
             snapshot = [:]
             file.remove()
+            clearedSinceSync = true
             Diag.info("spotlight: index cleared")
         } catch {
             Diag.fail("spotlight clear", error)

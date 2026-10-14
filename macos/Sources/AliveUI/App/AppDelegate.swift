@@ -51,8 +51,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func application(_ application: NSApplication, open urls: [URL]) {
-        MainActor.assumeIsolated { URLCommands.handle(urls.filter { $0.scheme == URLCommand.scheme }, model: AppDelegate.model) }
-        let paths = urls.filter { $0.pathExtension.lowercased() == "als" }.map(\.path)
+        let parts = OpenedURLs.partition(urls)
+        MainActor.assumeIsolated { URLCommands.handle(parts.commands, model: AppDelegate.model) }
+        let paths = parts.alsPaths
         guard !paths.isEmpty else { return }
         MainActor.assumeIsolated {
             if let model = AppDelegate.model {
@@ -81,5 +82,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// With the menu bar extra on, the app lives on after the last window is closed.
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         MainActor.assumeIsolated { !(AppDelegate.model?.settings.menuBar ?? false) }
+    }
+}
+
+/// Splits what the system hands to `application(_:open:)`: `alive://` commands are never files,
+/// and only real file URLs ending in `.als` may reach `openPaths` (so `alive://open/x/y.als` cannot
+/// smuggle a path in).
+enum OpenedURLs {
+    static func partition(_ urls: [URL]) -> (commands: [URL], alsPaths: [String]) {
+        let commands = urls.filter { $0.scheme?.lowercased() == URLCommand.scheme }
+        let paths = urls.filter { $0.isFileURL && $0.pathExtension.lowercased() == "als" }.map(\.path)
+        return (commands, paths)
     }
 }

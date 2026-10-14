@@ -9,7 +9,7 @@ import AliveCore
 final class IntegrationCoordinator {
     @ObservationIgnored private unowned let app: AppModel
     private let spotlight: SpotlightIndexer
-    private let finderTags: FinderTagSync
+    private let finderTags: FinderTagWorker
     private var observing = false
     private var syncTask: Task<Void, Never>?
     /// Brings the main window forward; replaced in tests (there is no application there).
@@ -24,7 +24,8 @@ final class IntegrationCoordinator {
         let underTest = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
         spotlight = SpotlightIndexer(dataDir: app.dataDir,
                                      backend: backend ?? (underTest ? NullSpotlightBackend() : CoreSpotlightBackend()))
-        finderTags = FinderTagSync(dataDir: app.dataDir)
+        finderTags = FinderTagWorker(dataDir: app.dataDir)
+        if app.settings.finderTags { finderTags.gate.enable() }
     }
 
     // MARK: hooks
@@ -39,13 +40,21 @@ final class IntegrationCoordinator {
     /// The catalog was published (cache loaded or a scan ended).
     func catalogDidChange() {
         refreshSpotlight()
+        refreshFinderTags()
         if let path = pendingLink { pendingLink = nil; showInAlive(path: path) }
     }
 
     func settingsDidChange(from old: AppSettings) {
         let now = app.settings
-        if now.spotlight != old.spotlight { refreshSpotlight() }
-        if now.finderTags != old.finderTags, now.finderTags { refreshFinderTags() }
+        if now.spotlight != old.spotlight || now.lang != old.lang { refreshSpotlight() }
+        if now.finderTags != old.finderTags {
+            if now.finderTags {
+                finderTags.gate.enable()
+                refreshFinderTags()
+            } else {
+                finderTags.gate.disable()   // queued and running writes stop at the next folder
+            }
+        }
     }
 
     private func observeTags() {
@@ -82,11 +91,14 @@ final class IntegrationCoordinator {
         guard app.catalog.isLoaded else { return }
         let sets = app.catalog.sets
         let meta = app.sets.meta
+        // Read on the main actor; the detached work formats with these immutable inputs only.
+        let lang = Localizer.shared.lang
+        let locale = Localizer.shared.locale
         syncTask = Task.detached(priority: .utility) {
             await previous?.value
             let documents = sets.compactMap { set in
                 SpotlightDocument.make(for: set, tags: meta.tagsOf(set.projectDir),
-                                       description: SpotlightDocument.describe(set))
+                                       description: SpotlightDocument.describe(set, lang: lang, locale: locale))
             }
             await indexer.sync(documents)
             if let text = SpotlightDebugQuery.text { SpotlightDebugQuery.logMatches(for: text) }
@@ -96,14 +108,14 @@ final class IntegrationCoordinator {
     // MARK: Finder tags
 
     private func refreshFinderTags() {
-        guard app.settings.finderTags, app.catalog.isLoaded else { return }
-        let sync = finderTags
+        guard app.settings.finderTags, app.catalog.isLoaded, let ticket = finderTags.gate.begin() else { return }
+        let worker = finderTags
         let meta = app.sets.meta
         let dirs = Set(app.catalog.sets.filter { !$0.isBackup }.map(\.projectDir))
         Task.detached(priority: .utility) {
             var desired: [String: [String]] = [:]
             for dir in dirs { desired[dir] = meta.tagsOf(dir) }
-            sync.sync(desired: desired)
+            await worker.run(desired: desired, ticket: ticket)
         }
     }
 
@@ -130,16 +142,31 @@ final class IntegrationCoordinator {
 /// Brings the main window forward, also when it was closed (the app keeps running for the menu bar).
 @MainActor
 enum MainWindowPresenter {
-    /// Set by the menu bar content, which has SwiftUI's `openWindow`.
+    /// Registered by the main window as soon as it exists (and by the menu bar content), so URL
+    /// commands can reopen a closed window; SwiftUI's `openWindow` is only reachable from a view.
     static var openWindow: (() -> Void)?
 
+    enum Step: Equatable { case raiseExisting, reopen, nothing }
+
+    /// Pure decision: raise the window if there is one, else reopen it if an opener is registered.
+    static func decide(hasMainWindow: Bool, hasOpener: Bool) -> Step {
+        if hasMainWindow { return .raiseExisting }
+        return hasOpener ? .reopen : .nothing
+    }
+
+    static func register(_ open: @escaping () -> Void) { openWindow = open }
+
     static func show() {
-        NSApp.activate(ignoringOtherApps: true)
-        if let window = NSApp.windows.first(where: { $0.identifier?.rawValue.hasPrefix("main") == true }) {
-            if window.isMiniaturized { window.deminiaturize(nil) }
-            window.makeKeyAndOrderFront(nil)
-        } else {
-            openWindow?()
+        if ProcessInfo.processInfo.environment["ALIVE_NO_ACTIVATE"] != "1" {
+            NSApp.activate(ignoringOtherApps: true)
+        }
+        let window = NSApp.windows.first(where: { $0.identifier?.rawValue.hasPrefix("main") == true })
+        switch decide(hasMainWindow: window != nil, hasOpener: openWindow != nil) {
+        case .raiseExisting:
+            if window?.isMiniaturized == true { window?.deminiaturize(nil) }
+            window?.makeKeyAndOrderFront(nil)
+        case .reopen: openWindow?()
+        case .nothing: break
         }
     }
 }

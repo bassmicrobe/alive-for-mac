@@ -71,10 +71,13 @@ struct FinderTagSync {
     /// folders Alive wrote to earlier. Folders that no longer exist are forgotten. Returns how many
     /// folders were changed.
     @discardableResult
-    func sync(desired: [String: [String]]) -> Int {
+    func sync(desired: [String: [String]], shouldContinue: () -> Bool = { true }) -> Int {
         var record = loadRecord()
         var changed = 0
         for dir in Set(desired.keys).union(record.keys).sorted() {
+            // Switched off or superseded meanwhile: stop before the next write. What was written
+            // so far is still recorded below, so ownership stays accurate.
+            guard shouldContinue() else { break }
             let wanted = (desired[dir] ?? []).map(Self.clean).filter { !$0.isEmpty }
             let recorded = record[dir] ?? []
             if wanted.isEmpty && recorded.isEmpty { continue }
@@ -106,5 +109,48 @@ struct FinderTagSync {
         tag.components(separatedBy: .newlines).joined(separator: " ")
             .replacingOccurrences(of: "\t", with: " ")
             .trimmingCharacters(in: .whitespaces)
+    }
+}
+
+/// Decides whether queued Finder-tag work may still write. Main-actor code changes it
+/// synchronously (`begin` / `disable`); the worker reads it before every folder.
+final class FinderTagGate: @unchecked Sendable {
+    private let lock = NSLock()
+    private var generation = 0
+    private var enabled = false
+
+    /// A new request supersedes every earlier one. nil while switched off.
+    func begin() -> Int? {
+        lock.withLock {
+            guard enabled else { return nil }
+            generation += 1
+            return generation
+        }
+    }
+
+    func enable() { lock.withLock { enabled = true } }
+
+    /// Invalidates everything queued or running.
+    func disable() { lock.withLock { enabled = false; generation += 1 } }
+
+    func isCurrent(_ ticket: Int) -> Bool { lock.withLock { enabled && generation == ticket } }
+}
+
+/// The only writer of Finder tags and `findertags.cfg`: requests run one after another, and one
+/// whose ticket is no longer current is dropped.
+actor FinderTagWorker {
+    private let sync: FinderTagSync
+    nonisolated let gate: FinderTagGate
+
+    init(dataDir: String, gate: FinderTagGate = FinderTagGate()) {
+        sync = FinderTagSync(dataDir: dataDir)
+        self.gate = gate
+    }
+
+    @discardableResult
+    func run(desired: [String: [String]], ticket: Int) -> Int {
+        let gate = gate
+        guard gate.isCurrent(ticket) else { return 0 }
+        return sync.sync(desired: desired, shouldContinue: { gate.isCurrent(ticket) })
     }
 }

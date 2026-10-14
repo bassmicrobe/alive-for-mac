@@ -29,7 +29,7 @@ struct MenuBarContent: View {
         .frame(width: 330)
         .background(Theme.bg)
         .preferredColorScheme(.dark)
-        .onAppear { MainWindowPresenter.openWindow = { openWindow(id: "main") } }
+        .onAppear { MainWindowPresenter.register { openWindow(id: "main") } }
     }
 
     // MARK: parts

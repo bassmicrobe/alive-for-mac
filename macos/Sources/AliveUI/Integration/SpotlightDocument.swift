@@ -41,16 +41,17 @@ struct SpotlightDocument: Equatable, Sendable {
                                  keywords: keywords, modified: set.modified, created: set.created)
     }
 
-    /// "140 BPM · C Major · 12 トラック · Live 11.3" in the UI language; unknown parts are left out.
-    static func describe(_ set: SetEntry) -> String {
+    /// "140 BPM · C Major · 12 トラック · Live 11.3" in the given language (captured on the main actor
+    /// by the caller, never read from `Localizer` here); unknown parts are left out.
+    static func describe(_ set: SetEntry, lang: Lang, locale: Locale) -> String {
         var parts: [String] = []
         if set.tempo > 0 {
             let bpm = set.tempo == set.tempo.rounded() ? String(Int(set.tempo)) : String(format: "%.1f", set.tempo)
             parts.append("\(bpm) BPM")
         }
         if !set.key.isEmpty { parts.append(set.key) }
-        if set.tracks > 0 { parts.append(IntegrationStrings.itemTracks.f(set.tracks)) }
-        if !set.creator.isEmpty { parts.append(IntegrationStrings.itemLive.f(set.shortVersion)) }
+        if set.tracks > 0 { parts.append(IntegrationStrings.itemTracks.f(lang: lang, locale: locale, set.tracks)) }
+        if !set.creator.isEmpty { parts.append(IntegrationStrings.itemLive.f(lang: lang, locale: locale, set.shortVersion)) }
         return parts.joined(separator: " · ")
     }
 }

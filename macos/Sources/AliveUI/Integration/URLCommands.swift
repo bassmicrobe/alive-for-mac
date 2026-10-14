@@ -68,6 +68,15 @@ enum URLAction: Equatable {
     case showStat
     /// The command was understood but cannot be carried out (unknown path, empty catalog).
     case refuse(URLRefusal)
+
+    /// Whether carrying it out shows the main window (reopening it if it was closed).
+    var presentsMainWindow: Bool {
+        switch self {
+        case .showHome, .showSets, .showSamples: return true
+        case .select(_, let openInLive): return !openInLive
+        case .rescan, .showStat, .refuse: return false
+        }
+    }
 }
 
 enum URLRefusal: Equatable {
@@ -172,9 +181,9 @@ enum URLCommands {
         }
     }
 
+    /// Shows the main window, reopening it when it was closed (the menu bar keeps the app alive).
     @MainActor private static func bringToFront() {
-        guard ProcessInfo.processInfo.environment["ALIVE_NO_ACTIVATE"] != "1" else { return }
-        NSApp.activate(ignoringOtherApps: true)
+        MainWindowPresenter.show()
     }
 
     @MainActor private static func openStatWindow() {

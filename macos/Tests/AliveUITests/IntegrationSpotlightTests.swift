@@ -51,7 +51,7 @@ final class IntegrationSpotlightDocumentTests: XCTestCase {
     func testDescriptionAndKeywords() throws {
         Localizer.shared.preference = .en
         let set = makeSet("/p/Proj/a.als")
-        XCTAssertEqual(SpotlightDocument.describe(set), "140 BPM · C Major · 12 tracks · Live 11.3")
+        XCTAssertEqual(SpotlightDocument.describe(set, lang: .en, locale: Locale(identifier: "en_US")), "140 BPM · C Major · 12 tracks · Live 11.3")
         let doc = try XCTUnwrap(SpotlightDocument.make(for: set, tags: ["drums", "serum"], description: "d"))
         XCTAssertEqual(doc.id, "/p/Proj/a.als")
         XCTAssertEqual(doc.title, "Probe")
@@ -61,12 +61,13 @@ final class IntegrationSpotlightDocumentTests: XCTestCase {
 
     func testJapaneseDescription() {
         Localizer.shared.preference = .ja
-        XCTAssertEqual(SpotlightDocument.describe(makeSet("/a.als")), "140 BPM · C Major · 12 トラック · Live 11.3")
+        XCTAssertEqual(SpotlightDocument.describe(makeSet("/a.als"), lang: .ja, locale: Locale(identifier: "ja_JP")), "140 BPM · C Major · 12 トラック · Live 11.3")
     }
 
     func testUnknownPartsAreLeftOutAndBackupsSkipped() {
         Localizer.shared.preference = .en
-        XCTAssertEqual(SpotlightDocument.describe(makeSet("/a.als", tempo: 127.5, key: "", tracks: 0, creator: "")),
+        XCTAssertEqual(SpotlightDocument.describe(makeSet("/a.als", tempo: 127.5, key: "", tracks: 0, creator: ""),
+                                                  lang: .en, locale: Locale(identifier: "en_US")),
                        "127.5 BPM")
         XCTAssertNil(SpotlightDocument.make(for: makeSet("/Backup/a.als", backup: true), tags: [], description: ""))
     }
@@ -136,20 +137,30 @@ final class IntegrationSpotlightIndexerTests: XCTestCase {
         XCTAssertEqual(backend.indexed.map(\.count), [SpotlightIndexer.batchSize, SpotlightIndexer.batchSize, 5])
     }
 
-    func testRemoveEverythingClearsOnlyWhatWasIndexed() async throws {
+    func testDescriptionIgnoresTheCurrentUILanguage() {
+        // The explicit language wins, whatever Localizer says (the work runs off the main actor).
+        let set = makeSet("/a.als")
+        let en = SpotlightDocument.describe(set, lang: .en, locale: Locale(identifier: "en_US"))
+        let ja = SpotlightDocument.describe(set, lang: .ja, locale: Locale(identifier: "ja_JP"))
+        XCTAssertTrue(en.contains("tracks"))
+        XCTAssertTrue(ja.contains("トラック"))
+    }
+
+    func testRemoveEverythingDeletesTheDomainEvenWithoutASnapshot() async throws {
         let dir = try scratchDir()
         let backend = FakeSpotlightBackend()
-        // Never indexed: the index is not touched at all.
-        await SpotlightIndexer(dataDir: dir, backend: backend).removeEverything()
-        XCTAssertEqual(backend.clearCount, 0)
+        // No snapshot file (data folder deleted, ALIVE_HOME switched, crash before the save):
+        // the domain is still emptied, once.
+        let fresh = SpotlightIndexer(dataDir: dir, backend: backend)
+        await fresh.removeEverything()
+        XCTAssertEqual(backend.clearCount, 1)
+        await fresh.removeEverything()
+        XCTAssertEqual(backend.clearCount, 1, "once per launch while the toggle stays off")
 
-        let indexer = SpotlightIndexer(dataDir: dir, backend: backend)
-        await indexer.sync(docs([makeSet("/a.als")]))
-        await indexer.removeEverything()
-        XCTAssertEqual(backend.clearCount, 1)
+        // Toggled on and off again: cleared again, and the snapshot goes away.
+        await fresh.sync(docs([makeSet("/a.als")]))
+        await fresh.removeEverything()
+        XCTAssertEqual(backend.clearCount, 2)
         XCTAssertFalse(SpotlightSnapshotFile(dir: dir).exists)
-        // And a second call finds nothing to do.
-        await indexer.removeEverything()
-        XCTAssertEqual(backend.clearCount, 1)
     }
 }

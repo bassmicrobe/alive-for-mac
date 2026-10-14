@@ -18,3 +18,11 @@ extension LocalizedStrings {
         String(format: s, locale: Localizer.shared.locale, arguments: args)
     }
 }
+
+extension LocalizedStrings {
+    /// Formats in an explicit language; for work that runs off the main actor, where
+    /// `Localizer.shared` must not be read.
+    func f(lang: Lang, locale: Locale, _ args: CVarArg...) -> String {
+        String(format: lang == .ja ? ja : en, locale: locale, arguments: args)
+    }
+}
