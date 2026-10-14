@@ -192,6 +192,7 @@ final class AppModel {
                                      disabledRoots: settings.disabledRoots).select)
         }
         flushPendingOpen()
+        WidgetSnapshotWriter.publish(activity: catalog.history, sets: catalog.sets, dir: dataDir)
         UpdateModel.shared.dailyCheckIfDue(app: self)
     }
 

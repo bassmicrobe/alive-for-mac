@@ -7,6 +7,13 @@
 #   scripts/build-app.sh --dmg      also write macos/dist/AliveForMac-<version>.dmg
 #                                   (app + Applications link + license files; no GUI needed)
 #   --zip and --dmg can be combined.
+#
+# The app carries two app extensions (Contents/PlugIns): AliveQuickLook (Space on an .als in
+# Finder) and AliveWidget (desktop widget). SwiftPM has no extension product type, so they are
+# executables linked to start in _NSExtensionMain; this script gives them their Info.plist and
+# sandbox entitlements (Resources/Extensions) and signs them before the app. They register on
+# first launch of the app but come up switched off: Settings has the button, or
+# `pluginkit -e use -i io.github.bassmicrobe.alive-for-mac.quicklook` (and `.widget`).
 set -euo pipefail
 
 NATIVE=0
@@ -17,7 +24,7 @@ for arg in "$@"; do
         --native) NATIVE=1 ;;
         --zip) ZIP=1 ;;
         --dmg) DMG=1 ;;
-        -h|--help) sed -n '2,10p' "$0"; exit 0 ;;
+        -h|--help) sed -n '2,16p' "$0"; exit 0 ;;
         *) echo "unknown option: $arg" >&2; exit 2 ;;
     esac
 done
@@ -58,7 +65,7 @@ BIN_DIR="$(swift build -c release ${ARCH_FLAGS[@]+"${ARCH_FLAGS[@]}"} --show-bin
 # ---------------------------------------------------------------- bundle
 echo "==> assembling $APP"
 rm -rf "$APP"
-mkdir -p "$CONTENTS/MacOS" "$CONTENTS/Resources"
+mkdir -p "$CONTENTS/MacOS" "$CONTENTS/Resources" "$CONTENTS/PlugIns"
 cp "$BIN_DIR/$EXECUTABLE" "$CONTENTS/MacOS/$EXECUTABLE"
 
 # SwiftPM resource bundles (none today, but features may add some).
@@ -99,6 +106,8 @@ fi
 
 # ---------------------------------------------------------------- Info.plist
 # .als is declared as Viewer / Alternate: Alive can open sets, but Live stays the default app.
+# The imported type com.ableton.live-set is what the Quick Look extension is registered for;
+# LSItemContentTypes ties the document type to it. alive:// is the URL scheme (Shortcuts).
 cat > "$CONTENTS/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -131,6 +140,30 @@ cat > "$CONTENTS/Info.plist" <<PLIST
             <array><string>als</string></array>
             <key>CFBundleTypeRole</key><string>Viewer</string>
             <key>LSHandlerRank</key><string>Alternate</string>
+            <key>LSItemContentTypes</key>
+            <array><string>com.ableton.live-set</string></array>
+        </dict>
+    </array>
+    <key>UTImportedTypeDeclarations</key>
+    <array>
+        <dict>
+            <key>UTTypeIdentifier</key><string>com.ableton.live-set</string>
+            <key>UTTypeDescription</key><string>Ableton Live Set</string>
+            <key>UTTypeConformsTo</key>
+            <array><string>public.data</string></array>
+            <key>UTTypeTagSpecification</key>
+            <dict>
+                <key>public.filename-extension</key>
+                <array><string>als</string></array>
+            </dict>
+        </dict>
+    </array>
+    <key>CFBundleURLTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleURLName</key><string>$BUNDLE_ID</string>
+            <key>CFBundleURLSchemes</key>
+            <array><string>alive</string></array>
         </dict>
     </array>
 </dict>
@@ -138,9 +171,43 @@ cat > "$CONTENTS/Info.plist" <<PLIST
 PLIST
 plutil -lint "$CONTENTS/Info.plist" >/dev/null
 
+# ---------------------------------------------------------------- extensions
+EXT_RES="$MACOS_DIR/Resources/Extensions"
+make_appex() { # <SwiftPM executable name> <bundle id suffix> <display name> <NSExtension plist fragment> <entitlements>
+    local name="$1" bid="$BUNDLE_ID.$2" display="$3" fragment="$4" entitlements="$5"
+    local appex="$CONTENTS/PlugIns/$name.appex"
+    mkdir -p "$appex/Contents/MacOS"
+    cp "$BIN_DIR/$name" "$appex/Contents/MacOS/$name"
+    cat > "$appex/Contents/Info.plist" <<EXTPLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleName</key><string>$name</string>
+    <key>CFBundleDisplayName</key><string>$display</string>
+    <key>CFBundleIdentifier</key><string>$bid</string>
+    <key>CFBundleExecutable</key><string>$name</string>
+    <key>CFBundlePackageType</key><string>XPC!</string>
+    <key>CFBundleInfoDictionaryVersion</key><string>6.0</string>
+    <key>CFBundleShortVersionString</key><string>$VERSION</string>
+    <key>CFBundleVersion</key><string>$BUILD_NUMBER</string>
+    <key>LSMinimumSystemVersion</key><string>14.0</string>
+$(cat "$fragment")
+</dict>
+</plist>
+EXTPLIST
+    plutil -lint "$appex/Contents/Info.plist" >/dev/null
+    # Each extension is sandboxed with its own entitlements; signed before the app that holds it.
+    codesign --force --sign - --entitlements "$entitlements" "$appex"
+}
+echo "==> assembling extensions"
+make_appex AliveQuickLook quicklook "Alive Quick Look" "$EXT_RES/quicklook.plist" "$EXT_RES/quicklook.entitlements"
+make_appex AliveWidget widget "Alive" "$EXT_RES/widget.plist" "$EXT_RES/widget.entitlements"
+
 # ---------------------------------------------------------------- sign
+# No --deep: it would re-sign the extensions without their entitlements.
 echo "==> ad-hoc signing"
-codesign --force --deep --sign - "$APP"
+codesign --force --sign - "$APP"
 codesign --verify --deep --strict "$APP"
 
 # ---------------------------------------------------------------- zip

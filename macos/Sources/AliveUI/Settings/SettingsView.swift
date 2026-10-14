@@ -61,6 +61,7 @@ private struct GeneralSettingsView: View {
                 }
             }
             UpdatesSection()
+            ExtensionsSection()
         }
         .formStyle(.grouped)
     }

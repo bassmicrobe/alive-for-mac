@@ -1,6 +1,7 @@
 // Mac-only: the background half of upstream's HomeView.Want/ThumbCache flow — disk cache first, then
 // parse + draw at most a few sets at a time, newest request first, skipping what was scrolled away.
 import AliveCore
+import AliveRender
 import CoreGraphics
 import Foundation
 

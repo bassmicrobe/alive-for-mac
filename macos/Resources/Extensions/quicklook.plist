@@ -1,0 +1,12 @@
+    <key>NSExtension</key>
+    <dict>
+        <key>NSExtensionPointIdentifier</key><string>com.apple.quicklook.preview</string>
+        <key>NSExtensionPrincipalClass</key><string>AlivePreviewProvider</string>
+        <key>NSExtensionAttributes</key>
+        <dict>
+            <key>QLSupportedContentTypes</key>
+            <array><string>com.ableton.live-set</string></array>
+            <key>QLIsDataBasedPreview</key><true/>
+            <key>QLSupportsSearchableItems</key><false/>
+        </dict>
+    </dict>

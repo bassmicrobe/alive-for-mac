@@ -1,6 +1,7 @@
 // Small pure pieces added by the UI/UX pass: unit-explicit counts, plain read errors, display-only
 // trimming, the name column of the preview and the localized VoiceOver states.
 import XCTest
+@testable import AliveRender
 @testable import AliveUI
 
 @MainActor

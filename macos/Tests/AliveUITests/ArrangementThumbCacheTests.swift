@@ -1,6 +1,7 @@
 import CoreGraphics
 import XCTest
 @testable import AliveCore
+@testable import AliveRender
 @testable import AliveUI
 
 final class ArrangementThumbCacheTests: XCTestCase {

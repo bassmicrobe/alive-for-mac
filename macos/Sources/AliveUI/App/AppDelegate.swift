@@ -10,6 +10,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @MainActor static func attach(_ app: AppModel) {
         model = app
+        URLCommands.attach(app)
         guard !earlyPaths.isEmpty else { return }
         app.openPaths(earlyPaths)
         earlyPaths = []
@@ -43,6 +44,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func application(_ application: NSApplication, open urls: [URL]) {
+        MainActor.assumeIsolated { URLCommands.handle(urls.filter { $0.scheme == URLCommand.scheme }, model: AppDelegate.model) }
         let paths = urls.filter { $0.pathExtension.lowercased() == "als" }.map(\.path)
         guard !paths.isEmpty else { return }
         MainActor.assumeIsolated {
