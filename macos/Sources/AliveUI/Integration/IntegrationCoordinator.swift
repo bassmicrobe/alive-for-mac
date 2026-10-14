@@ -71,7 +71,11 @@ final class IntegrationCoordinator {
         let indexer = spotlight
         let previous = syncTask
         guard app.settings.spotlight else {
-            syncTask = Task { await previous?.value; await indexer.removeEverything() }
+            syncTask = Task {
+                await previous?.value
+                await indexer.removeEverything()
+                if let text = SpotlightDebugQuery.text { SpotlightDebugQuery.logMatches(for: text) }
+            }
             return
         }
         // Nothing to say before the first publish: an empty catalog would clear the index.
@@ -85,6 +89,7 @@ final class IntegrationCoordinator {
                                        description: SpotlightDocument.describe(set))
             }
             await indexer.sync(documents)
+            if let text = SpotlightDebugQuery.text { SpotlightDebugQuery.logMatches(for: text) }
         }
     }
 
