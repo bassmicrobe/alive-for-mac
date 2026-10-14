@@ -7,11 +7,13 @@ let extensionSwiftSettings: [SwiftSetting] = [.unsafeFlags(["-application-extens
 // Quick Look has no `@main`: its principal class is found by NSExtension, so the executable starts in
 // _NSExtensionMain.
 let quickLookLinkerSettings: [LinkerSetting] = [
-    .unsafeFlags(["-Xlinker", "-e", "-Xlinker", "_NSExtensionMain", "-application-extension"]),
+    .unsafeFlags(["-Xlinker", "-e", "-Xlinker", "_NSExtensionMain", "-Xlinker", "-application_extension"]),
 ]
 // The widget is a SwiftUI `@main WidgetBundle`: its generated `_main` (WidgetBundle.main()) must run,
 // so the entry point is left alone.
-let widgetLinkerSettings: [LinkerSetting] = [.unsafeFlags(["-application-extension"])]
+// The linker flag goes straight to ld: the universal (xcbuild) link step drives clang, which
+// rejects the swiftc spelling `-application-extension` (Xcode 26).
+let widgetLinkerSettings: [LinkerSetting] = [.unsafeFlags(["-Xlinker", "-application_extension"])]
 
 let package = Package(
     name: "AliveForMac",
