@@ -59,6 +59,15 @@ public struct Settings: Equatable, Sendable {
     /// Mac-only: UI language, `system`, `en` or `ja`.
     public var lang = Settings.systemLang
 
+    // Mac-only integration (keys `spotlight`, `menubar`, `findertags`)
+    /// Index the sets in Spotlight.
+    public var spotlight = true
+    /// Show the menu bar extra.
+    public var menuBar = true
+    /// Write a project's tags to its folder as Finder tags. Off by default: it changes the
+    /// project folders, which Dropbox / iCloud sync.
+    public var finderTags = false
+
     /// Lines with keys this build does not know, in file order — round-tripped verbatim.
     public var unknownLines: [String] = []
 
@@ -134,6 +143,9 @@ public struct Settings: Equatable, Sendable {
         case "collecttozip": collectToZip = on
         case "windowmax": windowMaximized = on
         case "checkupdates": checkUpdates = on
+        case "spotlight": spotlight = on
+        case "menubar": menuBar = on
+        case "findertags": finderTags = on
         default: return false
         }
         return true
@@ -196,6 +208,7 @@ public struct Settings: Equatable, Sendable {
         opt("window", windowBounds); flag("windowmax", windowMaximized)
         flag("checkupdates", checkUpdates)
         opt("lastupdatecheck", lastUpdateCheck); opt("seenupdate", seenUpdate)
+        flag("spotlight", spotlight); flag("menubar", menuBar); flag("findertags", finderTags)
         out.append("lang=\(lang)")
         out.append(contentsOf: unknownLines)
         return out.joined(separator: "\n") + "\n"

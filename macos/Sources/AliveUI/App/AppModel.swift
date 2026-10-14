@@ -58,6 +58,8 @@ final class AppModel {
     @ObservationIgnored lazy var player = PlayerModel(app: self)
     @ObservationIgnored lazy var rescue = RescueModel(app: self)
     @ObservationIgnored lazy var export = ExportModel(app: self)
+    /// Spotlight, Finder tags and the "show in Alive" entry point (Integration/).
+    @ObservationIgnored lazy var integration = IntegrationCoordinator(app: self)
 
     init(dataDir: String = AppHome.path) {
         self.dataDir = dataDir
@@ -81,6 +83,7 @@ final class AppModel {
         _ = HomeStore.shared.pins
         announceBackedUpFiles()
         catalog.start()
+        integration.start()
         samples.expandsRootsOnFirstLoad = true
         samples.start()
     }
@@ -96,8 +99,10 @@ final class AppModel {
         let groupingChanged = next.groupByFolder != settings.groupByFolder
         let sampleRootsChanged = next.sampleRoots != settings.sampleRoots
             || next.disabledSampleRoots != settings.disabledSampleRoots
+        let previous = settings
         settings = next
         saveSettings()
+        integration.settingsDidChange(from: previous)
         if groupingChanged { catalog.settingsDidChange() }
         if sampleRootsChanged { samples.syncRoots() }
     }
@@ -192,6 +197,7 @@ final class AppModel {
                                      disabledRoots: settings.disabledRoots).select)
         }
         flushPendingOpen()
+        integration.catalogDidChange()
         UpdateModel.shared.dailyCheckIfDue(app: self)
     }
 

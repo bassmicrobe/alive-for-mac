@@ -19,7 +19,7 @@ struct SettingsView: View {
                 .tabItem { Label(SettingsStrings.tabAbout.s, systemImage: "info.circle") }
                 .tag(Pane.about)
         }
-        .frame(width: 540, height: 560)
+        .frame(width: 540, height: 680)
     }
 }
 
@@ -60,6 +60,7 @@ private struct GeneralSettingsView: View {
                         .textSelection(.enabled)
                 }
             }
+            IntegrationSection()
             UpdatesSection()
         }
         .formStyle(.grouped)
