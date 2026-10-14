@@ -129,6 +129,7 @@ extension SamplesModel {
             let fresh = await SampleWalkQueue.run { () -> SampleIndex? in
                 let built = SampleIndex.build(roots: roots, disabled: off, previous: previous,
                                               mounted: VolumeState.mountedVolumeNames(),
+                                              mountedNow: { VolumeState.mountedVolumeNames() },
                                               progress: relay.report, isCancelled: { flag.isCancelled })
                 guard !flag.isCancelled else { return nil }
                 SampleCache.save(built, dir: dir)

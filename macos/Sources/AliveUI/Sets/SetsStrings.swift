@@ -16,7 +16,7 @@ enum SetsStrings: LocalizedStrings {
     case rendersHeading, moreItems
     // Readiness (Mac-only)
     case readyNow, readyNowHelp, statusHeading, statusReady, statusOffline, statusMissingFiles
-    case statusMissingPlugins, statusUnknown, statusOfflineLine, statusStaleLine, staleRender, staleRenderHelp
+    case statusMissingPlugins, statusUnknown, statusUnreadable, statusUnreadableHelp, statusOfflineLine, statusStaleLine, staleRender, staleRenderHelp
     case fltReadiness, fltStaleRender, fltReadinessNone
     // Filters
     case filtersTitle, fltModified, fltFrom, fltTo, fltDateHint, fltVersion, fltKeyRoot, fltScale, fltTags, fltTracks
@@ -100,6 +100,9 @@ enum SetsStrings: LocalizedStrings {
         case .statusMissingFiles: return ("Files missing", "ファイル不足")
         case .statusMissingPlugins: return ("Plugins missing", "プラグイン不足")
         case .statusUnknown: return ("Plugin status unknown", "プラグイン状況不明")
+        case .statusUnreadable: return ("Can't be read", "読み込めません")
+        case .statusUnreadableHelp: return ("The set file could not be read, so what it needs is unknown",
+                                            "セットファイルを読み込めなかったため、必要なものが分かりません")
         case .statusOfflineLine: return ("%1$@ isn't connected (%2$lld files)", "%1$@ が未接続（%2$lld ファイル）")
         case .statusStaleLine: return ("The render is older than the set (exported %@)", "レンダーがセットより古い（%@ 書き出し）")
         case .staleRender: return ("Stale render", "レンダーが古い")

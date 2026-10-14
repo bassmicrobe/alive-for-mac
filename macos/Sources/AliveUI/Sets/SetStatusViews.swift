@@ -12,6 +12,7 @@ enum SetStatusFormat {
         case .missingFiles: return SetsStrings.statusMissingFiles.s
         case .missingPlugins: return SetsStrings.statusMissingPlugins.s
         case .unknown: return SetsStrings.statusUnknown.s
+        case .unreadable: return SetsStrings.statusUnreadable.s
         }
     }
 
@@ -22,13 +23,14 @@ enum SetStatusFormat {
         case .missingFiles: return "exclamationmark.triangle"
         case .missingPlugins: return "puzzlepiece.extension"
         case .unknown: return "questionmark.circle"
+        case .unreadable: return "doc.badge.ellipsis"
         }
     }
 
     static func tint(_ readiness: Readiness) -> Color {
         switch readiness {
         case .ready: return Theme.green
-        case .offline, .missingFiles, .missingPlugins: return Theme.red
+        case .offline, .missingFiles, .missingPlugins, .unreadable: return Theme.red
         case .unknown: return Theme.secondaryText
         }
     }
@@ -48,7 +50,8 @@ enum SetStatusFormat {
 
     /// Help text for a mark: the readiness plus whatever is behind it.
     static func help(_ status: SetStatus) -> String {
-        [label(status.readiness), offlineLine(status), staleLine(status)]
+        [label(status.readiness), status.isUnreadable ? SetsStrings.statusUnreadableHelp.s : nil,
+         offlineLine(status), staleLine(status)]
             .compactMap { $0 }.joined(separator: "\n")
     }
 }
@@ -92,6 +95,10 @@ struct DetailStatus: View {
             Text(SetsStrings.statusHeading.s).font(Theme.fLabel).foregroundStyle(Theme.secondaryText)
             line(symbol: SetStatusFormat.symbol(status.readiness), tint: SetStatusFormat.tint(status.readiness),
                  text: SetStatusFormat.label(status.readiness), color: Theme.text)
+            if status.isUnreadable {
+                line(symbol: "info.circle", tint: Theme.secondaryText, text: SetsStrings.statusUnreadableHelp.s,
+                     color: Theme.secondaryText)
+            }
             if let offline = SetStatusFormat.offlineLine(status) {
                 line(symbol: "externaldrive.badge.xmark", tint: Theme.red, text: offline, color: Theme.secondaryText)
             }

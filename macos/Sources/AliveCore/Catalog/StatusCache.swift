@@ -77,13 +77,15 @@ public enum StatusCache {
     }
 
     /// Writes only when the content differs from what is on disk (a no-op rescan leaves the
-    /// file's mtime alone). Returns whether it was written.
+    /// file's mtime alone). Returns whether the file now holds `content` (written or already so);
+    /// false: the write failed.
     @discardableResult
     public static func save(_ content: StatusCacheContent, dir: String) -> Bool {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
         do {
-            return try AppHome.writeAtomicallyIfChanged(try encoder.encode(content), to: path(dir: dir))
+            _ = try AppHome.writeAtomicallyIfChanged(try encoder.encode(content), to: path(dir: dir))
+            return true
         } catch {
             Diag.fail("status.cache write", error)
             return false

@@ -32,8 +32,14 @@ extension SampleIndex {
     /// not walked — an unplugged drive is not an empty one — and keeps its tree from `previous`
     /// (or stands there empty if it was never walked), so its samples, and the sets' use of them,
     /// survive until the drive is back. nil: no volume knowledge, every root is walked.
+    ///
+    /// A root whose walk fails, or whose volume disappeared while it was walked (`mountedNow` is
+    /// read again after each walk and compared with `mounted`; nil: assumed unchanged), keeps the
+    /// subtree of `previous`: only a root that is confirmed gone (missing on a mounted volume)
+    /// drops out. A tree that lost a root is never the result.
     public static func build(roots: [String], disabled: [String], previous: SampleIndex? = nil,
                              mounted: Set<String>? = nil,
+                             mountedNow: (() -> Set<String>)? = nil,
                              progress: ((Int) -> Void)? = nil,
                              isCancelled: @escaping () -> Bool = { false }) -> SampleIndex {
         let walk = effective(roots, disabled: disabled)
@@ -48,7 +54,18 @@ extension SampleIndex {
             if let mounted, VolumeState.isOffline(walk[i], mounted: mounted) {
                 return SampleIndex.kept(root: walk[i], from: previous)
             }
-            return SampleIndex.walk(root: walk[i], known: known, found: counter.add, isCancelled: isCancelled)
+            let tree = SampleIndex.walk(root: walk[i], known: known, found: counter.add, isCancelled: isCancelled)
+            if isCancelled() { return tree }
+            guard let mounted else { return tree }
+            // The drive may have gone away during the walk: what was read is then not to be trusted.
+            let now = mountedNow?() ?? mounted
+            if VolumeState.isOffline(walk[i], mounted: now) { return SampleIndex.kept(root: walk[i], from: previous) }
+            if let tree { return tree }
+            // The walk failed on a mounted volume: gone for sure only if the folder does not exist.
+            if !FileManager.default.fileExists(atPath: walk[i]), !VolumeState.isOffline(walk[i], mounted: mounted) {
+                return nil
+            }
+            return SampleIndex.kept(root: walk[i], from: previous)
         }
         var idx = SampleIndex.combining(trees.compactMap { $0 })
         if !isCancelled() { SamplePrints.take(&idx, known: known, isCancelled: isCancelled) }

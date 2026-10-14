@@ -25,6 +25,11 @@ public enum FullScanReason: Equatable, Sendable {
     case tooManyChanges
     /// Something changed directly in the root (above the project level).
     case changedAtRoot
+    /// An external or removable volume: FSEvents ids are host-global, and such a drive may have
+    /// been changed on another Mac, so its position proves nothing.
+    case externalVolume
+    /// The catalog on disk is not the one the checkpoint was taken with.
+    case catalogMismatch
 }
 
 public enum RootScanMode: Equatable, Sendable {
@@ -82,12 +87,14 @@ public enum DiffScan {
 
     /// Full walk or journal replay for one root? Pure.
     public static func mode(history: RootHistory?, identity: RootIdentity, hasCachedSets: Bool,
-                            now: Date = Date()) -> RootScanMode {
+                            now: Date = Date(), catalogStamp: String = "") -> RootScanMode {
         guard let history else { return .full(.noHistory) }
         guard identity.isLocal, history.isLocal else { return .full(.notLocal) }
+        guard identity.isInternal else { return .full(.externalVolume) }
         guard let uuid = identity.deviceUUID, !uuid.isEmpty else { return .full(.noJournal) }
         guard uuid == history.deviceUUID else { return .full(.deviceChanged) }
         guard hasCachedSets else { return .full(.noCachedSets) }
+        guard history.catalogStamp == catalogStamp else { return .full(.catalogMismatch) }
         guard now.timeIntervalSince(history.fullWalkAt) <= maxHistoryAge else { return .full(.tooOld) }
         return .replay(since: history.eventId)
     }

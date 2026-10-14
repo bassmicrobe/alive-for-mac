@@ -30,6 +30,12 @@ public struct ScanStats: Equatable, Sendable {
     public var fullFallbacks: [FullScanReason] = []
     /// Directories read again by a diff scan.
     public var diffRegions = 0
+    /// Diffed roots with a changed folder that could not be listed (permission, a volume that went
+    /// away mid-scan): their previous rows were kept and no checkpoint is recorded for them, so the
+    /// next launch walks them in full.
+    public var incompleteDiffRoots: [String] = []
+    /// The caches could not be saved, so the journal checkpoint was left where it was.
+    public var checkpointKept = false
 }
 
 /// The catalog of sets. Parsing one set takes around 100 ms and there are thousands of them, so
@@ -71,6 +77,9 @@ public final class ProjectIndex: @unchecked Sendable {
     var _projectFacts: [String: ProjectFacts] = [:]
     var _factsLoaded = false
     var _mounted: Set<String>?
+    var _mountGeneration = 0                  // bumps whenever `_mounted` is replaced
+    /// Test seam: runs between computing the statuses and publishing them.
+    var beforeStatusPublish: (() -> Void)?
     var _statuses: [String: SetStatus] = [:]
 
     /// The volumes mounted right now; injectable for tests.
@@ -193,8 +202,9 @@ public final class ProjectIndex: @unchecked Sendable {
         var stats = ScanStats()
         let cache = cachedEntries()
         let diff = useHistory ? planDiff(roots: Self.enabled(roots, disabledRoots), cache: cache, stats: &stats) : [:]
+        var keep = DiffKeep()
         let files = collectFiles(roots: roots, disabledRoots: disabledRoots, cache: cache, diff: diff, mounted: mounted,
-                                 progress: progress, stats: &stats, isCancelled: isCancelled)
+                                 keep: &keep, progress: progress, stats: &stats, isCancelled: isCancelled)
         stats.total = files.count
         // An offline drive or denied directory is not evidence that its sets were deleted.
         // Keep the last complete catalog and both caches until every enabled root is readable.
@@ -215,7 +225,7 @@ public final class ProjectIndex: @unchecked Sendable {
         let counters = Counters()
         let built: [Built?] = Parallel.map(count: files.count, isCancelled: isCancelled) { i in
             let r = self.entry(for: files[i], cache: cache, facts: known.sets, mounted: mounted, env: env,
-                               probe: probe, counters: counters, isCancelled: isCancelled)
+                               probe: probe, counters: counters, keep: keep, isCancelled: isCancelled)
             let n = counters.done()
             if let progress, n % 8 == 0 || n == files.count { progress(n, files.count, r.entry.name) }
             return r
@@ -243,7 +253,8 @@ public final class ProjectIndex: @unchecked Sendable {
             return true
         }
         let previousActivity = history.total > 0 ? history : Activity.loadCache(dir: dir)
-        let regions = diff.values.flatMap { $0 }
+        let incompleteRegions = Set(keep.regions)
+        let regions = diff.values.flatMap { $0 }.filter { !incompleteRegions.contains($0) }   // an unreadable folder keeps its last facts
         let reusable = diff.isEmpty ? [:] : cleanProjects(known.projects, diffRoots: Array(diff.keys), regions: regions)
         guard let walked = walkProjects(&fresh, changed: changed, full: fullRescan, reuse: reusable,
                                         isCancelled: isCancelled),
@@ -259,14 +270,23 @@ public final class ProjectIndex: @unchecked Sendable {
         lock.lock()
         _sets = fresh; _history = activity; _generation += 1
         _weightMemo = walked.memo
-        _facts = newFacts.sets; _projectFacts = newFacts.projects; _mounted = mounted
+        _facts = newFacts.sets; _projectFacts = newFacts.projects; _mounted = mounted; _mountGeneration += 1
         lock.unlock()
-        StatusCache.save(newFacts, dir: dir)
-        recordHistory(roots: Self.enabled(roots, disabledRoots), eventId: startEventId, diff: diff,
-                      failed: stats.failedRoots)
         activity.saveCache(dir: dir)
         // The reuse map follows the file on disk: a failed save leaves it as it was.
-        if IndexCache.save(fresh, dir: dir) != .failed { rememberCache(fresh) }
+        let indexSaved = IndexCache.save(fresh, dir: dir)
+        if indexSaved != .failed { rememberCache(fresh) }
+        let statusSaved = StatusCache.save(newFacts, dir: dir)
+        // The journal checkpoint is committed last, and only when both caches are on disk (written
+        // or verified unchanged): a checkpoint newer than its catalog would make the next launch
+        // skip changes the saved catalog never saw. It carries the stamp of the pair it belongs to.
+        if indexSaved != .failed, statusSaved {
+            recordHistory(roots: Self.enabled(roots, disabledRoots), eventId: startEventId, diff: diff,
+                          failed: stats.failedRoots, incomplete: stats.incompleteDiffRoots)
+        } else {
+            stats.checkpointKept = true
+            Diag.warn("scan: catalog caches not saved; the journal checkpoint stays where it was")
+        }
         refreshInstalled()
         progress?(fresh.count, files.count, "")
 
@@ -281,8 +301,9 @@ public final class ProjectIndex: @unchecked Sendable {
     /// Walks each enabled root. One and the same .als turns up twice easily when roots are
     /// nested ("~/Music" and "~/Music/Ableton"): without the `seen` filter the set would double.
     private func collectFiles(roots: [String], disabledRoots: [String], cache: [String: SetEntry],
-                              diff: [String: [String]], mounted: Set<String>, progress: ScanProgress?,
-                              stats: inout ScanStats, isCancelled: () -> Bool) -> [String] {
+                              diff: [String: [String]], mounted: Set<String>, keep: inout DiffKeep,
+                              progress: ScanProgress?, stats: inout ScanStats,
+                              isCancelled: () -> Bool) -> [String] {
         var files: [String] = []
         var seen = Set<String>()
         func add(_ f: String) {
@@ -294,11 +315,23 @@ public final class ProjectIndex: @unchecked Sendable {
             if isCancelled() { break }
             let before = files.count
             if let regions = diff[Self.diffKey(root)] {
-                let r = collectDiffFiles(root: root, regions: regions, cache: cache, onFile: add,
+                let d = collectDiffFiles(root: root, regions: regions, cache: cache, onFile: add,
                                          isCancelled: isCancelled)
+                let r = d.result
+                keep.paths.formUnion(d.kept)
+                keep.regions += d.incompleteRegions
                 stats.unreadableFolders += r.unreadable
+                if d.incomplete { stats.incompleteDiffRoots.append(root) }
+                // The whole root vanished while the cached rows were being checked (a drive pulled
+                // out): that is a failed root, not a root without sets.
+                if !isCancelled(), FolderScan.list(DiffScan.norm(root)) == nil {
+                    stats.failedRoots.append(root)
+                    if !FileManager.default.fileExists(atPath: root),
+                       !VolumeState.isOffline(root, mounted: mountProvider()) { stats.missingRoots.append(root) }
+                }
                 Diag.info("scan: \(root) -> \(files.count - before) sets, journal diff: \(regions.count) folders read"
-                          + (r.unreadable > 0 ? ", \(r.unreadable) folders unreadable" : ""))
+                          + (r.unreadable > 0 ? ", \(r.unreadable) folders unreadable" : "")
+                          + (d.incomplete ? ", incomplete: previous rows kept, full walk next time" : ""))
                 continue
             }
             let r = FolderScan.find(root: root, ext: ".als", includeBackups: false, onFile: add,
@@ -338,8 +371,14 @@ public final class ProjectIndex: @unchecked Sendable {
 
     private func entry(for file: String, cache: [String: SetEntry], facts: [String: SetFacts],
                        mounted: Set<String>, env: LiveEnvironment, probe: ProbeCache, counters: Counters,
-                       isCancelled: () -> Bool) -> Built {
+                       keep: DiffKeep, isCancelled: () -> Bool) -> Built {
         guard let stamp = SetBuilder.stamp(of: file) else {
+            // Its folder could not be listed and the row is not known to be gone: it stays as it was.
+            if keep.paths.contains(file.lowercased()), let cached = cache[file.lowercased()] {
+                counters.reuse()
+                return Built(entry: cached, reused: true,
+                             offline: facts[file.lowercased()].flatMap { $0.matches(cached) ? $0 : nil }?.offline ?? [])
+            }
             counters.failed()
             return Built(entry: SetBuilder.failed(path: file, error: "cannot read file attributes"),
                          reused: false, offline: [])

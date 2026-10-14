@@ -6,6 +6,9 @@ import Foundation
 /// Can the set be opened as it was saved, and if not, why. Order of precedence when several
 /// apply: missing files, missing plugins, offline volume, unknown, ready.
 public enum Readiness: String, Sendable, CaseIterable {
+    /// The .als could not be read (damaged, wrong format, no permission): nothing about it is
+    /// known, so it must never count as ready. Takes precedence over everything else.
+    case unreadable
     /// Every referenced file found and every plugin installed.
     case ready
     /// Nothing known to be missing, but some files live on a volume that isn't connected.
@@ -28,6 +31,8 @@ public struct SetStatus: Equatable, Sendable {
     public var missingFiles: Int
     /// Plugins not installed; `nil` when the inventory is unavailable.
     public var missingPlugins: Int?
+    /// The set failed to parse (`SetEntry.error` is not empty); see `Readiness.unreadable`.
+    public var isUnreadable: Bool
     /// Modification date of the newest render next to the set, if any.
     public var newestRender: Date?
     /// The set was saved after its newest render (beyond `staleTolerance`).
@@ -37,7 +42,9 @@ public struct SetStatus: Equatable, Sendable {
     public static let staleTolerance: TimeInterval = 120
 
     public init(offlineFiles: Int = 0, offlineVolumes: [String] = [], missingFiles: Int = 0,
-                missingPlugins: Int? = 0, newestRender: Date? = nil, renderIsStale: Bool = false) {
+                missingPlugins: Int? = 0, newestRender: Date? = nil, renderIsStale: Bool = false,
+                isUnreadable: Bool = false) {
+        self.isUnreadable = isUnreadable
         self.offlineFiles = offlineFiles
         self.offlineVolumes = offlineVolumes
         self.missingFiles = missingFiles
@@ -47,6 +54,7 @@ public struct SetStatus: Equatable, Sendable {
     }
 
     public var readiness: Readiness {
+        if isUnreadable { return .unreadable }
         if missingFiles > 0 { return .missingFiles }
         if let plugins = missingPlugins, plugins > 0 { return .missingPlugins }
         if offlineFiles > 0 { return .offline }
@@ -65,7 +73,8 @@ public struct SetStatus: Equatable, Sendable {
     /// sidecar doesn't cover.
     public static func basic(_ entry: SetEntry, pluginsKnown: Bool) -> SetStatus {
         SetStatus(missingFiles: entry.missingFiles,
-                  missingPlugins: pluginsKnown ? entry.missingPlugins : nil)
+                  missingPlugins: pluginsKnown ? entry.missingPlugins : nil,
+                  isUnreadable: !entry.error.isEmpty)
     }
 
     /// The one place a set's status is worked out (scan, mount/unmount handling and tests all use
@@ -75,6 +84,12 @@ public struct SetStatus: Equatable, Sendable {
     /// *now* are offline too — that is how an unplugged drive shows without a rescan.
     public static func derive(entry: SetEntry, offlinePaths: [String], newestRender: Date?,
                               mounted: Set<String>, pluginsKnown: Bool) -> SetStatus {
+        if !entry.error.isEmpty {
+            // A set that did not parse says nothing about its files or plugins.
+            return SetStatus(missingPlugins: pluginsKnown ? 0 : nil, newestRender: newestRender,
+                             renderIsStale: isStale(setModified: entry.modified, newestRender: newestRender),
+                             isUnreadable: true)
+        }
         var volumes = Set<String>()
         var offline = 0
         for path in entry.samples + offlinePaths {
