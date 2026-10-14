@@ -124,7 +124,7 @@ shows a sample in the tree, `⇧Return` reveals it in Finder.
 - Everything Alive remembers lives in `~/Library/Application Support/Alive for Mac` (Settings → Data
   folder). Set the `ALIVE_HOME` environment variable to keep it somewhere else. Tags and notes are in
   `notes.cfg`, settings in `settings.cfg`, the scan result in `index.cache`, thumbnails in `thumbs/`.
-  File names and formats are, for the most part, the original's. Files this port adds: `status.cache` (per-set state such as offline references and the newest render), `scan-history.cfg` (the FSEvents position of each folder, for the fast launch scan), `spotlight.snapshot` (what was donated to Spotlight), `findertags.cfg` (the Finder tags Alive added) and `widget.json` (the widget's data).
+  File names and formats are, for the most part, the original's. Files this port adds: `status.cache` (per-set state such as offline references and the newest render), `scan-history.cfg` (the FSEvents position of each folder, for the fast launch scan), `spotlight.snapshot` (what was donated to Spotlight), `findertags.cfg` (the Finder tags Alive added) and `widget/widget.json` (the widget's data, in a subfolder of its own).
 - Alive **never modifies your original sets** and **never moves or deletes your samples**. Rescue works
   on copies of the set; Export writes to a new folder (or `.zip`). The one exception, only if you turn it on, is Finder tags (see above), which change the Finder tags of project folders.
 - The **only** network use is the update check: one request to GitHub for the latest release of this

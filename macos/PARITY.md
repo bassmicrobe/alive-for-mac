@@ -134,15 +134,15 @@ data lives in separate files, see below).
 
 | Feature | Note |
 |---|---|
-| Set readiness ("Ready to open") | A Sets filter and an inspector line: every referenced file found, every plugin installed, no drive missing. Precedence: files missing, plugins missing, drive offline, plugin status unknown, ready. |
+| Set readiness ("Ready to open") | A Sets filter and an inspector line: every referenced file found, every plugin installed, no drive missing. Precedence: can't be read (the .als did not parse: never ready), files missing, plugins missing, drive offline, plugin status unknown, ready. |
 | Offline volumes | A path under an unmounted `/Volumes/<X>` is *offline*, not missing: its own wording on sets and sample roots, updated on mount/unmount without a rescan. A project root that no longer exists is reported as "Folder not found" with *Choose again* / *Remove*. |
 | Stale render | A set saved more than two minutes after its newest render is marked; also a Sets filter. |
-| Launch diff scan | At launch a local root is brought up to date from the FSEvents journal (`scan-history.cfg`) instead of a full walk; network volumes, an old or untrusted journal and every explicit rescan fall back to a full scan. |
-| Spotlight search | Sets are donated to Core Spotlight (name, tempo, key, plugins, tags). The items are app-donated: they appear in the system search (⌘Space), **not** in `mdfind`. On by default (Settings, "Mac 連携"). |
+| Launch diff scan | At launch a local root is brought up to date from the FSEvents journal (`scan-history.cfg`) instead of a full walk; network volumes, external or removable drives (event ids are host-global), an old or untrusted journal, a catalog that is not the one the checkpoint was taken with, and every explicit rescan fall back to a full scan. The checkpoint is saved only after `index.cache` and `status.cache` were; a changed folder that cannot be listed keeps its rows and the root is walked in full next time. |
+| Spotlight search | Sets are donated to Core Spotlight (name, tempo, key, plugins, tags). The items are app-donated: they appear in the system search (⌘Space), **not** in `mdfind`. On by default (Settings, "Mac 連携"). Switching it off deletes Alive's items from Spotlight (the whole domain, once per launch, whether or not a local snapshot exists). |
 | Menu bar extra | Today's saves, streak, pinned and recent projects, now playing. On by default. |
 | Finder tags | Opt-in, off by default: Alive tags are written to the project folder as Finder tags (merged with the user's own; only tags Alive added are removed again). This changes project folders, which Dropbox / iCloud sync. |
 | Quick Look preview | Space on an `.als` in Finder shows the arrangement and the set's details. Needs **one-time enabling** (Settings, "Quick Look とウィジェット", then *Enable*). |
-| Desktop widget | Streak, activity heatmap and recent sets. Needs **one-time enabling** (right-click the desktop, Edit Widgets, Alive). It reads `widget.json` from the default data folder only: with a custom `ALIVE_HOME` it shows its placeholder. |
+| Desktop widget | Streak, activity heatmap and recent sets. Needs **one-time enabling** (right-click the desktop, Edit Widgets, Alive). It reads `widget/widget.json` from the default data folder only: with a custom `ALIVE_HOME` it shows its placeholder. |
 | `alive://` URL scheme | `home`, `sets?q=`, `open?path=`, `latest`, `random`, `rescan`, `samples?q=`, `stat`. This is the Shortcuts route ("Open URLs"): **App Intents are not implemented**. `open?path=` only opens sets that are in the catalog. |
 | Language-following sizes | File sizes follow the app language, not the system locale. |
 
@@ -150,7 +150,7 @@ data lives in separate files, see below).
 
 | Item | Status | Note |
 |---|---|---|
-| `status.cache`, `scan-history.cfg`, `spotlight.snapshot`, `findertags.cfg`, `widget.json` | Mac-only | New files in the data folder; upstream's files are untouched. `status.cache` (JSON) holds offline references, newest render and project-folder facts; `scan-history.cfg` the journal position per root (tab separated); `spotlight.snapshot` what was donated to Spotlight; `findertags.cfg` the Finder tags Alive added; `widget.json` the widget's data. |
+| `status.cache`, `scan-history.cfg`, `spotlight.snapshot`, `findertags.cfg`, `widget/widget.json` | Mac-only | New files in the data folder; upstream's files are untouched. `status.cache` (JSON) holds offline references, newest render and project-folder facts; `scan-history.cfg` the journal position per root (tab separated); `spotlight.snapshot` what was donated to Spotlight; `findertags.cfg` the Finder tags Alive added; `widget/widget.json` the widget's data (its own subfolder, the only place the widget's sandbox may read). |
 | `settings.cfg`, `notes.cfg`, `home.cfg`, `previews.cfg`, `nebula.cfg`, `alive.log`, `probes.txt` | Done | Unknown keys round-trip unchanged; Mac-only keys are extra lines (`lang=`, `spotlight=`, `menubar=`, `findertags=`; `sets-columns.json` is a separate file). |
 | `index.cache`, `activity.cache`, `samples.cache` | Simplified | Written in the .NET `BinaryWriter` layout and tested against hand-verified bytes, but **never verified against a cache written by the real Windows app**. |
 | `.als` parsing | Simplified | The whole set is inflated into memory and tokenized by hand (about 11x faster than `XMLParser`; 754 sets in about 8 s on a warm disk). UTF-8 only. AU fields added. Line-based patching for Rescue like upstream. |

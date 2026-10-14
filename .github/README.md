@@ -114,7 +114,7 @@ Quick Look とウィジェットは、最初に一度だけ有効にする必要
 
 ## データ・プライバシー・このアプリがしないこと
 
-- Alive が記憶する内容はすべて `~/Library/Application Support/Alive for Mac` にあります（設定 → データフォルダ）。環境変数 `ALIVE_HOME` で保存先を変更できます。タグとメモは `notes.cfg`、設定は `settings.cfg`、スキャン結果は `index.cache`、サムネイルは `thumbs/` に保存されます。ファイル名と形式は基本的にオリジナルと同じです。このポートが追加したファイルは次のとおりです。`status.cache`（オフラインの参照、最新レンダーなどセットごとの状態）、`scan-history.cfg`（起動時の差分スキャン用に、フォルダごとの FSEvents の位置）、`spotlight.snapshot`（Spotlight に登録した内容）、`findertags.cfg`（Alive が付けた Finder タグの記録）、`widget.json`（ウィジェット用のデータ）。
+- Alive が記憶する内容はすべて `~/Library/Application Support/Alive for Mac` にあります（設定 → データフォルダ）。環境変数 `ALIVE_HOME` で保存先を変更できます。タグとメモは `notes.cfg`、設定は `settings.cfg`、スキャン結果は `index.cache`、サムネイルは `thumbs/` に保存されます。ファイル名と形式は基本的にオリジナルと同じです。このポートが追加したファイルは次のとおりです。`status.cache`（オフラインの参照、最新レンダーなどセットごとの状態）、`scan-history.cfg`（起動時の差分スキャン用に、フォルダごとの FSEvents の位置）、`spotlight.snapshot`（Spotlight に登録した内容）、`findertags.cfg`（Alive が付けた Finder タグの記録）、`widget/widget.json`（ウィジェット用のデータ。ウィジェットが読める専用のサブフォルダ）。
 - 元のセットを**変更することは決してありません**。サンプルを**移動・削除することもありません**。レスキューはセットのコピーに対して動作し、エクスポートは新しいフォルダ（または `.zip`）に書き出します。例外は、オンにした場合の Finder タグ（上記）で、プロジェクトフォルダの Finder タグだけを書き換えます。
 - ネットワークを使うのは**アップデート確認だけ**です。設定の「アップデートを確認」を押したとき、または「1日1回アップデートを確認する」を有効にしたとき（初期状態は無効）に、このリポジトリの最新リリース情報を GitHub から取得します。あなたやライブラリの情報は送信しません。
 
