@@ -77,7 +77,27 @@ The DMG also contains the license files (`LICENSE`, `LICENSE-macos`, `NOTICE.md`
 - **Export.** Collect everything a set needs into one folder or `.zip`, like *Collect All and Save*.
 - **Preview and player.** The whole arrangement in Live's clip colours; play the render next to the set.
 - **Stat.** Your library as a cloud of dots; choose what axes, size and colour show.
+- **Ready to open.** Narrow Sets down to the ones that open right now: every file found, every plugin installed, every drive connected (the "Ready to open" button on Sets, or Readiness in Filters). The inspector says what is missing.
+- **External drives.** Files on an unplugged `/Volumes/<name>` drive are shown as *not connected*, not as missing, and catch up when you plug it in again; sample folders show an Offline badge. If a project folder itself was moved or deleted, Alive says "Folder not found" and lets you choose it again or remove it from the list.
+- **Stale renders.** A set saved more than two minutes after its newest render is marked, and you can filter for them.
+- **Fast launch.** For local folders, Alive re-reads only the project folders that changed since last time, using the FSEvents history (network volumes, an outdated history and manual rescans do a full scan).
+- **Spotlight search.** Find sets by name, tempo, key, plugin or tag from the system search (⌘Space). The items are donated by the app, so they show up in Spotlight but not in `mdfind`. Can be turned off in Settings (on by default).
+- **Menu bar.** Today's saves, streak, pinned and recent projects and what is playing, one click away (on by default).
+- **Finder tags (opt-in).** When enabled in Settings, Alive writes its tags to the project folders as Finder tags and keeps the ones you added yourself. It is off by default because it **modifies the project folders, and Dropbox / iCloud Drive sync that to your other devices**.
+- **Quick Look.** Select an `.als` in Finder and press Space to see its arrangement and details ([needs enabling](#enabling-quick-look-and-the-widget)).
+- **Desktop widget.** Streak, activity heatmap and recent sets on your desktop ([needs enabling](#enabling-quick-look-and-the-widget)).
+- **`alive://` URLs** for Shortcuts ("Open URLs") and scripts:
+  `alive://home`, `alive://sets?q=<text>`, `alive://open?path=<path of an .als>` (only sets in the catalog; opens in Live), `alive://latest` (opens the most recently modified set in Live), `alive://random` (selects a random project), `alive://rescan`, `alive://samples?q=<text>`, `alive://stat`
 - **English and Japanese**, switchable at runtime (Settings → Language: System / English / 日本語).
+
+## Enabling Quick Look and the widget
+
+Quick Look and the widget have to be switched on once.
+
+1. Put Alive for Mac in `/Applications`, open it, then go to **Settings → Quick Look & widget** (Japanese UI: Quick Look とウィジェット) and press **Enable**.
+2. **Quick Look:** select an `.als` file in Finder and press Space.
+3. **Widget:** right-click the desktop → Edit Widgets → pick **Alive**. The widget reads only the default data folder; if you moved it with `ALIVE_HOME`, it shows a placeholder.
+4. If Quick Look does not show up, run `qlmanage -r` in Terminal and try Finder again.
 
 ## Keyboard shortcuts
 
@@ -104,9 +124,9 @@ shows a sample in the tree, `⇧Return` reveals it in Finder.
 - Everything Alive remembers lives in `~/Library/Application Support/Alive for Mac` (Settings → Data
   folder). Set the `ALIVE_HOME` environment variable to keep it somewhere else. Tags and notes are in
   `notes.cfg`, settings in `settings.cfg`, the scan result in `index.cache`, thumbnails in `thumbs/`.
-  File names and formats are, for the most part, the original's.
+  File names and formats are, for the most part, the original's. Files this port adds: `status.cache` (per-set state such as offline references and the newest render), `scan-history.cfg` (the FSEvents position of each folder, for the fast launch scan), `spotlight.snapshot` (what was donated to Spotlight), `findertags.cfg` (the Finder tags Alive added) and `widget.json` (the widget's data).
 - Alive **never modifies your original sets** and **never moves or deletes your samples**. Rescue works
-  on copies of the set; Export writes to a new folder (or `.zip`).
+  on copies of the set; Export writes to a new folder (or `.zip`). The one exception, only if you turn it on, is Finder tags (see above), which change the Finder tags of project folders.
 - The **only** network use is the update check: one request to GitHub for the latest release of this
   repository, made when you press "Check for updates" in Settings, or once a day if you turn on
   "Check for updates once a day" (off by default). Nothing about you or your library is sent.

@@ -127,11 +127,31 @@ Legend: **Done** = same behaviour · **Simplified** = works, but less than upstr
 | Keyboard shortcuts | Done | Mac mapping in PORTING §7 (⌘ instead of Ctrl, ⌥⌘F for Filters, ⌘R for Rescan, ...). Same table in Help. |
 | App icon | Done | From `icon256.ico` (max 256 px). |
 
+## Mac-only additions
+
+None of these exist in upstream. They are additive: upstream's files and formats are unchanged (new
+data lives in separate files, see below).
+
+| Feature | Note |
+|---|---|
+| Set readiness ("Ready to open") | A Sets filter and an inspector line: every referenced file found, every plugin installed, no drive missing. Precedence: files missing, plugins missing, drive offline, plugin status unknown, ready. |
+| Offline volumes | A path under an unmounted `/Volumes/<X>` is *offline*, not missing: its own wording on sets and sample roots, updated on mount/unmount without a rescan. A project root that no longer exists is reported as "Folder not found" with *Choose again* / *Remove*. |
+| Stale render | A set saved more than two minutes after its newest render is marked; also a Sets filter. |
+| Launch diff scan | At launch a local root is brought up to date from the FSEvents journal (`scan-history.cfg`) instead of a full walk; network volumes, an old or untrusted journal and every explicit rescan fall back to a full scan. |
+| Spotlight search | Sets are donated to Core Spotlight (name, tempo, key, plugins, tags). The items are app-donated: they appear in the system search (⌘Space), **not** in `mdfind`. On by default (Settings, "Mac 連携"). |
+| Menu bar extra | Today's saves, streak, pinned and recent projects, now playing. On by default. |
+| Finder tags | Opt-in, off by default: Alive tags are written to the project folder as Finder tags (merged with the user's own; only tags Alive added are removed again). This changes project folders, which Dropbox / iCloud sync. |
+| Quick Look preview | Space on an `.als` in Finder shows the arrangement and the set's details. Needs **one-time enabling** (Settings, "Quick Look とウィジェット", then *Enable*). |
+| Desktop widget | Streak, activity heatmap and recent sets. Needs **one-time enabling** (right-click the desktop, Edit Widgets, Alive). It reads `widget.json` from the default data folder only: with a custom `ALIVE_HOME` it shows its placeholder. |
+| `alive://` URL scheme | `home`, `sets?q=`, `open?path=`, `latest`, `random`, `rescan`, `samples?q=`, `stat`. This is the Shortcuts route ("Open URLs"): **App Intents are not implemented**. `open?path=` only opens sets that are in the catalog. |
+| Language-following sizes | File sizes follow the app language, not the system locale. |
+
 ## Data formats
 
 | Item | Status | Note |
 |---|---|---|
-| `settings.cfg`, `notes.cfg`, `home.cfg`, `previews.cfg`, `nebula.cfg`, `alive.log`, `probes.txt` | Done | Unknown keys round-trip unchanged; Mac-only keys are extra lines (`lang=`, `sets-columns.json` is a separate file). |
+| `status.cache`, `scan-history.cfg`, `spotlight.snapshot`, `findertags.cfg`, `widget.json` | Mac-only | New files in the data folder; upstream's files are untouched. `status.cache` (JSON) holds offline references, newest render and project-folder facts; `scan-history.cfg` the journal position per root (tab separated); `spotlight.snapshot` what was donated to Spotlight; `findertags.cfg` the Finder tags Alive added; `widget.json` the widget's data. |
+| `settings.cfg`, `notes.cfg`, `home.cfg`, `previews.cfg`, `nebula.cfg`, `alive.log`, `probes.txt` | Done | Unknown keys round-trip unchanged; Mac-only keys are extra lines (`lang=`, `spotlight=`, `menubar=`, `findertags=`; `sets-columns.json` is a separate file). |
 | `index.cache`, `activity.cache`, `samples.cache` | Simplified | Written in the .NET `BinaryWriter` layout and tested against hand-verified bytes, but **never verified against a cache written by the real Windows app**. |
 | `.als` parsing | Simplified | The whole set is inflated into memory and tokenized by hand (about 11x faster than `XMLParser`; 754 sets in about 8 s on a warm disk). UTF-8 only. AU fields added. Line-based patching for Rescue like upstream. |
 | Scanning | Simplified | `concurrentPerform` with max(2, cores) workers (upstream: min(8, cores-1)). A cancelled scan publishes nothing. Symlinks, hidden files, `._*`, `.app`/packages and `Backup` are skipped. File sizes and dates come from `stat(2)` (see tech debt). |

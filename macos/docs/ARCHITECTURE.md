@@ -9,11 +9,16 @@ UI types are internal to `AliveUI`; all models are `@MainActor @Observable`.
 | Target | Contents | Rules |
 |---|---|---|
 | `CZlib` | system zlib module map | |
-| `AliveCore` | pure logic, Foundation + CZlib only, no user-visible strings. `Infra` (AppHome, Diag, Settings, Parallel, `FileStat`), `Als` (gzip, tokenizer, arrangement, refs), `Catalog` (scan, ProjectIndex, caches, FolderWatch, SetFilter, ProjectMeta, HomeStore), `Live` (environment, log, versions), `Plugins` (bundle scanner, inventory, filter, table), `Samples` (walk, index, usage, copies, cache), `Rescue` (probe, session, patching), `Export` (collect plan/scan/copy), `Update` (release check, schedule) | log text English; typed errors |
-| `AliveUI` | SwiftUI/AppKit: `App` (AliveApp, AppModel, MainWindow, AppCommands, SheetHost, DebugLaunch), `L10n`, `Theme`, `Services`, and one folder per feature (`Catalog`, `Home`, `Sets`, `Plugins`, `Samples`, `Stat`, `Rescue`, `Export`, `Settings`, `Help`) | every string in an `XxxStrings` table (en + ja) |
+| `AliveCore` | pure logic, Foundation + CZlib only, no user-visible strings. `Infra` (AppHome, Diag, Settings, Parallel, `FileStat`, `WidgetSnapshot`), `Als` (gzip, tokenizer, arrangement, refs), `Catalog` (scan, ProjectIndex, caches, FolderWatch, SetFilter, ProjectMeta, HomeStore; Mac-only: `SetStatus`/`Readiness`, `VolumeState`, `StatusCache`, `ScanHistory` + `DiffScan` + `FSEventsReplay`, `ByteSize`), `Live` (environment, log, versions), `Plugins` (bundle scanner, inventory, filter, table), `Samples` (walk, index, usage, copies, cache), `Rescue` (probe, session, patching), `Export` (collect plan/scan/copy), `Update` (release check, schedule) | log text English; typed errors |
+| `AliveUI` | SwiftUI/AppKit: `App` (AliveApp, AppModel, MainWindow, AppCommands, SheetHost, DebugLaunch), `L10n`, `Theme`, `Services`, and one folder per feature (`Catalog`, `Home`, `Sets`, `Plugins`, `Samples`, `Stat`, `Rescue`, `Export`, `Settings`, `Help`, and Mac-only `Integration`: Spotlight, menu bar extra, Finder tags, `alive://` URLs, widget snapshot writer) | every string in an `XxxStrings` table (en + ja) |
 | `AliveRender` | CoreGraphics/CoreText/ImageIO only (extension-safe): `ArrangementRender`, and the Quick Look page (`PreviewModel`, `PreviewPage`, `PreviewStrings`) | pure; used by the app and the Quick Look extension |
 | `AliveQuickLook`, `AliveWidget` | app extensions, SwiftPM executables linked with `-e _NSExtensionMain -application-extension`; `scripts/build-app.sh` wraps them into `Contents/PlugIns/*.appex` (plists + sandbox entitlements in `Resources/Extensions`) and signs them before the app (never `--deep`). The widget reads `widget.json` (`AliveCore.WidgetSnapshot`, written by `AliveUI/Integration/WidgetSnapshot.swift` on every catalog publish); with a custom `ALIVE_HOME` it shows its placeholder. `alive://` URLs: `Integration/URLCommands.swift`. Enable flow: `Settings/ExtensionsSection.swift` (`pluginkit`) | extensions start switched off |
 | `AliveForMac` | `main.swift` calling `AliveApp.main()` | |
+
+Dependencies: `AliveCore` <- `AliveRender` <- `AliveUI` <- `AliveForMac`; `AliveQuickLook` links
+`AliveCore` + `AliveRender`, `AliveWidget` links `AliveCore` only (so neither extension can reach the UI).
+The Quick Look page and the widget choose English or Japanese from the system language, not from
+`settings.lang` (they run in another process).
 
 Tests: `Tests/AliveCoreTests` (parsers, caches, scanners, rescue, export...) and `Tests/AliveUITests`
 (models, string tables, pure formatting). Fixtures are built in code; real-library smoke tests are gated
@@ -26,12 +31,20 @@ by `ALIVE_TEST_SETS`, `ALIVE_TEST_SAMPLES`, `ALIVE_TEST_PARSER_DIFF`.
 `settings.lang` → `MainWindow.task` → `AppDelegate.attach(app)` + `app.start()`:
 1. `RescueProbe.cleanupStale(dir:)` removes leftover probe copies listed in `probes.txt`.
 2. `CatalogModel.start()`: cache loaded off the main thread and published, then a background scan if
-   there is an enabled root; it also starts `app.sets.watcher` (FSEvents, new sets appear by themselves).
+   there is an enabled root; it also starts `app.sets.watcher` (FSEvents, new sets appear by themselves)
+   and `VolumeWatcher` (NSWorkspace mount/unmount, debounced 1.5 s -> `volumesChanged()`). That first
+   scan is the only one with `fromHistory: true`: for a local root whose `scan-history.cfg` entry is
+   usable it replays the FSEvents journal (`DiffScan`, `FSEventsReplay`) and re-reads only the project
+   folders that changed; every other reason falls back to a full walk (`FullScanReason`, in the log),
+   and any explicit rescan is a full one.
 3. `SamplesModel.start()`: `samples.cache` shown at once, then a quiet background walk.
 4. When the catalog is ready: `catalogDidBecomeReady()` flushes Finder-opened paths
    (`app.pendingOpenPaths`, `OpenPathPlan`) and calls `UpdateModel.shared.dailyCheckIfDue` (a no-op
    unless the daily check is on).
-5. `DebugLaunch.apply` (only when `ALIVE_DEBUG_*` variables are set).
+5. `IntegrationCoordinator` (lazy on `AppModel`) follows every catalog publish: Spotlight donation, Finder
+   tags, the widget snapshot (`widget.json`); the menu bar extra is a `MenuBarExtra` scene in `AliveApp`
+   shown while `settings.menuBar` is on.
+6. `DebugLaunch.apply` (only when `ALIVE_DEBUG_*` variables are set).
 
 ## AppModel (`App/AppModel.swift`)
 
@@ -58,12 +71,20 @@ Published: `sets: [SetEntry]` (all), `projects` (folded per folder when `setting
 `env: LiveEnvironment`, `history: Activity`, `isScanning`, `progress: CatalogProgress`
 (`done,total,current,fraction?`), `lastScanStats`, `isLoaded`, `isReady` (= loaded and not scanning),
 `revision` (bumped on each publish; memoize on it), `hasEnabledRoots`.
-`lastScanStats.failedRoots` / `unreadableFolders` expose access failures. If an enabled root is
-unreadable, the previous catalog and disk caches are retained (`retainedPreviousCatalog`); Home
+`lastScanStats.failedRoots` / `unreadableFolders` expose access failures; `missingRoots` is the subset of
+failed roots whose folder does not exist (moved/deleted: `FolderScan.Result.rootMissing`, log line
+`ROOT NOT FOUND`, UI `MissingRootRows` with "Choose again" = `replaceRoot(_:with:)` and "Remove" =
+`removeRoot`). A root under an unmounted `/Volumes/<X>` is *offline*, never missing (`VolumeState`).
+If an enabled root is unreadable, the previous catalog and disk caches are retained (`retainedPreviousCatalog`); Home
 and Sets show recovery actions and a persistent notice when older rows remain visible. New
 partial updates wait for a complete scan, while a readable empty root still clears deleted rows.
 Actions: `rescan()` (cancels and restarts; a no-op before `start()`, so root edits in tests never scan), `addRoots([String])` / `addRoot(_)` (a file counts as its
-folder; toasts; saves; rescans), `removeRoot(_)`, `setRoot(_:enabled:)`, `settingsDidChange()`.
+folder; toasts; saves; rescans), `removeRoot(_)`, `replaceRoot(_:with:)`, `setRoot(_:enabled:)`, `settingsDidChange()`,
+`volumesChanged()` (an unmount turns the sets with files there offline at once, a mount re-reads
+the sets that had lost files on it and rescans a root that lives there). `statuses[path]` /
+`status(for:)` give a set's `SetStatus` (`Readiness`: ready, offline, missing files, missing
+plugins, unknown; stale render), derived from `status.cache` facts, the mount table and the plugin
+inventory — kept out of `index.cache`, whose layout is upstream's v11.
 `index: ProjectIndex` is exposed for what the model does not wrap (`inSameFolder`, `inventory`,
 `usage`…); read it, don't scan through it. Filter *then* fold: use `SetSearch.rows(_:query:groupByFolder:)`
 or `ProjectIndex.collapseByFolder` after your own filter.
@@ -86,7 +107,9 @@ Changing `pluginSource` rescans. No UserDefaults except Localizer's `AppleLangua
   versions are core `LiveVersion`. Errors: `LiveLauncherError`. Go through `app.openInLive/launchLive`
   to get the localized toast.
 - `Finder` — `reveal(path:)`, `openFolder(path:)`; go through `app.revealInFinder`.
-- `FolderPicker.chooseFolders(message:prompt:) -> [String]` — NSOpenPanel for directories.
+- `FolderPicker.chooseFolders(message:prompt:allowsMultiple:) -> [String]` — NSOpenPanel for directories.
+- `ByteSize.string(_:locale:)` (AliveCore) — every file size in the UI goes through it with
+  `Localizer.shared.locale`; never `ByteCountFormatter` directly (it follows the system locale).
 
 ## Shared UI
 
@@ -123,6 +146,18 @@ Settings key: add the field to core `Settings` (load/serialize), expose it in `A
 | `RescueModel`, `ExportModel` | `Rescue/`, `Export/` | the two sheets on top of `RescueSession` / `CollectAll` |
 | `UpdateModel.shared` | `Settings/` | manual and daily update check, `hasUnseenUpdate` (dot on the Settings gear) |
 
+### Integration (`Integration/`, Mac-only)
+
+| Piece | What it is |
+|---|---|
+| `IntegrationCoordinator` | reacts to catalog publishes, tag edits and the three toggles |
+| `SpotlightIndexer` (+ `SpotlightDocument`) | Core Spotlight donation, incremental against `spotlight.snapshot`; items live in one domain, so switching it off deletes exactly Alive's items. Items are app-donated: they show in Spotlight (⌘Space), not in `mdfind` |
+| `MenuBarContent`, `MenuBarSnapshot` | the menu bar extra (today's saves, streak, pinned, recent, now playing) |
+| `FinderTagSync` | opt-in (`findertags`, off by default): merges Alive tags into the project folder's Finder tags; only tags it added itself (`findertags.cfg`) are ever removed |
+| `URLCommands` | `alive://home`, `sets?q=`, `open?path=` (only sets of the catalog), `latest`, `random`, `rescan`, `samples?q=`, `stat`; pure `parse`/`plan`, then `perform` |
+| `WidgetSnapshot` (AliveUI) | writes `widget.json` (model in `AliveCore/Infra/WidgetSnapshot.swift`), reloads timelines only for the default data folder |
+| `Settings/IntegrationSection`, `Settings/ExtensionsSection` | "Mac 連携" toggles; "Quick Look とウィジェット" enable button (`pluginkit -e use`) |
+
 Cross-feature calls go through these entry points, not through views: `app.sets.select(path:)`,
 `app.plugins.show(pluginNamed:)`, `app.samples.showFolder(_:)`, `app.home.togglePin(path:)`.
 
@@ -145,11 +180,21 @@ Cross-feature calls go through these entry points, not through views: `app.sets.
   the latter also reads extended attributes, which is ~28 ms per file on an SMB volume.
 - **Don't raise the top bar's minimum widths.** The bar must fit in 1120 pt in Japanese with the scan
   pill showing; the search field shrinks (min 80) instead.
+- **Offline is not missing.** A reference or root under an unmounted `/Volumes/<X>` is offline
+  (`VolumeState`); only a path that is really gone counts as missing. Do not merge the two in text or logic.
+- **`index.cache` stays upstream's layout.** Mac-only per-set facts go to `status.cache`, scan positions
+  to `scan-history.cfg`.
 - Missing plugins are a *state* (PORTING rule 11): one aggregated mark per set, one notice per screen.
 
 ## Automated screenshots (no clicks)
 
-Launch the built app in the background with `ALIVE_NO_ACTIVATE=1` and a scratch `ALIVE_HOME`; the
+Launch the built app in the background with `ALIVE_NO_ACTIVATE=1` and a scratch `ALIVE_HOME`.
+**The scratch folder's `settings.cfg` must contain `spotlight=0`, `menubar=0` and `findertags=0`** before
+the first launch: the defaults are Spotlight on and menu bar on, so a QA run would otherwise put its
+fixture sets into the real Spotlight index and add a menu bar item (Finder tags default to off; keep
+the line anyway so nothing is written into folders). The widget only reads the default data folder,
+so a scratch `ALIVE_HOME` never feeds it. Under XCTest the real Spotlight index is never touched
+(`XCTestConfigurationFilePath`). Then the
 window numbers are written to `alive.log` (`window-number: …`), so `screencapture -l <n> -o file.png`
 photographs just our window. `ALIVE_DEBUG_TAB`, `ALIVE_DEBUG_SELECT`, `ALIVE_DEBUG_PLUGIN`,
 `ALIVE_DEBUG_SHEET`, `ALIVE_DEBUG_WINDOW` (`stat|player|settings`) and `ALIVE_DEBUG_SETTINGS_TAB=about`
