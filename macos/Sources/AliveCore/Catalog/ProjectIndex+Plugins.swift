@@ -43,6 +43,7 @@ extension ProjectIndex {
             lock.unlock()
         }
 
+        rebuildStatuses()     // readiness follows the inventory (rule 11: unknown when it is unavailable)
         if inv.isAvailable {
             Diag.info("plugins: \(inv.all.count) installed (\(inv.sources.joined(separator: ", "))); "
                       + "\(missingNames.count) used plugins not installed, in \(affected) sets")

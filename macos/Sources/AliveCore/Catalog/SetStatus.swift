@@ -67,4 +67,25 @@ public struct SetStatus: Equatable, Sendable {
         SetStatus(missingFiles: entry.missingFiles,
                   missingPlugins: pluginsKnown ? entry.missingPlugins : nil)
     }
+
+    /// The one place a set's status is worked out (scan, mount/unmount handling and tests all use
+    /// it). `offlinePaths` are the references recorded as unresolved because their volume was not
+    /// mounted when the set was parsed; upstream counts them in `entry.missingFiles`, so they come
+    /// off that number. Found samples (`entry.samples`) that sit on a volume which is unmounted
+    /// *now* are offline too — that is how an unplugged drive shows without a rescan.
+    public static func derive(entry: SetEntry, offlinePaths: [String], newestRender: Date?,
+                              mounted: Set<String>, pluginsKnown: Bool) -> SetStatus {
+        var volumes = Set<String>()
+        var offline = 0
+        for path in entry.samples + offlinePaths {
+            guard let name = VolumeState.volumeName(of: path), !mounted.contains(name) else { continue }
+            offline += 1
+            volumes.insert(name)
+        }
+        return SetStatus(offlineFiles: offline, offlineVolumes: volumes.sorted(),
+                         missingFiles: max(0, entry.missingFiles - offlinePaths.count),
+                         missingPlugins: pluginsKnown ? entry.missingPlugins : nil,
+                         newestRender: newestRender,
+                         renderIsStale: isStale(setModified: entry.modified, newestRender: newestRender))
+    }
 }

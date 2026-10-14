@@ -193,7 +193,8 @@ final class SamplesModel {
         buildSerial += 1
         let serial = buildSerial
         building = key
-        let input = SamplesSnapshotInput(key: key, index: index, sets: app.catalog.sets, open: openFolders,
+        let input = SamplesSnapshotInput(key: key, index: index, sets: app.catalog.sets,
+                                         offlineReferences: app.catalog.offlineReferences, open: openFolders,
                                          previous: snapshot)
         snapshotTask = Task { [weak self] in
             let built = await BlockingWork.run { isCancelled in

@@ -32,6 +32,8 @@ struct SamplesSnapshotInput: Sendable {
     var key: SamplesSnapshotKey
     var index: SampleIndex
     var sets: [SetEntry]
+    /// Set path to the references it lost to a disconnected drive; they still count as use.
+    var offlineReferences: [String: [String]] = [:]
     var open: Set<String>
     /// The snapshot shown so far: whatever it already holds for the same index or sets is reused.
     var previous: SamplesSnapshot?
@@ -48,7 +50,8 @@ enum SamplesSnapshotBuilder {
         if let prev, sameIndex, prev.key.catalogRevision == key.catalogRevision {
             usage = prev.usage
         } else {
-            usage = SampleUsage.compute(index: input.index, sets: input.sets, isCancelled: isCancelled)
+            usage = SampleUsage.compute(index: input.index, sets: input.sets,
+                                         offlineReferences: input.offlineReferences, isCancelled: isCancelled)
         }
         if isCancelled() { return nil }
 
