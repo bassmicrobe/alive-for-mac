@@ -57,8 +57,9 @@ struct SetNameCell: View {
             statusMarks
             // What plays is always the render of the project's principal version, so a version
             // row gets no button (upstream: CanPlay = HasRenders && !childRow).
-            if set.hasRenders, !isVersionRow {
-                PlayGlyph(app: app, path: set.path)
+            if !isVersionRow {
+                // The slot is kept without a render so the status marks line up down the list.
+                if set.hasRenders { PlayGlyph(app: app, path: set.path) } else { Color.clear.frame(width: 22, height: 22) }
             }
         }
         .frame(minHeight: CellStyle.height)
