@@ -26,6 +26,8 @@ enum SamplesStrings: LocalizedStrings {
     case usedTag
     // Outside the library
     case outsideTitle, outsideBody, addAsFolder
+    // Offline roots
+    case offlineBadge, offlineBadgeHelp, offlineTitle, offlineBody
     // Toasts
     case alreadyInLibrary
 
@@ -119,6 +121,10 @@ enum SamplesStrings: LocalizedStrings {
         case .formatKHz: return ("%@ kHz", "%@ kHz")
         case .formatBits: return ("%lld-bit", "%lld ビット")
         case .usedTag: return ("used", "使用中")
+        case .offlineBadge: return ("Offline", "オフライン")
+        case .offlineBadgeHelp: return ("The drive this folder lives on isn't connected", "このフォルダのあるドライブが接続されていません")
+        case .offlineTitle: return ("%@ isn't connected", "%@ が未接続です")
+        case .offlineBody: return ("Connect it to rescan. Until then you see what was indexed last time.", "接続すると再スキャンします。それまでは前回のインデックス内容を表示します。")
         case .outsideTitle: return ("Not in the sample library", "サンプルライブラリにありません")
         case .outsideBody: return ("%@ lies outside the folders Alive indexes.", "%@ は Alive がインデックスを作成しているフォルダの外にあります。")
         case .addAsFolder: return ("Add as sample folder", "サンプルフォルダとして追加")

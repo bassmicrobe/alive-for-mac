@@ -89,6 +89,7 @@ struct OverviewPanel: View {
                 OverviewColumn {
                     VStack(alignment: .leading, spacing: 20) {
                         cards(stats)
+                        ReadySetsCard(summary: app.home.readySummary) { app.home.showReadySets() }
                         ActivityHeatmap(grid: app.home.heatmap, hovered: $hovered)
                         footer(stats)
                     }
@@ -171,5 +172,38 @@ private struct StatCard: View {
         .background(Theme.surface, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(Theme.cardBorder, lineWidth: 1))
         .accessibilityElement(children: .combine)
+    }
+}
+
+/// "Ready to open  N / M": one click lists them on the Sets tab.
+private struct ReadySetsCard: View {
+    let summary: ReadySummary
+    let action: () -> Void
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 8) {
+                Image(systemName: "checkmark.circle").font(.system(size: 12, weight: .medium)).foregroundStyle(Theme.green)
+                Text(HomeStrings.readySets.s).font(Theme.fLabel).foregroundStyle(Theme.secondaryText)
+                Spacer(minLength: 8)
+                Text("\(summary.ready) / \(summary.total)")
+                    .font(.system(size: 15, weight: .semibold)).foregroundStyle(Theme.text).monospacedDigit()
+                IconView(icon: .chevronDown, size: 9, weight: .semibold)
+                    .rotationEffect(.degrees(-90))
+                    .foregroundStyle(hovering ? Theme.text : Theme.secondaryText)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 7)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(hovering ? Theme.surfaceHover : Theme.surface, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(Theme.cardBorder, lineWidth: 1))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+        .animation(Theme.hoverAnimation, value: hovering)
+        .help(HomeStrings.readySetsHelp.s)
+        .accessibilityValue("\(summary.ready) / \(summary.total)")
     }
 }

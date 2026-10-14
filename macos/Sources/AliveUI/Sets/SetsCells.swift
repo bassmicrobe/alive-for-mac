@@ -54,6 +54,7 @@ struct SetNameCell: View {
                     .help(ReadErrorLog.note(set.error, of: set.path))
             }
             Spacer(minLength: 4)
+            statusMarks
             // What plays is always the render of the project's principal version, so a version
             // row gets no button (upstream: CanPlay = HasRenders && !childRow).
             if set.hasRenders, !isVersionRow {
@@ -61,6 +62,15 @@ struct SetNameCell: View {
             }
         }
         .frame(minHeight: CellStyle.height)
+    }
+
+    /// Readiness at a glance (icon, wording in the help) and a second mark for a stale render.
+    @ViewBuilder private var statusMarks: some View {
+        if set.error.isEmpty {
+            let status = app.sets.status(of: set)
+            if status.renderIsStale { StaleRenderMark(size: 11) }
+            ReadinessMark(status: status, size: 11)
+        }
     }
 }
 

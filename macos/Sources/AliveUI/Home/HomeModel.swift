@@ -57,6 +57,12 @@ enum TileNavigation {
     }
 }
 
+/// How many projects open as saved right now.
+struct ReadySummary: Equatable {
+    var ready = 0
+    var total = 0
+}
+
 @MainActor
 @Observable
 final class HomeModel {
@@ -73,6 +79,7 @@ final class HomeModel {
     @ObservationIgnored let previewLoader = ArrangementLoader()
 
     @ObservationIgnored private var rowsCache: (key: RowsKey, rows: [SetEntry])?
+    @ObservationIgnored private var readyCache: (key: Int, summary: ReadySummary)?
     @ObservationIgnored private var statsCache: (key: Int, stats: OverviewStats)?
     @ObservationIgnored private var heatmapCache: (key: HeatmapKey, grid: HeatmapGrid)?
 
@@ -137,6 +144,23 @@ final class HomeModel {
         let stats = OverviewStats.compute(history: app.catalog.history, sets: app.catalog.sets)
         statsCache = (revision, stats)
         return stats
+    }
+
+    /// "N of M projects open right now" for the Overview.
+    var readySummary: ReadySummary {
+        let revision = app.catalog.revision
+        if let cache = readyCache, cache.key == revision { return cache.summary }
+        let heads = app.catalog.projects.filter { !$0.isBackup }
+        let summary = ReadySummary(ready: heads.filter { app.sets.status(of: $0).readiness == .ready }.count,
+                                   total: heads.count)
+        readyCache = (revision, summary)
+        return summary
+    }
+
+    /// Switches to the Sets tab showing only the sets that open right now.
+    func showReadySets() {
+        app.sets.filter.readiness = [.ready]
+        app.tab = .sets
     }
 
     /// The year calendar. The date is part of the key: the window moves at every midnight.

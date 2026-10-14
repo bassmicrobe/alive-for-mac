@@ -62,9 +62,18 @@ private struct Detail: View {
             Fact(PluginsStrings.detailVersion.s, row.version)
             Fact(PluginsStrings.detailCategory.s, PluginsFormat.category(row.stat.installed?.category ?? ""))
             Fact(PluginsStrings.detailUsedIn.s, row.sets > 0 ? PluginsFormat.setsPhrase(row.sets) : "")
+            if row.status == .installed, !sets.isEmpty {
+                Fact(PluginsStrings.detailWouldStop.s, PluginsFormat.setsPhrase(readySetCount))
+                    .help(PluginsStrings.detailWouldStopHelp.s)
+            }
             Fact(PluginsStrings.detailLastUsed.s, row.lastUsed == nil ? "" : PluginsFormat.lastUsed(row.lastUsed))
         }
         .font(Theme.fBody)
+    }
+
+    /// Sets using the plugin that open right now (an approximation of "would become not ready").
+    private var readySetCount: Int {
+        sets.filter { app.sets.status(of: $0).readiness == .ready }.count
     }
 
     private var statusTone: Color {

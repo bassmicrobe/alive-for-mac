@@ -29,6 +29,11 @@ public struct SetFilter: Equatable, Sendable {
     public var pluginsAllInstalled = false
     public var previewHasRenders = false
     public var previewNoRenders = false
+    /// Mac-only: readiness to open (any of the picked; empty means "any"). `[.ready]` is the
+    /// "open right now" quick toggle.
+    public var readiness: Set<Readiness> = []
+    /// Mac-only: only sets saved after their newest render.
+    public var staleRenderOnly = false
 
     public static let noKey = -1
     public static let anyKey = -2
@@ -47,6 +52,7 @@ public struct SetFilter: Equatable, Sendable {
         public static let fileState = Ignore(rawValue: 16)
         public static let renders = Ignore(rawValue: 32)
         public static let tags = Ignore(rawValue: 64)
+        public static let readiness = Ignore(rawValue: 128)
     }
 
     public var isEmpty: Bool { activeCount == 0 }
@@ -62,12 +68,23 @@ public struct SetFilter: Equatable, Sendable {
         if pluginsMin >= 0 || pluginsMax >= 0 || pluginsMissingOnly || pluginsAllInstalled { n += 1 }
         if filesComplete || filesMissing || filesUnreadable { n += 1 }
         if previewHasRenders || previewNoRenders { n += 1 }
+        if !readiness.isEmpty || staleRenderOnly { n += 1 }
         return n
     }
 
+    /// Whether the readiness conditions need a `SetStatus` (it costs a lookup per set).
+    public var needsStatus: Bool { !readiness.isEmpty || staleRenderOnly }
+
+    /// The status of a set with no sidecar facts: upstream fields only, plugins taken as known.
+    public static let basicStatus: (SetEntry) -> SetStatus = { SetStatus.basic($0, pluginsKnown: true) }
+
     /// `tagsOf` maps a project folder to its tags. Tags live in a separate file (notes.cfg)
     /// rather than in the set, so they are only asked for when the tag filter is on.
-    public func matches(_ s: SetEntry, tagsOf: (String) -> [String], ignoring skip: Ignore = []) -> Bool {
+    /// `statusOf` supplies the Mac-only readiness facts; it is only called when a readiness
+    /// condition is on.
+    public func matches(_ s: SetEntry, tagsOf: (String) -> [String],
+                        statusOf: (SetEntry) -> SetStatus = SetFilter.basicStatus,
+                        ignoring skip: Ignore = []) -> Bool {
         if let from, s.modified < from { return false }
         if let to, s.modified > to { return false }
 
@@ -106,6 +123,12 @@ public struct SetFilter: Equatable, Sendable {
 
         if !skip.contains(.renders), previewHasRenders || previewNoRenders {
             if !((previewHasRenders && s.hasRenders) || (previewNoRenders && !s.hasRenders)) { return false }
+        }
+
+        if !skip.contains(.readiness), needsStatus {
+            let status = statusOf(s)
+            if !readiness.isEmpty, !readiness.contains(status.readiness) { return false }
+            if staleRenderOnly, !status.renderIsStale { return false }
         }
         return true
     }
@@ -214,13 +237,17 @@ public struct SetFilterFacets: Equatable, Sendable {
     public var canPickUnreadable = false
     public var canPickHasRenders = false
     public var canPickNoRenders = false
+    /// Readiness values some set would still have under the rest of the filter.
+    public var availableReadiness: Set<Readiness> = []
+    public var canPickStale = false
 
     /// How many sets pass the whole filter.
     public var matches = 0
 
     public init() {}
 
-    public static func make(sets: [SetEntry], filter f: SetFilter, tagsOf: (String) -> [String]) -> SetFilterFacets {
+    public static func make(sets: [SetEntry], filter f: SetFilter, tagsOf: (String) -> [String],
+                            statusOf: (SetEntry) -> SetStatus = SetFilter.basicStatus) -> SetFilterFacets {
         var r = SetFilterFacets()
         var versions = Set<String>(), roots = Set<Int>(), scales = Set<Int>(), tags = Set<String>()
         var noKey = false
@@ -238,27 +265,32 @@ public struct SetFilterFacets: Equatable, Sendable {
         // Facets: what is still possible with every OTHER group applied.
         var okVersions = Set<String>(), okRoots = Set<Int>(), okScales = Set<Int>(), okTags = Set<String>()
         for s in sets {
-            if f.matches(s, tagsOf: tagsOf, ignoring: .versions), !s.shortVersion.isEmpty { okVersions.insert(s.shortVersion) }
-            if f.matches(s, tagsOf: tagsOf, ignoring: .keyRoots) {
+            if f.matches(s, tagsOf: tagsOf, statusOf: statusOf, ignoring: .versions), !s.shortVersion.isEmpty { okVersions.insert(s.shortVersion) }
+            if f.matches(s, tagsOf: tagsOf, statusOf: statusOf, ignoring: .keyRoots) {
                 okRoots.insert(s.scaleRoot)
                 if s.scaleRoot >= 0 { okRoots.insert(SetFilter.anyKey) }
             }
-            if f.matches(s, tagsOf: tagsOf, ignoring: .keyScales), s.scaleIndex >= 0 { okScales.insert(s.scaleIndex) }
-            if f.matches(s, tagsOf: tagsOf, ignoring: .tags) { okTags.formUnion(tagsOf(s.projectDir)) }
-            if f.matches(s, tagsOf: tagsOf, ignoring: .pluginsState) {
+            if f.matches(s, tagsOf: tagsOf, statusOf: statusOf, ignoring: .keyScales), s.scaleIndex >= 0 { okScales.insert(s.scaleIndex) }
+            if f.matches(s, tagsOf: tagsOf, statusOf: statusOf, ignoring: .tags) { okTags.formUnion(tagsOf(s.projectDir)) }
+            if f.matches(s, tagsOf: tagsOf, statusOf: statusOf, ignoring: .pluginsState) {
                 if s.missingPlugins > 0 { r.canPickMissingPlugins = true } else { r.canPickAllInstalled = true }
             }
-            if f.matches(s, tagsOf: tagsOf, ignoring: .fileState) {
+            if f.matches(s, tagsOf: tagsOf, statusOf: statusOf, ignoring: .fileState) {
                 switch SetFilter.fileState(of: s) {
                 case .complete: r.canPickComplete = true
                 case .missing: r.canPickMissingFiles = true
                 case .unreadable: r.canPickUnreadable = true
                 }
             }
-            if f.matches(s, tagsOf: tagsOf, ignoring: .renders) {
+            if f.matches(s, tagsOf: tagsOf, statusOf: statusOf, ignoring: .renders) {
                 if s.hasRenders { r.canPickHasRenders = true } else { r.canPickNoRenders = true }
             }
-            if f.matches(s, tagsOf: tagsOf) { r.matches += 1 }
+            if f.matches(s, tagsOf: tagsOf, statusOf: statusOf, ignoring: .readiness) {
+                let status = statusOf(s)
+                r.availableReadiness.insert(status.readiness)
+                if status.renderIsStale { r.canPickStale = true }
+            }
+            if f.matches(s, tagsOf: tagsOf, statusOf: statusOf) { r.matches += 1 }
         }
         r.disabledVersions = Set(r.versions).subtracting(okVersions)
         r.disabledRoots = Set(r.roots).subtracting(okRoots)

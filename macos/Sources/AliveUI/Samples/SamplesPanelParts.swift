@@ -286,3 +286,46 @@ private struct WaveCanvas: View {
         .accessibilityHidden(true)
     }
 }
+
+// MARK: - Offline roots
+
+/// Is a sample folder on a drive that isn't connected? Only paths under /Volumes can be.
+enum SampleOffline {
+    static func isOffline(_ path: String) -> Bool {
+        guard VolumeState.volumeName(of: path) != nil else { return false }
+        return VolumeState.isOffline(path, mounted: VolumeState.mountedVolumeNames())
+    }
+}
+
+/// "Offline" pill for a root whose drive is not connected.
+struct OfflineBadge: View {
+    var body: some View {
+        Text(SamplesStrings.offlineBadge.s)
+            .font(Theme.fMini)
+            .foregroundStyle(Theme.secondaryText)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 2)
+            .background(Theme.surfaceHover, in: Capsule())
+            .overlay(Capsule().strokeBorder(Theme.hairline, lineWidth: 1))
+            .help(SamplesStrings.offlineBadgeHelp.s)
+    }
+}
+
+/// The explanation in a root's panel.
+struct OfflineNotice: View {
+    let path: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 6) {
+                Image(systemName: "externaldrive.badge.xmark").foregroundStyle(Theme.secondaryText)
+                Text(SamplesStrings.offlineTitle.f(VolumeState.volumeName(of: path) ?? path))
+                    .font(Theme.fTitle).foregroundStyle(Theme.text)
+            }
+            Text(SamplesStrings.offlineBody.s)
+                .font(Theme.fLabel).foregroundStyle(Theme.secondaryText)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}

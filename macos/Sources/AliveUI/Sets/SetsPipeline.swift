@@ -23,6 +23,8 @@ struct SetsPipeline {
         /// Whether the installed-plugin list could be read. When it could not, "missing" is not a
         /// fact but an unknown, so the missing/installed conditions are left out.
         var pluginsKnown = true
+        /// Readiness facts per set (Mac-only); only asked for when the filter has a readiness condition.
+        var statusOf: (SetEntry) -> SetStatus = SetFilter.basicStatus
     }
 
     static func key(forDirectory dir: String) -> String { dir.lowercased() }
@@ -43,7 +45,7 @@ struct SetsPipeline {
         // finds it).
         let filter = effectiveFilter(input.filter, pluginsKnown: input.pluginsKnown)
         var matched = input.sets.filter { set in
-            filter.matches(set, tagsOf: input.tagsOf) && (words.isEmpty || SetSearch.matches(set, query: input.query))
+            filter.matches(set, tagsOf: input.tagsOf, statusOf: input.statusOf) && (words.isEmpty || SetSearch.matches(set, query: input.query))
         }
         var out = SetsPipeline()
         if input.groupByFolder {

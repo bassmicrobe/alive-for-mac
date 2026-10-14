@@ -97,6 +97,7 @@ struct SampleRowView: View {
                 .lineLimit(1)
                 .truncationMode(.middle)
             tail
+            offlineBadge
             Spacer(minLength: 0)
         }
         .padding(.horizontal, 6)
@@ -150,6 +151,13 @@ struct SampleRowView: View {
             .accessibilityLabel(open ? SamplesStrings.collapse.s : SamplesStrings.expand.s)
         } else {
             Color.clear.frame(width: Self.chevronSlot, height: 1)
+        }
+    }
+
+    /// A root on a drive that isn't connected says so instead of looking empty or never used.
+    @ViewBuilder private var offlineBadge: some View {
+        if case .folder(let d) = row.kind, model.index.folders[d].parent == nil, SampleOffline.isOffline(row.id) {
+            OfflineBadge()
         }
     }
 

@@ -67,6 +67,7 @@ struct FiltersSheet: View {
                                          isEnabled: facets.canPickUnreadable || sets.filter.filesUnreadable)
                         }
                     }
+                    readinessRow
                     row(SetsStrings.fltRenders.s) {
                         HStack(spacing: 8) {
                             FilterToggle(title: SetsStrings.fltHasRenders.s, isOn: $sets.filter.previewHasRenders,
@@ -117,6 +118,23 @@ struct FiltersSheet: View {
         }
     }
 
+    /// Mac-only: can the set be opened as saved (any of the picked states), and stale renders.
+    private var readinessRow: some View {
+        @Bindable var sets = app.sets
+        let options = Readiness.allCases.map { ChoicePills<Readiness>.Option(value: $0, title: SetStatusFormat.label($0)) }
+        let disabled = Set(Readiness.allCases).subtracting(facets.availableReadiness)
+        return row(SetsStrings.fltReadiness.s) {
+            VStack(alignment: .leading, spacing: 8) {
+                ChoicePills(options: options, selection: Binding(
+                    get: { Array(sets.filter.readiness).sorted { $0.rawValue < $1.rawValue } },
+                    set: { sets.filter.readiness = Set($0) }),
+                            disabled: disabled, placeholder: SetsStrings.fltReadinessNone.s)
+                FilterToggle(title: SetsStrings.fltStaleRender.s, isOn: $sets.filter.staleRenderOnly,
+                             isEnabled: facets.canPickStale || sets.filter.staleRenderOnly)
+            }
+        }
+    }
+
     private var footer: some View {
         HStack(spacing: 10) {
             Text(SetsStrings.fltMatches.f(facets.matches, app.catalog.sets.count))
@@ -144,7 +162,9 @@ struct FiltersSheet: View {
 
     private func refreshFacets() {
         let meta = app.sets.meta
-        facets = SetFilterFacets.make(sets: app.catalog.sets, filter: app.sets.filter, tagsOf: { meta.tagsOf($0) })
+        let sets = app.sets
+        facets = SetFilterFacets.make(sets: app.catalog.sets, filter: sets.filter, tagsOf: { meta.tagsOf($0) },
+                                      statusOf: { sets.status(of: $0) })
     }
 
     static func rootTitle(_ value: Int) -> String {

@@ -247,4 +247,80 @@ final class SetFilterTests: XCTestCase {
         XCTAssertTrue(x.roots.isEmpty)
         XCTAssertEqual(x.matches, 0)
     }
+
+    // MARK: - Readiness (Mac-only)
+
+    private func statuses(_ table: [String: SetStatus]) -> (SetEntry) -> SetStatus {
+        { table[$0.name] ?? SetStatus() }
+    }
+
+    private var readinessCatalog: ([SetEntry], (SetEntry) -> SetStatus) {
+        let sets = ["ready", "offline", "gone", "plugs", "unk", "stale"].map { set($0) }
+        let table: [String: SetStatus] = [
+            "offline": SetStatus(offlineFiles: 3, offlineVolumes: ["LaCie"]),
+            "gone": SetStatus(missingFiles: 1),
+            "plugs": SetStatus(missingPlugins: 2),
+            "unk": SetStatus(missingPlugins: nil),
+            "stale": SetStatus(newestRender: Date(timeIntervalSince1970: 1), renderIsStale: true),
+        ]
+        return (sets, statuses(table))
+    }
+
+    func testReadyOnlyKeepsSetsThatOpenRightNow() {
+        let (sets, status) = readinessCatalog
+        var f = SetFilter()
+        f.readiness = [.ready]
+        XCTAssertEqual(f.activeCount, 1)
+        XCTAssertEqual(sets.filter { f.matches($0, tagsOf: noTags, statusOf: status) }.map(\.name), ["ready", "stale"])
+    }
+
+    func testReadinessIsAnyOfThePickedOnes() {
+        let (sets, status) = readinessCatalog
+        var f = SetFilter()
+        f.readiness = [.offline, .unknown]
+        XCTAssertEqual(sets.filter { f.matches($0, tagsOf: noTags, statusOf: status) }.map(\.name), ["offline", "unk"])
+    }
+
+    func testStaleRenderFilterCombinesWithReadiness() {
+        let (sets, status) = readinessCatalog
+        var f = SetFilter()
+        f.staleRenderOnly = true
+        XCTAssertEqual(sets.filter { f.matches($0, tagsOf: noTags, statusOf: status) }.map(\.name), ["stale"])
+        f.readiness = [.offline]
+        XCTAssertEqual(f.activeCount, 1, "readiness and stale are one group")
+        XCTAssertTrue(sets.filter { f.matches($0, tagsOf: noTags, statusOf: status) }.isEmpty)
+    }
+
+    func testStatusIsOnlyAskedForWhenAReadinessConditionIsOn() {
+        var asked = 0
+        let counting: (SetEntry) -> SetStatus = { _ in asked += 1; return SetStatus() }
+        XCTAssertTrue(SetFilter().matches(set("a"), tagsOf: noTags, statusOf: counting))
+        XCTAssertEqual(asked, 0)
+    }
+
+    func testDefaultStatusFallsBackToUpstreamFields() {
+        var f = SetFilter()
+        f.readiness = [.ready]
+        XCTAssertTrue(f.matches(set("fine"), tagsOf: noTags))
+        XCTAssertFalse(f.matches(set("lost", missingFiles: 2), tagsOf: noTags))
+        XCTAssertFalse(f.matches(set("noplug", missingPlugins: 1), tagsOf: noTags))
+    }
+
+    func testReadinessFacets() {
+        let (sets, status) = readinessCatalog
+        var f = SetFilter()
+        f.readiness = [.offline]
+        let x = SetFilterFacets.make(sets: sets, filter: f, tagsOf: noTags, statusOf: status)
+        XCTAssertEqual(x.matches, 1)
+        XCTAssertEqual(x.availableReadiness, [.ready, .offline, .missingFiles, .missingPlugins, .unknown])
+        XCTAssertTrue(x.canPickStale)
+    }
+
+    func testClearResetsReadiness() {
+        var f = SetFilter()
+        f.readiness = [.ready]
+        f.staleRenderOnly = true
+        f.clear()
+        XCTAssertTrue(f.isEmpty)
+    }
 }

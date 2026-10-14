@@ -12,7 +12,7 @@ enum PluginsStrings: LocalizedStrings {
     case statusInstalled, statusNotInstalled, statusOtherFormat, statusUnknown
     case roleInstrument, roleEffect
     // Inspector
-    case detailStatus, detailFormat, detailVersion, detailCategory, detailKind, detailUsedIn, detailLastUsed
+    case detailStatus, detailFormat, detailVersion, detailCategory, detailKind, detailUsedIn, detailWouldStop, detailWouldStopHelp, detailLastUsed
     case detailFile, detailSetsHeader, setsOne, setsMany, selectPrompt, noSetsUse, neverUsed
     case copyName, copyPath, sortBy, filtersActive
     // Aggregated notes
@@ -61,6 +61,9 @@ enum PluginsStrings: LocalizedStrings {
         case .detailCategory: return ("Category", "カテゴリ")
         case .detailKind: return ("Kind", "種類")
         case .detailUsedIn: return ("Used in", "使用セット数")
+        case .detailWouldStop: return ("Would stop opening", "開けなくなるセット")
+        case .detailWouldStopHelp: return ("Sets that open right now and use this plugin: they would not be ready if it were uninstalled",
+                                           "今すぐ開けて、このプラグインを使っているセット。アンインストールすると開けなくなります。")
         case .detailLastUsed: return ("Last used", "最終使用")
         case .detailFile: return ("File", "ファイル")
         case .detailSetsHeader: return ("Sets (%lld)", "セット（%lld）")

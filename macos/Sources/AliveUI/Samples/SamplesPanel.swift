@@ -49,6 +49,7 @@ private struct FolderPanel: View {
         VStack(alignment: .leading, spacing: 16) {
             PanelHeader(title: d.parent == nil ? rootTitle(d) : d.name, trailing: SampleFormat.megabytes(d.totalBytes))
             PathLink(model: model, path: d.path)
+            if d.parent == nil, SampleOffline.isOffline(d.path) { OfflineNotice(path: d.path) }
             VStack(spacing: 6) {
                 PanelRow(label: SamplesStrings.panelSamples.s, value: SampleFormat.number(d.totalSamples))
                 PanelRow(label: SamplesStrings.panelUsed.s,

@@ -45,6 +45,7 @@ final class SetsModel {
     }
 
     @ObservationIgnored private var memo: (key: MemoKey, value: SetsPipeline)?
+    @ObservationIgnored private var readyCountCache: (revision: Int, count: Int)?
     @ObservationIgnored private var saveTask: Task<Void, Never>?
 
     private struct MemoKey: Equatable {
@@ -86,7 +87,8 @@ final class SetsModel {
         let value = SetsPipeline.make(.init(
             sets: app.catalog.sets, query: key.query, filter: key.filter, groupByFolder: key.group,
             sort: key.sort, pinnedFirst: key.pinnedFirst, pins: key.pins,
-            tagsOf: { meta.tagsOf($0) }, pluginsKnown: key.pluginsKnown))
+            tagsOf: { meta.tagsOf($0) }, pluginsKnown: key.pluginsKnown,
+            statusOf: { [weak self] in self?.status(of: $0) ?? SetFilter.basicStatus($0) }))
         memo = (key, value)
         return value
     }
@@ -112,6 +114,27 @@ final class SetsModel {
     /// Whether "missing plugin" is a known fact: false while the installed-plugin list could not be
     /// read. Then no missing marks are shown anywhere: the status is unknown, not missing.
     var pluginsKnown: Bool { PluginKnowledge.isKnown(app.catalog.index.inventory) }
+
+    /// What is known about whether `set` opens right now (offline drives, plugins, stale render).
+    func status(of set: SetEntry) -> SetStatus {
+        app.catalog.status(for: set.path) ?? SetStatus.basic(set, pluginsKnown: pluginsKnown)
+    }
+
+    /// The quick "ready to open" toggle: readiness is exactly `[.ready]`.
+    var isReadyOnly: Bool { filter.readiness == [.ready] }
+
+    func setReadyOnly(_ on: Bool) {
+        if on { filter.readiness = [.ready] } else if isReadyOnly { filter.readiness = [] }
+    }
+
+    /// Sets (every saved version counts, as in the Filters window) that open right now.
+    var readyCount: Int {
+        let revision = app.catalog.revision
+        if let cache = readyCountCache, cache.revision == revision { return cache.count }
+        let count = app.catalog.sets.filter { status(of: $0).readiness == .ready }.count
+        readyCountCache = (revision, count)
+        return count
+    }
 
     func set(at path: String) -> SetEntry? {
         app.catalog.sets.first { $0.path == path }

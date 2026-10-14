@@ -14,6 +14,10 @@ enum SetsStrings: LocalizedStrings {
     case versionsHeading, filesHeading, fileCount, missingCount, notInstalledCount, sampleFoldersHeading
     case pluginsHeading, onlyLiveDevices, otherFormat, showPluginHelp, pluginStatusUnknown
     case rendersHeading, moreItems
+    // Readiness (Mac-only)
+    case readyNow, readyNowHelp, statusHeading, statusReady, statusOffline, statusMissingFiles
+    case statusMissingPlugins, statusUnknown, statusOfflineLine, statusStaleLine, staleRender, staleRenderHelp
+    case fltReadiness, fltStaleRender, fltReadinessNone
     // Filters
     case filtersTitle, fltModified, fltFrom, fltTo, fltDateHint, fltVersion, fltKeyRoot, fltScale, fltTags, fltTracks
     case fltPluginCount, fltPlugins, fltFiles, fltRenders, fltMin, fltMax, fltNone, fltNoTags
@@ -86,6 +90,23 @@ enum SetsStrings: LocalizedStrings {
                                            "インストール済みプラグインを読み取れないため、状態は不明です。")
         case .rendersHeading: return ("Renders (%lld):", "レンダー (%lld):")
         case .moreItems: return ("… %lld more", "… ほか %lld 件")
+
+        case .readyNow: return ("Ready to open", "今すぐ開ける")
+        case .readyNowHelp: return ("Only sets that open as saved right now: every file found, every plugin installed, no drive missing",
+                                    "保存したとおりに今すぐ開けるセットだけを表示（ファイルがすべてあり、プラグインがすべてインストール済みで、未接続のドライブがない）")
+        case .statusHeading: return ("Status:", "状態:")
+        case .statusReady: return ("Ready to open", "開ける")
+        case .statusOffline: return ("Drive not connected", "外付けドライブ未接続")
+        case .statusMissingFiles: return ("Files missing", "ファイル不足")
+        case .statusMissingPlugins: return ("Plugins missing", "プラグイン不足")
+        case .statusUnknown: return ("Plugin status unknown", "プラグイン状況不明")
+        case .statusOfflineLine: return ("%1$@ isn't connected (%2$lld files)", "%1$@ が未接続（%2$lld ファイル）")
+        case .statusStaleLine: return ("The render is older than the set (exported %@)", "レンダーがセットより古い（%@ 書き出し）")
+        case .staleRender: return ("Stale render", "レンダーが古い")
+        case .staleRenderHelp: return ("The set was saved after its newest render", "最新のレンダーよりあとにセットが保存されています")
+        case .fltReadiness: return ("Readiness", "開けるか")
+        case .fltStaleRender: return ("stale render", "レンダーが古い")
+        case .fltReadinessNone: return ("nothing to pick", "選択肢がありません")
 
         case .filtersTitle: return ("Filters", "フィルター")
         case .fltModified: return ("Modified", "更新日")

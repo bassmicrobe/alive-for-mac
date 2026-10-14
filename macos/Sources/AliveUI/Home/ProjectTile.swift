@@ -9,6 +9,8 @@ struct ProjectTile: View {
     let isKeyboardFocused: Bool
     let isPinned: Bool
     let isPlaying: Bool
+    /// Readiness facts (Mac-only); nil while unknown to the catalog.
+    var status: SetStatus?
     let focus: FocusState<String?>.Binding
     let onSelect: () -> Void
     let onFocus: () -> Void
@@ -27,7 +29,16 @@ struct ProjectTile: View {
             ArrangementThumbnailView(path: set.path)
                 .overlay(alignment: .topTrailing) { starButton.padding(6) }
                 .overlay(alignment: .bottomTrailing) {
-                    if set.hasRenders { PlayBadge(isPlaying: isPlaying, action: onPlay).padding(8) }
+                    HStack(spacing: 6) {
+                        if let status, status.renderIsStale { TileMark(symbol: "clock.arrow.circlepath", help: SetsStrings.staleRenderHelp.s) }
+                        if set.hasRenders { PlayBadge(isPlaying: isPlaying, action: onPlay) }
+                    }
+                    .padding(8)
+                }
+                .overlay(alignment: .bottomLeading) {
+                    if let status, status.offlineFiles > 0 {
+                        TileMark(symbol: "externaldrive.badge.xmark", help: SetStatusFormat.help(status)).padding(8)
+                    }
                 }
                 .padding(8)
             VStack(alignment: .leading, spacing: 2) {
@@ -95,6 +106,23 @@ struct ProjectTile: View {
         .opacity(isPinned || hovering || isSelected || isFocused ? 1 : 0)
         .help(isPinned ? HomeStrings.unpin.s : HomeStrings.pinProject.s)
         .accessibilityLabel(isPinned ? HomeStrings.unpin.s : HomeStrings.pinProject.s)
+    }
+}
+
+/// A small round mark on a tile's picture (stale render, drive not connected).
+private struct TileMark: View {
+    let symbol: String
+    let help: String
+
+    var body: some View {
+        Image(systemName: symbol)
+            .font(.system(size: 11, weight: .medium))
+            .foregroundStyle(Theme.lightTop)
+            .frame(width: 24, height: 24)
+            .background(Color.black.opacity(0.6), in: Circle())
+            .overlay(Circle().strokeBorder(Color.white.opacity(0.12), lineWidth: 1))
+            .help(help)
+            .accessibilityLabel(help)
     }
 }
 

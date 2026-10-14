@@ -44,6 +44,7 @@ private struct SetDetail: View {
                     DetailHeader(set: set)
                     DetailThumbnail(path: set.path)
                     DetailPath(path: set.path)
+                    if set.error.isEmpty { DetailStatus(status: app.sets.status(of: set)) }
                     DetailTagsAndNote(set: set)
                     DetailVersions(set: set)
                     DetailFiles(set: set)

@@ -59,6 +59,9 @@ private struct SetsListStrip: View {
     var body: some View {
         HStack(spacing: 8) {
             PinnedFirstToggle(isOn: app.settings.pinnedFirst) { app.sets.setPinnedFirst($0) }
+            ReadyNowToggle(isOn: app.sets.isReadyOnly, count: app.sets.isReadyOnly ? nil : app.sets.readyCount) {
+                app.sets.setReadyOnly($0)
+            }
             Spacer(minLength: 8)
             if app.sets.activeFilterCount > 0 {
                 StripButton(title: SetsStrings.clearFilters.s, icon: .close) { app.sets.filter.clear() }
@@ -93,6 +96,37 @@ private struct PinnedFirstToggle: View {
         .onHover { hovering = $0 }
         .animation(Theme.hoverAnimation, value: hovering)
         .help(SetsStrings.pinnedFirstHelp.s)
+        .accessibilityAddTraits(isOn ? .isSelected : [])
+    }
+}
+
+/// "Ready to open": only the sets that open as saved right now.
+private struct ReadyNowToggle: View {
+    let isOn: Bool
+    let count: Int?
+    let set: (Bool) -> Void
+    @State private var hovering = false
+
+    var body: some View {
+        Button { set(!isOn) } label: {
+            HStack(spacing: 6) {
+                Image(systemName: "checkmark.circle").font(.system(size: 11, weight: .medium))
+                Text(SetsStrings.readyNow.s)
+                if let count {
+                    Text(count.formatted()).monospacedDigit().opacity(0.7)
+                }
+            }
+            .font(Theme.fSmall)
+            .foregroundStyle(isOn ? Theme.onLight : hovering ? Theme.text : Theme.secondaryText)
+            .padding(.horizontal, 12)
+            .frame(height: 24)
+            .background(isOn ? AnyShapeStyle(Theme.light)
+                        : AnyShapeStyle(hovering ? Theme.surfaceHover : Theme.surface), in: Capsule())
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+        .animation(Theme.hoverAnimation, value: hovering)
+        .help(SetsStrings.readyNowHelp.s)
         .accessibilityAddTraits(isOn ? .isSelected : [])
     }
 }

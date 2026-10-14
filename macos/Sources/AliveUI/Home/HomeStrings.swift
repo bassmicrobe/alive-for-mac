@@ -6,6 +6,7 @@ enum HomeStrings: LocalizedStrings {
     // Tab / sheet titles
     case title, previewTitle
     // Overview
+    case readySets, readySetsHelp
     case overview, activeDays, streak, noStreak, record, peakHour, onDisk
     case nothingSaved, saveOne, saveMany, daysShort, overviewCollapse, overviewExpand
     // Projects
@@ -32,6 +33,8 @@ enum HomeStrings: LocalizedStrings {
         case .title: return ("Home", "ホーム")
         case .previewTitle: return ("Arrangement Preview", "アレンジメントのプレビュー")
 
+        case .readySets: return ("Ready to open", "今すぐ開けるセット")
+        case .readySetsHelp: return ("Show the sets that open right now on the Sets tab", "今すぐ開けるセットをセットタブで表示")
         case .overview: return ("Overview", "概要")
         case .activeDays: return ("Active days", "作業した日")
         case .streak: return ("Streak", "連続日数")

@@ -107,6 +107,7 @@ private struct HomeContent: View {
             isKeyboardFocused: keyboardActive,
             isPinned: app.home.isPinned(path),
             isPlaying: app.player.isPlaying(setPath: path),
+            status: app.catalog.status(for: path),
             focus: $focusedPath,
             onSelect: { app.selectedSetPath = path; keyboardActive = false; focusedPath = path },
             onFocus: { app.selectedSetPath = path; keyboardActive = true },
