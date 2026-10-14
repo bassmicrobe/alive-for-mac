@@ -43,6 +43,24 @@ final class AppPreferences {
         set { app.mutateSettings { $0.checkUpdates = newValue } }
     }
 
+    /// Index the sets in Spotlight (`settings.spotlight`).
+    var spotlight: Bool {
+        get { app.settings.spotlight }
+        set { app.mutateSettings { $0.spotlight = newValue } }
+    }
+
+    /// The menu bar extra (`settings.menuBar`).
+    var menuBar: Bool {
+        get { app.settings.menuBar }
+        set { app.mutateSettings { $0.menuBar = newValue } }
+    }
+
+    /// Project tags as Finder tags on the project folders (`settings.finderTags`).
+    var finderTags: Bool {
+        get { app.settings.finderTags }
+        set { app.mutateSettings { $0.finderTags = newValue } }
+    }
+
     /// Plugin list source (`settings.pluginsFromFolders`). Changing it rescans: the plugin inventory
     /// is rebuilt by the scan.
     var pluginSource: PluginSource {

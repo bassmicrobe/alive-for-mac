@@ -28,6 +28,12 @@ public struct AliveApp: App {
             PlayerWindow().environment(app).preferredColorScheme(.dark)
         }
 
+        MenuBarExtra(CommonStrings.appName.s, systemImage: "waveform",
+                     isInserted: Binding(get: { app.prefs.menuBar }, set: { app.prefs.menuBar = $0 })) {
+            MenuBarContent().environment(app)
+        }
+        .menuBarExtraStyle(.window)
+
         Settings {
             SettingsView().environment(app).preferredColorScheme(.dark)
         }

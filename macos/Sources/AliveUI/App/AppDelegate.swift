@@ -8,8 +8,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Files that arrived before the model was attached.
     @MainActor private static var earlyPaths: [String] = []
 
+    /// A Spotlight result opened before the model was attached.
+    @MainActor private static var earlySpotlightPath: String?
+
     @MainActor static func attach(_ app: AppModel) {
         model = app
+        if let path = earlySpotlightPath {
+            earlySpotlightPath = nil
+            app.integration.showInAlive(path: path)
+        }
         guard !earlyPaths.isEmpty else { return }
         app.openPaths(earlyPaths)
         earlyPaths = []
@@ -54,5 +61,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
+    /// A Spotlight result (`CSSearchableItemActionType`): show that set on the Sets tab.
+    func application(_ application: NSApplication, continue userActivity: NSUserActivity,
+                     restorationHandler: @escaping ([any NSUserActivityRestoring]) -> Void) -> Bool {
+        guard let path = SpotlightLink.path(activityType: userActivity.activityType,
+                                            userInfo: userActivity.userInfo) else { return false }
+        MainActor.assumeIsolated {
+            if let model = AppDelegate.model {
+                model.integration.showInAlive(path: path)
+            } else {
+                AppDelegate.earlySpotlightPath = path
+            }
+        }
+        return true
+    }
+
+    /// With the menu bar extra on, the app lives on after the last window is closed.
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
+        MainActor.assumeIsolated { !(AppDelegate.model?.settings.menuBar ?? false) }
+    }
 }

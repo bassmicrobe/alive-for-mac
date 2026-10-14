@@ -64,6 +64,7 @@ struct HelpSheet: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
                     tabsCard
+                    IntegrationHelpCard()
                     SectionHeader(HelpStrings.shortcuts.s)
                     LazyVGrid(columns: columns, spacing: 14) {
                         ForEach(shortcutGroups) { group in

@@ -50,6 +50,24 @@ final class SettingsTests: XCTestCase {
         XCTAssertEqual(try String(contentsOfFile: Settings.filePath(dir: t.path)), s.serialized())
     }
 
+    func testMacIntegrationKeysDefaultAndRoundTrip() throws {
+        let defaults = Settings()
+        XCTAssertTrue(defaults.spotlight)
+        XCTAssertTrue(defaults.menuBar)
+        XCTAssertFalse(defaults.finderTags)
+        XCTAssertTrue(defaults.serialized().contains("spotlight=1\nmenubar=1\nfindertags=0\n"))
+
+        let t = makeTemp()
+        var s = Settings()
+        s.spotlight = false; s.menuBar = false; s.finderTags = true
+        try s.save(dir: t.path)
+        let back = Settings.load(dir: t.path)
+        XCTAssertFalse(back.spotlight)
+        XCTAssertFalse(back.menuBar)
+        XCTAssertTrue(back.finderTags)
+        XCTAssertEqual(back, s)
+    }
+
     func testFormatIsUpstreamsLineFormat() {
         var s = Settings()
         s.roots = ["/r"]
