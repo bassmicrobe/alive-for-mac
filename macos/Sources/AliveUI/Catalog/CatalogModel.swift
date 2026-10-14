@@ -159,6 +159,16 @@ final class CatalogModel {
         revision += 1
     }
 
+    // MARK: - Set status (Mac-only)
+
+    /// Per-set readiness facts (offline volumes, plugin readiness, stale renders), keyed by set
+    /// path. Placeholder derived from upstream fields until the sidecar is wired in; views read
+    /// `status(for:)` and observe `revision`.
+    func status(for path: String) -> SetStatus? {
+        guard let entry = sets.first(where: { $0.path == path }) else { return nil }
+        return SetStatus.basic(entry, pluginsKnown: index.inventory.isAvailable)
+    }
+
     /// Re-derives `projects` after a setting such as `groupByFolder` changed.
     func settingsDidChange() {
         projects = app.settings.groupByFolder ? ProjectIndex.collapseByFolder(sets) : sets
