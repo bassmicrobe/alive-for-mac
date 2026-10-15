@@ -43,6 +43,7 @@ struct SampleRowView: View {
         .help(isFile ? SamplesStrings.dragHelp.s : "")
         .accessibilityElement(children: .combine)
         .accessibilityLabel(cells.text(.name, row))
+        .accessibilityValue(isOfflineRoot ? SamplesStrings.offlineBadgeHelp.s : "")
         .accessibilityHint(isFile ? SamplesStrings.dragHelp.s : "")
         .accessibilityAddTraits(selected ? [.isSelected, .isButton] : .isButton)
         .accessibilityAction {
@@ -61,6 +62,11 @@ struct SampleRowView: View {
     private var isFile: Bool {
         if case .file = row.kind { return true }
         return false
+    }
+
+    private var isOfflineRoot: Bool {
+        guard case .folder(let d) = row.kind, model.index.folders[d].parent == nil else { return false }
+        return model.isOffline(root: row.id)
     }
 
     // MARK: cells
@@ -156,7 +162,7 @@ struct SampleRowView: View {
 
     /// A root on a drive that isn't connected says so instead of looking empty or never used.
     @ViewBuilder private var offlineBadge: some View {
-        if case .folder(let d) = row.kind, model.index.folders[d].parent == nil, SampleOffline.isOffline(row.id) {
+        if isOfflineRoot {
             OfflineBadge()
         }
     }

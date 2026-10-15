@@ -132,6 +132,7 @@ struct FilterField: View {
                 .textFieldStyle(.plain)
                 .font(Theme.fBody)
                 .foregroundStyle(isInvalid ? Theme.red : Theme.text)
+                .accessibilityLabel(cue)
                 .focused($focused)
         }
         .padding(.horizontal, 14)
@@ -164,7 +165,7 @@ struct DateFilterField: View {
                 if new == nil, SetFilter.parseDate(text, upperBound: upperBound) != nil { text = "" }
             }
             .popover(isPresented: $showPicker, arrowEdge: .bottom) {
-                DatePicker("", selection: $picked, displayedComponents: .date)
+                DatePicker(cue, selection: $picked, displayedComponents: .date)
                     .datePickerStyle(.graphical)
                     .labelsHidden()
                     .padding(12)

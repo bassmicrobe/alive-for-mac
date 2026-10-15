@@ -14,14 +14,7 @@ struct MenuBarContent: View {
         VStack(alignment: .leading, spacing: 10) {
             activityLine(snapshot)
             if app.player.isStripVisible { nowPlaying }
-            if !snapshot.pinned.isEmpty {
-                section(IntegrationStrings.pinned.s, snapshot.pinned)
-            }
-            if snapshot.recent.isEmpty {
-                Text(IntegrationStrings.noProjects.s).font(Theme.fSmall).foregroundStyle(Theme.secondaryText)
-            } else {
-                section(IntegrationStrings.recent.s, snapshot.recent)
-            }
+            MenuBarProjects(snapshot: snapshot)
             Divider().overlay(Theme.hairline)
             footer
         }
@@ -69,13 +62,6 @@ struct MenuBarContent: View {
         .background(Theme.surface, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 
-    private func section(_ title: String, _ sets: [SetEntry]) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            SectionHeader(title).padding(.bottom, 2)
-            ForEach(sets) { set in MenuBarProjectRow(set: set) }
-        }
-    }
-
     private var footer: some View {
         HStack(spacing: 8) {
             Button(IntegrationStrings.openAlive.s) { MainWindowPresenter.show() }
@@ -98,6 +84,43 @@ struct MenuBarContent: View {
         .foregroundStyle(Theme.text)
         .help(label)
         .accessibilityLabel(label)
+    }
+}
+
+/// Keep all projects reachable while the footer stays visible, even with many pins. Short lists
+/// use their natural height; only a list taller than the available space needs to scroll.
+struct MenuBarProjects: View {
+    static let maxHeight: CGFloat = 360
+    let snapshot: MenuBarSnapshot
+
+    var body: some View {
+        ViewThatFits(in: .vertical) {
+            projects.fixedSize(horizontal: false, vertical: true)
+            ScrollView { projects }
+                .frame(height: Self.maxHeight)
+        }
+        .frame(maxHeight: Self.maxHeight)
+    }
+
+    private var projects: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            if !snapshot.pinned.isEmpty {
+                section(IntegrationStrings.pinned.s, snapshot.pinned)
+            }
+            if snapshot.recent.isEmpty {
+                Text(IntegrationStrings.noProjects.s).font(Theme.fSmall).foregroundStyle(Theme.secondaryText)
+            } else {
+                section(IntegrationStrings.recent.s, snapshot.recent)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func section(_ title: String, _ sets: [SetEntry]) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            SectionHeader(title).padding(.bottom, 2)
+            ForEach(sets) { set in MenuBarProjectRow(set: set) }
+        }
     }
 }
 

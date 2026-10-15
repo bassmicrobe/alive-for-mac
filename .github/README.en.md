@@ -22,6 +22,19 @@ wrapper. The original C# sources stay in this repository untouched, as the refer
 
 ## Release notes
 
+### [0.3.1](https://github.com/bassmicrobe/alive-for-mac/releases/tag/v0.3.1) — 2026-10-15 performance and UI/UX improvements
+
+991 tests, zero failures, with 11 environment-dependent skips. Native Japanese UI checks on Apple Silicon covered automatic refresh, filters and offline indicators.
+
+- **Responsive scans and catalog protection.** Startup change-history replay has time and event limits, supports cancellation, and falls back to a full scan for large changes. Sample walks also respond to cancellation. Project and sample scans retain previous catalog data when a subtree cannot be read.
+- **Automatic file-change refresh.** Fix project monitoring not starting on normal launch, so saving or adding sets automatically refreshes the catalog.
+- **Spotlight and widget updates.** Superseded work is canceled and publication is ordered so older work cannot overwrite newer results.
+- **Complete Quick Look arrangements.** Sets with many tracks fit within the image budget while keeping the final track visible.
+- **State and controls.** Long lists of pins and missing folders scroll while recovery and footer actions stay visible. Filters follow scans and tag changes; sample offline indicators, extension status checks, rechecking, progress feedback and accessibility labels are improved.
+- **Finder tag ownership.** Alive remembers which tags it added while a drive is unavailable, so they remain distinct from your own tags after reconnection. Unchanged ownership records are no longer rewritten.
+
+See the [audit report](../macos/docs/PERFORMANCE_UIUX_AUDIT_2026-10-15.md) for changes and validation scope.
+
 ### [0.2.1](https://github.com/bassmicrobe/alive-for-mac/releases/tag/v0.2.1) — 2026-10-05 performance and UI/UX improvements
 
 - **Preserve the catalog when a drive is unavailable.** Unreadable project roots keep the previous list and caches. Home and Sets explain the failure, link to folder settings, and clearly indicate when the displayed catalog may be outdated.

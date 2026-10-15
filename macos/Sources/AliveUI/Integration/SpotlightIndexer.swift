@@ -122,23 +122,31 @@ actor SpotlightIndexer {
 
     /// Brings the index in line with `documents`.
     func sync(_ documents: [SpotlightDocument]) async {
+        guard !Task.isCancelled else { return }
         clearedSinceSync = false
         let plan = SpotlightPlan.make(previous: snapshot, current: documents)
         guard !plan.isEmpty else { return }
+        var removed = 0, indexed = 0
         do {
             for batch in plan.deletes.chunked(Self.batchSize) {
+                try Task.checkCancellation()
                 try await backend.delete(ids: batch)
                 batch.forEach { snapshot[$0] = nil }
+                removed += batch.count
             }
             for batch in plan.upserts.chunked(Self.batchSize) {
+                try Task.checkCancellation()
                 try await backend.index(batch)
                 batch.forEach { snapshot[$0.id] = $0.signature }
+                indexed += batch.count
             }
+        } catch is CancellationError {
+            // Preserve completed batches so the next request resumes from the actual index.
         } catch {
             Diag.fail("spotlight index", error)
         }
         file.save(snapshot)
-        Diag.info("spotlight: \(plan.upserts.count) indexed, \(plan.deletes.count) removed")
+        Diag.info("spotlight: \(indexed) indexed, \(removed) removed")
     }
 
     /// The toggle is off: removes everything Alive gave to Spotlight. It does not depend on the

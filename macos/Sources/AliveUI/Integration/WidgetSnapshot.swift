@@ -41,14 +41,43 @@ enum WidgetSnapshotWriter {
         ProcessInfo.processInfo.environment["ALIVE_HOME"]?.isEmpty ?? true
     }
 
-    /// Called whenever the catalog is ready: builds the snapshot off the main thread, writes it and,
-    /// when it changed, reloads the widget's timelines.
-    static func publish(activity: Activity, sets: [SetEntry], dir: String) {
-        Task.detached(priority: .utility) {
-            let snapshot = WidgetSnapshot.make(activity: activity, sets: sets)
-            if write(snapshot, dir: dir) == .written, usesDefaultFolder {
-                WidgetCenter.shared.reloadAllTimelines()
-            }
+    static func reloadTimelines() {
+        if usesDefaultFolder { WidgetCenter.shared.reloadAllTimelines() }
+    }
+}
+
+/// One publisher per app. A superseded build can finish, but cannot write over a newer snapshot.
+/// Waiting for the preceding task also serializes any write that was already in progress.
+@MainActor
+final class WidgetSnapshotPublisher {
+    private var pending: Task<Void, Never>?
+    private let reload: @Sendable () -> Void
+
+    init(reload: @escaping @Sendable () -> Void = { WidgetSnapshotWriter.reloadTimelines() }) {
+        self.reload = reload
+    }
+
+    deinit { pending?.cancel() }
+
+    @discardableResult
+    func publish(activity: Activity, sets: [SetEntry], dir: String) -> Task<Void, Never> {
+        publish(dir: dir) { WidgetSnapshot.make(activity: activity, sets: sets) }
+    }
+
+    /// The builder is injectable so completion-order races can be reproduced without WidgetKit.
+    @discardableResult
+    func publish(dir: String, makeSnapshot: @escaping @Sendable () -> WidgetSnapshot) -> Task<Void, Never> {
+        let previous = pending
+        previous?.cancel()
+        let reload = reload
+        let next = Task.detached(priority: .utility) {
+            await previous?.value
+            guard !Task.isCancelled else { return }
+            let snapshot = makeSnapshot()
+            guard !Task.isCancelled else { return }
+            if WidgetSnapshotWriter.write(snapshot, dir: dir) == .written { reload() }
         }
+        pending = next
+        return next
     }
 }

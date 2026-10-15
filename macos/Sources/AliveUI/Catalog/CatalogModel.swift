@@ -78,6 +78,8 @@ final class CatalogModel {
     func start() {
         guard !started else { return }
         started = true
+        // Arm before loading the cache: changes during launch wait in the watcher's retry loop.
+        app.sets.watcher.start()
         let watcher = VolumeWatcher()
         watcher.onChange = { [weak self] in self?.volumesChanged() }
         watcher.start()

@@ -1,4 +1,6 @@
 import XCTest
+import AppKit
+import SwiftUI
 import AliveCore
 @testable import AliveUI
 
@@ -30,6 +32,22 @@ final class IntegrationMenuBarTests: XCTestCase {
         let sets = [set("/a/x.als", modified: 1), set("/b/y.als", modified: 3), set("/c/z.als", modified: 2)]
         let snap = MenuBarSnapshot.make(sets: sets, pins: ["/a/x.als", "/b/y.als", "/nope.als"], activity: .empty)
         XCTAssertEqual(snap.pinned.map(\.path), ["/b/y.als", "/a/x.als"])
+    }
+
+    func testManyPinsKeepTheProjectListBoundedWhileShortListsStayCompact() throws {
+        let app = try makeModel(files: ["settings.cfg": Self.off])
+        let sets = (0..<40).map { set("/lib/P\($0)/a.als", modified: Double($0)) }
+        let long = MenuBarSnapshot.make(sets: sets, pins: Set(sets.map(\.path)), activity: .empty)
+        let short = MenuBarSnapshot.make(sets: Array(sets.prefix(1)), pins: [], activity: .empty)
+        let longHost = NSHostingView(rootView: MenuBarProjects(snapshot: long).environment(app).frame(width: 302))
+        let shortHost = NSHostingView(rootView: MenuBarProjects(snapshot: short).environment(app).frame(width: 302))
+        longHost.layoutSubtreeIfNeeded()
+        shortHost.layoutSubtreeIfNeeded()
+
+        XCTAssertGreaterThan(longHost.fittingSize.height, 0)
+        XCTAssertLessThanOrEqual(longHost.fittingSize.height, MenuBarProjects.maxHeight + 1)
+        XCTAssertLessThan(shortHost.fittingSize.height, longHost.fittingSize.height)
+        XCTAssertEqual(long.pinned.count, 40) // Every pin remains available in the scrolling list.
     }
 
     func testPreferencesRoundTripThroughTheModel() throws {
