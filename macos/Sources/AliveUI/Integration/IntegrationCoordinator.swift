@@ -80,8 +80,10 @@ final class IntegrationCoordinator {
         let indexer = spotlight
         let previous = syncTask
         guard app.settings.spotlight else {
+            previous?.cancel()
             syncTask = Task {
                 await previous?.value
+                guard !Task.isCancelled else { return }
                 await indexer.removeEverything()
                 if let text = SpotlightDebugQuery.text { SpotlightDebugQuery.logMatches(for: text) }
             }
@@ -89,6 +91,7 @@ final class IntegrationCoordinator {
         }
         // Nothing to say before the first publish: an empty catalog would clear the index.
         guard app.catalog.isLoaded else { return }
+        previous?.cancel()
         let sets = app.catalog.sets
         let meta = app.sets.meta
         // Read on the main actor; the detached work formats with these immutable inputs only.
@@ -96,11 +99,19 @@ final class IntegrationCoordinator {
         let locale = Localizer.shared.locale
         syncTask = Task.detached(priority: .utility) {
             await previous?.value
-            let documents = sets.compactMap { set in
-                SpotlightDocument.make(for: set, tags: meta.tagsOf(set.projectDir),
-                                       description: SpotlightDocument.describe(set, lang: lang, locale: locale))
+            guard !Task.isCancelled else { return }
+            var documents: [SpotlightDocument] = []
+            documents.reserveCapacity(sets.count)
+            for set in sets {
+                guard !Task.isCancelled else { return }
+                if let document = SpotlightDocument.make(for: set, tags: meta.tagsOf(set.projectDir),
+                    description: SpotlightDocument.describe(set, lang: lang, locale: locale)) {
+                    documents.append(document)
+                }
             }
+            guard !Task.isCancelled else { return }
             await indexer.sync(documents)
+            guard !Task.isCancelled else { return }
             if let text = SpotlightDebugQuery.text { SpotlightDebugQuery.logMatches(for: text) }
         }
     }

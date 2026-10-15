@@ -98,7 +98,8 @@ public enum PreviewPage {
                                     minLane: 6, maxLane: 26, scale: 2)
         let natural = ArrangementRender.fullHeight(trackCount: a.tracks.count, options: options)
         let height = min(max(natural, 300), 1100)
-        guard let image = ArrangementRender.makeImage(a, width: width, height: height, options: options) else { return nil }
+        guard let image = ArrangementRender.makeImage(a, width: width, height: height, options: options,
+                                                     fitAllTracks: true) else { return nil }
         return png(image)
     }
 

@@ -21,7 +21,7 @@ enum AppExtension: CaseIterable, Identifiable {
 }
 
 enum ExtensionState: Equatable {
-    case checking, enabled, disabled, notInstalled
+    case checking, enabling, enabled, disabled, notInstalled, checkFailed
 
     /// `pluginkit -m -i <id>` prints one line per registered copy, led by a mark column: `+` (enabled),
     /// `-` (switched off), a blank (registered but never elected, which is how a fresh install
@@ -29,9 +29,12 @@ enum ExtensionState: Equatable {
     /// counts as enabled.
     static func parse(pluginkitOutput: String) -> ExtensionState {
         let lines = pluginkitOutput.split(whereSeparator: \.isNewline)
-            .filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty && !$0.hasPrefix("(") }
-        guard let first = lines.first else { return .notInstalled }
-        return first.first == "+" ? .enabled : .disabled
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty && !$0.hasPrefix("(") }
+        guard !lines.isEmpty else { return .notInstalled }
+        // Several app copies can be registered. The first can be superseded or disabled even
+        // while another is elected; ordering must not turn an enabled extension into "off".
+        return lines.contains { $0.hasPrefix("+") } ? .enabled : .disabled
     }
 }
 
@@ -57,7 +60,14 @@ enum PluginKit {
     }
 
     static func state(of ext: AppExtension) -> ExtensionState {
-        ExtensionState.parse(pluginkitOutput: run(["-m", "-i", ext.bundleID]).output)
+        let result = run(["-m", "-i", ext.bundleID])
+        if result.status != 0 { Diag.warn("pluginkit status failed (\(result.status)): \(result.output)") }
+        return state(from: result)
+    }
+
+    static func state(from result: Result) -> ExtensionState {
+        guard result.status == 0 else { return .checkFailed }
+        return ExtensionState.parse(pluginkitOutput: result.output)
     }
 
     /// `pluginkit -e use -i <id>`; the failure text on error.
@@ -70,18 +80,22 @@ enum PluginKit {
 struct ExtensionsSection: View {
     @State private var states: [AppExtension: ExtensionState] = [:]
     @State private var failure: String?
+    @State private var isBusy = false
 
     var body: some View {
         Section(ExtensionStrings.title.s) {
             ForEach(AppExtension.allCases) { ext in row(ext) }
             if let failure {
-                Text(ExtensionStrings.enableFailed.f(failure))
+                Text(ExtensionStrings.enableFailed.f(failure.isEmpty ? ExtensionStrings.noFailureDetails.s : failure))
                     .font(Theme.fSmall).foregroundStyle(Theme.errorText)
                     .fixedSize(horizontal: false, vertical: true)
             }
             if states.values.contains(.notInstalled) {
                 Text(ExtensionStrings.notInstalledHint.s).font(Theme.fSmall).foregroundStyle(Theme.secondaryText)
             }
+            PillButton(title: ExtensionStrings.recheck.s) { Task { await refresh() } }
+                .disabled(isBusy)
+                .accessibilityLabel(ExtensionStrings.recheckAccessibility.s)
         }
         .task { await refresh() }
     }
@@ -98,6 +112,8 @@ struct ExtensionsSection: View {
                 Spacer(minLength: 8)
                 if state == .disabled {
                     PillButton(title: ExtensionStrings.enable.s, kind: .quiet) { enable(ext) }
+                        .disabled(isBusy)
+                        .accessibilityLabel(ExtensionStrings.enableExtension.f(title(ext)))
                 }
             }
             Text(howTo(ext)).font(Theme.fSmall).foregroundStyle(Theme.secondaryText)
@@ -116,23 +132,39 @@ struct ExtensionsSection: View {
     private func statusText(_ state: ExtensionState) -> String {
         switch state {
         case .checking: return ExtensionStrings.stateChecking.s
+        case .enabling: return ExtensionStrings.stateEnabling.s
         case .enabled: return ExtensionStrings.stateEnabled.s
         case .disabled: return ExtensionStrings.stateDisabled.s
         case .notInstalled: return ExtensionStrings.stateNotInstalled.s
+        case .checkFailed: return ExtensionStrings.stateCheckFailed.s
         }
     }
 
     private func refresh() async {
+        guard !isBusy else { return }
+        isBusy = true
+        defer { isBusy = false }
+        failure = nil
+        states = Dictionary(uniqueKeysWithValues: AppExtension.allCases.map { ($0, .checking) })
+        states = await queriedStates()
+    }
+
+    private func queriedStates() async -> [AppExtension: ExtensionState] {
         let found = await Task.detached(priority: .userInitiated) {
             Dictionary(uniqueKeysWithValues: AppExtension.allCases.map { ($0, PluginKit.state(of: $0)) })
         }.value
-        states = found
+        return found
     }
 
     private func enable(_ ext: AppExtension) {
+        guard !isBusy, states[ext] == .disabled else { return }
+        isBusy = true
+        failure = nil
+        states[ext] = .enabling
         Task {
             failure = await Task.detached(priority: .userInitiated) { PluginKit.enable(ext) }.value
-            await refresh()
+            states = await queriedStates()
+            isBusy = false
         }
     }
 }

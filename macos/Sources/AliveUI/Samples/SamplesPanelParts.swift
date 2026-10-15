@@ -289,14 +289,6 @@ private struct WaveCanvas: View {
 
 // MARK: - Offline roots
 
-/// Is a sample folder on a drive that isn't connected? Only paths under /Volumes can be.
-enum SampleOffline {
-    static func isOffline(_ path: String) -> Bool {
-        guard VolumeState.volumeName(of: path) != nil else { return false }
-        return VolumeState.isOffline(path, mounted: VolumeState.mountedVolumeNames())
-    }
-}
-
 /// "Offline" pill for a root whose drive is not connected.
 struct OfflineBadge: View {
     var body: some View {

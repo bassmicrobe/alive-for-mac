@@ -56,13 +56,14 @@ extension SampleIndex {
             }
             let tree = SampleIndex.walk(root: walk[i], known: known, found: counter.add, isCancelled: isCancelled)
             if isCancelled() { return tree }
-            guard let mounted else { return tree }
             // The drive may have gone away during the walk: what was read is then not to be trusted.
-            let now = mountedNow?() ?? mounted
-            if VolumeState.isOffline(walk[i], mounted: now) { return SampleIndex.kept(root: walk[i], from: previous) }
+            if let mounted, VolumeState.isOffline(walk[i], mounted: mountedNow?() ?? mounted) {
+                return SampleIndex.kept(root: walk[i], from: previous)
+            }
             if let tree { return tree }
-            // The walk failed on a mounted volume: gone for sure only if the folder does not exist.
-            if !FileManager.default.fileExists(atPath: walk[i]), !VolumeState.isOffline(walk[i], mounted: mounted) {
+            // A denied subfolder makes the whole walk incomplete. Keep the root, including its
+            // old samples, instead of interpreting a partial listing as their deletion.
+            if !FileManager.default.fileExists(atPath: walk[i]) {
                 return nil
             }
             return SampleIndex.kept(root: walk[i], from: previous)
@@ -103,7 +104,8 @@ extension SampleIndex {
     }
 
     /// One root. A stack rather than recursion — libraries run a dozen levels deep. nil: the root
-    /// itself would not open, or the walk was called off.
+    /// or any subfolder would not open, or the walk was called off. A partial listing cannot
+    /// establish that the samples absent from it were deleted.
     ///
     /// `known` — AIFFs looked into before; nil — do not look into AIFFs at all (`silent`): the
     /// index wants it, the count in a folders dialog does not. Only read here, so the parallel
@@ -122,16 +124,14 @@ extension SampleIndex {
         var files: [SampleFile] = []
         var todo = [Pending(path: top, folder: 0, own: true)]
         var batch = 0
-        var first = true
-
         while let p = todo.popLast() {
             if isCancelled() { return nil }
             guard let entries = FolderScan.list(p.path) else {
-                if first { return nil }
-                continue
+                Diag.warn("samples: cannot read folder \(p.path); root walk incomplete")
+                return nil
             }
-            first = false
-            for e in entries.sorted(by: { $0.name < $1.name }) {
+            for (offset, e) in entries.sorted(by: { $0.name < $1.name }).enumerated() {
+                if offset % 256 == 0, isCancelled() { return nil }
                 if e.isDirectory {
                     let full = combine(p.path, e.name)
                     if !p.own || e.isPackage || isWeightOnly(e.name) {

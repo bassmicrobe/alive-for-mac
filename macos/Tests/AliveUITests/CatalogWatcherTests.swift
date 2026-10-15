@@ -1,8 +1,49 @@
 import XCTest
+import AliveCore
 @testable import AliveUI
 
 @MainActor
 final class CatalogWatcherTests: XCTestCase {
+    func testStartingTheCatalogArmsTheWatcherAndResavedSetsRefreshAutomatically() async throws {
+        let scratch = makeHomeScratch()
+        let path = try scratch.writeSet("lib/Watched Project/A.als")
+        let app = AppModel(dataDir: scratch.sub("data"))
+        app.mutateSettings {
+            $0.roots = [scratch.sub("lib")]
+            $0.spotlight = false
+        }
+        let watcher = app.sets.watcher
+        defer {
+            watcher.stop()
+            watcher.waitUntilArmed()
+        }
+
+        // Exercise the production lifecycle, rather than starting the watcher in the test.
+        app.catalog.start()
+        app.catalog.start()
+        watcher.waitUntilArmed()
+        XCTAssertEqual(watcher.armCount, 1, "catalog startup must arm the watch exactly once")
+        for _ in 0..<400 where !(app.catalog.isReady && app.catalog.lastScanStats != nil) {
+            try await Task.sleep(nanoseconds: 50_000_000)
+        }
+        XCTAssertTrue(app.catalog.isReady)
+        let initial = try XCTUnwrap(app.catalog.sets.first { $0.path == path })
+        XCTAssertEqual(initial.shortVersion, "12.3.5")
+
+        let xml = HomeFixtures.setXML(withClip: true)
+            .replacingOccurrences(of: "12.3.5", with: "12.3.6")
+        try Gzip.compress(Data(xml.utf8)).write(to: URL(fileURLWithPath: path), options: .atomic)
+        // Keep cache invalidation independent of the file system's timestamp resolution.
+        try FileManager.default.setAttributes([.modificationDate: initial.modified.addingTimeInterval(5)],
+                                             ofItemAtPath: path)
+        for _ in 0..<400 where app.catalog.sets.first(where: { $0.path == path })?.shortVersion != "12.3.6" {
+            try await Task.sleep(nanoseconds: 50_000_000)
+        }
+        XCTAssertEqual(app.catalog.sets.first { $0.path == path }?.shortVersion, "12.3.6",
+                       "saving an .als must refresh the catalog without a manual rescan")
+        XCTAssertEqual(watcher.armCount, 1, "a file change must not replace the watch")
+    }
+
     func testTheWatcherIsNotRearmedByUnrelatedSettingsChanges() async throws {
         let app = try makeModel()
         let watcher = app.sets.watcher

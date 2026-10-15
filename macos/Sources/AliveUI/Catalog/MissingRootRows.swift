@@ -7,6 +7,17 @@ struct MissingRootRows: View {
     @Environment(AppModel.self) private var app
 
     var body: some View {
+        if roots.count > 3 {
+            // A disconnected multi-folder library must leave the catalog and recovery buttons
+            // reachable. Keep the banner compact and let all missing roots scroll within it.
+            ScrollView { rows }
+                .frame(height: Theme.controlH * 3 + 16)
+        } else {
+            rows
+        }
+    }
+
+    private var rows: some View {
         VStack(spacing: 8) {
             ForEach(roots, id: \.self) { root in
                 HStack(spacing: 10) {

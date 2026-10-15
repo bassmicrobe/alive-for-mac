@@ -62,20 +62,29 @@ public enum ReplayOutcome: Equatable, Sendable {
 /// The three things the diff scan asks the system, injectable so tests need no real journal.
 public struct ScanHistoryOps: Sendable {
     public var identity: @Sendable (_ root: String) -> RootIdentity
-    public var replay: @Sendable (_ root: String, _ since: UInt64) -> ReplayOutcome
+    public var replay: @Sendable (_ root: String, _ since: UInt64,
+                                 _ isCancelled: @escaping () -> Bool) -> ReplayOutcome
     public var currentEventId: @Sendable () -> UInt64
 
     public init(identity: @escaping @Sendable (String) -> RootIdentity,
-                replay: @escaping @Sendable (String, UInt64) -> ReplayOutcome,
+                replay: @escaping @Sendable (String, UInt64, @escaping () -> Bool) -> ReplayOutcome,
                 currentEventId: @escaping @Sendable () -> UInt64) {
         self.identity = identity
         self.replay = replay
         self.currentEventId = currentEventId
     }
 
+    /// Existing synchronous test journals need no cancellation bridge of their own.
+    public init(identity: @escaping @Sendable (String) -> RootIdentity,
+                replay: @escaping @Sendable (String, UInt64) -> ReplayOutcome,
+                currentEventId: @escaping @Sendable () -> UInt64) {
+        self.init(identity: identity, replay: { root, since, _ in replay(root, since) },
+                  currentEventId: currentEventId)
+    }
+
     public static let live = ScanHistoryOps(
         identity: { RootIdentity.of($0) },
-        replay: { FSEventsReplay.events(root: $0, since: $1) },
+        replay: { FSEventsReplay.events(root: $0, since: $1, isCancelled: $2) },
         currentEventId: { FSEventsGetCurrentEventId() })
 }
 
@@ -120,6 +129,13 @@ public enum DiffScan {
             guard let region = region(of: e, root: top, projectDirs: projectDirs) else { continue }
             if region.lowercased() == top.lowercased() { return .full(.changedAtRoot) }
             found.insert(region)
+            // Bound the quadratic nested-region reduction too. A later parent event might
+            // merge these regions, but a full walk is already a safe and cheaper fallback.
+            if found.count > maxRegions {
+                let merged = dropNested(found)
+                if merged.count > maxRegions { return .full(.tooManyChanges) }
+                found = Set(merged)
+            }
         }
         let merged = dropNested(found)
         return merged.count > maxRegions ? .full(.tooManyChanges) : .regions(merged.sorted())

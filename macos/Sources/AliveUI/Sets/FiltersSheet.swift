@@ -87,13 +87,15 @@ struct FiltersSheet: View {
         .defaultFocus($restingFocus, true)
         .onAppear(perform: refreshFacets)
         .onChange(of: app.sets.filter) { _, _ in refreshFacets() }
+        .onChange(of: app.catalog.revision) { _, _ in refreshFacets() }
+        .onChange(of: app.sets.metaRevision) { _, _ in refreshFacets() }
         .onKeyPress(.escape) { dismiss(); return .handled }
     }
 
     // MARK: - Pieces
 
-    /// "Some not installed" / "all installed": mutually exclusive, and disabled outright while the
-    /// installed-plugin list is unknown.
+    /// "Some not installed" / "all installed": mutually exclusive. An unknown plugin list prevents
+    /// adding either condition, but a selected condition can still be undone.
     private var pluginStateRow: some View {
         @Bindable var sets = app.sets
         let known = app.sets.pluginsKnown
@@ -104,12 +106,12 @@ struct FiltersSheet: View {
                                  isOn: Binding(get: { sets.filter.pluginsMissingOnly },
                                                set: { sets.filter.pluginsMissingOnly = $0
                                                       if $0 { sets.filter.pluginsAllInstalled = false } }),
-                                 isEnabled: known && (facets.canPickMissingPlugins || sets.filter.pluginsMissingOnly))
+                                 isEnabled: sets.filter.pluginsMissingOnly || (known && facets.canPickMissingPlugins))
                     FilterToggle(title: SetsStrings.fltAllInstalled.s,
                                  isOn: Binding(get: { sets.filter.pluginsAllInstalled },
                                                set: { sets.filter.pluginsAllInstalled = $0
                                                       if $0 { sets.filter.pluginsMissingOnly = false } }),
-                                 isEnabled: known && (facets.canPickAllInstalled || sets.filter.pluginsAllInstalled))
+                                 isEnabled: sets.filter.pluginsAllInstalled || (known && facets.canPickAllInstalled))
                 }
                 if !known {
                     Text(SetsStrings.pluginStatusUnknown.s).font(Theme.fBadge).foregroundStyle(Theme.secondaryText)

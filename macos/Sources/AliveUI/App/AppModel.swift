@@ -44,6 +44,7 @@ final class AppModel {
     /// sounds never overlap. Its errors surface as toasts.
     @ObservationIgnored let audio = AudioPlayback()
     @ObservationIgnored private var started = false
+    @ObservationIgnored private let widgetPublisher = WidgetSnapshotPublisher()
 
     @ObservationIgnored lazy var prefs = AppPreferences(app: self)
 
@@ -198,7 +199,7 @@ final class AppModel {
         }
         flushPendingOpen()
         integration.catalogDidChange()
-        WidgetSnapshotWriter.publish(activity: catalog.history, sets: catalog.sets, dir: dataDir)
+        widgetPublisher.publish(activity: catalog.history, sets: catalog.sets, dir: dataDir)
         UpdateModel.shared.dailyCheckIfDue(app: self)
     }
 

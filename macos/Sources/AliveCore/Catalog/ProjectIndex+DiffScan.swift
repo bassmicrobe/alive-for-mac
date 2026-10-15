@@ -9,11 +9,13 @@ extension ProjectIndex {
 
     /// For each enabled root: the folders to read again if the journal can be trusted, nothing if
     /// the root has to be walked in full. Keyed by `diffKey`.
-    func planDiff(roots: [String], cache: [String: SetEntry], stats: inout ScanStats) -> [String: [String]] {
+    func planDiff(roots: [String], cache: [String: SetEntry], stats: inout ScanStats,
+                  isCancelled: @escaping () -> Bool) -> [String: [String]] {
         let history = ScanHistory.load(dir: dir)
         let stamp = ScanHistory.catalogStamp(dir: dir)
         var plan: [String: [String]] = [:]
         for root in roots {
+            if isCancelled() { break }
             let top = DiffScan.norm(root)
             let low = top.lowercased() + "/"
             let underRoot = cache.values.filter { $0.path.lowercased().hasPrefix(low) }
@@ -25,7 +27,9 @@ extension ProjectIndex {
                 continue
             }
             let projectDirs = Set(underRoot.map { $0.projectDir.lowercased() })
-            switch DiffScan.plan(for: historyOps.replay(top, since), root: top, projectDirs: projectDirs) {
+            let outcome = historyOps.replay(top, since, isCancelled)
+            if isCancelled() { break }
+            switch DiffScan.plan(for: outcome, root: top, projectDirs: projectDirs) {
             case .full(let why): fallBack(root, why, &stats)
             case .regions(let regions):
                 plan[Self.diffKey(root)] = regions

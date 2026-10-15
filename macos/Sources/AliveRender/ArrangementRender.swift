@@ -76,7 +76,8 @@ public enum ArrangementRender {
     }
 
     /// A finished picture with a transparent background. `nil` for a zero size.
-    public static func makeImage(_ a: Arrangement, width: Int, height: Int, options: RenderOptions) -> CGImage? {
+    public static func makeImage(_ a: Arrangement, width: Int, height: Int, options: RenderOptions,
+                                 fitAllTracks: Bool = false) -> CGImage? {
         guard width > 0, height > 0,
               let g = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0,
                                 space: CGColorSpace(name: CGColorSpace.sRGB) ?? CGColorSpaceCreateDeviceRGB(),
@@ -85,18 +86,19 @@ public enum ArrangementRender {
         // y down, like GDI: the port keeps upstream's arithmetic.
         g.translateBy(x: 0, y: CGFloat(height))
         g.scaleBy(x: 1, y: -1)
-        if options.scale > 0, options.scale < 1 {
-            // Budget-limited previews retain their logical track geometry. Rounding every
-            // lane/gap separately at sub-1x would accumulate and cut off the final tracks.
-            g.scaleBy(x: options.scale, y: options.scale)
-            var logicalOptions = options
-            logicalOptions.scale = 1
-            draw(g, area: CGRect(x: 0, y: 0, width: Double(width) / options.scale,
-                                 height: Double(height) / options.scale),
-                 arrangement: a, options: logicalOptions)
-        } else {
-            draw(g, area: CGRect(x: 0, y: 0, width: width, height: height), arrangement: a, options: options)
+        // Keep logical lane/gap geometry intact and scale the finished drawing uniformly.
+        // Quick Look has a fixed bitmap budget, but must still include the final track.
+        var drawingScale = options.scale > 0 && options.scale < 1 ? options.scale : 1
+        var logicalOptions = options
+        if drawingScale < 1 { logicalOptions.scale = 1 }
+        if fitAllTracks {
+            let fullHeight = Self.fullHeight(trackCount: a.tracks.count, options: logicalOptions)
+            if fullHeight > 0 { drawingScale = min(drawingScale, Double(height) / Double(fullHeight)) }
         }
+        g.scaleBy(x: drawingScale, y: drawingScale)
+        draw(g, area: CGRect(x: 0, y: 0, width: Double(width) / drawingScale,
+                             height: Double(height) / drawingScale),
+             arrangement: a, options: logicalOptions)
         return g.makeImage()
     }
 

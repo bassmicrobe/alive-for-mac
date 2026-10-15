@@ -36,8 +36,17 @@ by `ALIVE_TEST_SETS`, `ALIVE_TEST_SAMPLES`, `ALIVE_TEST_PARSER_DIFF`.
    scan is the only one with `fromHistory: true`: for a local root whose `scan-history.cfg` entry is
    usable it replays the FSEvents journal (`DiffScan`, `FSEventsReplay`) and re-reads only the project
    folders that changed; every other reason falls back to a full walk (`FullScanReason`, in the log),
-   and any explicit rescan is a full one. Only roots on internal, non-removable volumes are replayed (`RootIdentity.isInternal`); a checkpoint is committed last, after `index.cache` and `status.cache` were saved, together with their stamp (`ScanHistory.catalogStamp`; a mismatch is `.catalogMismatch`). A changed folder that cannot be listed (permissions, volume gone) keeps its rows (`DiffKeep`) and the root loses its checkpoint.
-3. `SamplesModel.start()`: `samples.cache` shown at once, then a quiet background walk.
+   and any explicit rescan is a full one. Only roots on internal, non-removable volumes are replayed
+   (`RootIdentity.isInternal`). Replay buffers at most 16,384 events; unreliable journals or too
+   many changed regions fall back to a full walk. Its wait polls cancellation every 20 ms; a
+   cancelled scan publishes no partial catalog or checkpoint. A checkpoint is committed last,
+   after `index.cache` and `status.cache` were saved, together with their stamp
+   (`ScanHistory.catalogStamp`; a mismatch is `.catalogMismatch`). A changed folder that cannot
+   be listed (permissions, volume gone) keeps its rows (`DiffKeep`) and the root loses its checkpoint.
+3. `SamplesModel.start()`: `samples.cache` shown at once, then a quiet background walk. Any unreadable
+   subfolder makes that root's walk incomplete, so it keeps its previous subtree; other roots can
+   still update. A confirmed missing root is removed. Walks check cancellation between folders and
+   every 256 entries within a folder; `SampleIndex.countIn` returns -1 for an incomplete walk.
 4. When the catalog is ready: `catalogDidBecomeReady()` flushes Finder-opened paths
    (`app.pendingOpenPaths`, `OpenPathPlan`) and calls `UpdateModel.shared.dailyCheckIfDue` (a no-op
    unless the daily check is on).
@@ -75,9 +84,10 @@ Published: `sets: [SetEntry]` (all), `projects` (folded per folder when `setting
 failed roots whose folder does not exist (moved/deleted: `FolderScan.Result.rootMissing`, log line
 `ROOT NOT FOUND`, UI `MissingRootRows` with "Choose again" = `replaceRoot(_:with:)` and "Remove" =
 `removeRoot`). A root under an unmounted `/Volumes/<X>` is *offline*, never missing (`VolumeState`).
-If an enabled root is unreadable, the previous catalog and disk caches are retained (`retainedPreviousCatalog`); Home
-and Sets show recovery actions and a persistent notice when older rows remain visible. New
-partial updates wait for a complete scan, while a readable empty root still clears deleted rows.
+If any enabled root or one of its subfolders cannot be listed during a full walk, the previous
+catalog and disk caches are retained (`retainedPreviousCatalog`); Home and Sets show recovery actions
+and a persistent notice when older rows remain visible. New partial updates wait for a complete
+scan, while a readable empty root still clears deleted rows.
 Actions: `rescan()` (cancels and restarts; a no-op before `start()`, so root edits in tests never scan), `addRoots([String])` / `addRoot(_)` (a file counts as its
 folder; toasts; saves; rescans), `removeRoot(_)`, `replaceRoot(_:with:)`, `setRoot(_:enabled:)`, `settingsDidChange()`,
 `volumesChanged()` (an unmount turns the sets with files there offline at once, a mount re-reads
@@ -85,6 +95,10 @@ the sets that had lost files on it and rescans a root that lives there). `status
 `status(for:)` give a set's `SetStatus` (`Readiness`: ready, offline, missing files, missing
 plugins, unknown, unreadable; stale render), derived from `status.cache` facts, the mount table and the plugin
 inventory — kept out of `index.cache`, whose layout is upstream's v11.
+Core `scan` and `recheck` share a write gate, so their catalog and cache writes are serialized.
+Mount notifications can update statuses while a scan runs: a scan only publishes its captured mount
+table if the mount generation is still current, and status rebuilds publish only against matching
+catalog and mount generations. A scan finishing after an unmount cannot restore the older table.
 `index: ProjectIndex` is exposed for what the model does not wrap (`inSameFolder`, `inventory`,
 `usage`…); read it, don't scan through it. Filter *then* fold: use `SetSearch.rows(_:query:groupByFolder:)`
 or `ProjectIndex.collapseByFolder` after your own filter.
@@ -151,11 +165,11 @@ Settings key: add the field to core `Settings` (load/serialize), expose it in `A
 | Piece | What it is |
 |---|---|
 | `IntegrationCoordinator` | reacts to catalog publishes, tag edits and the three toggles |
-| `SpotlightIndexer` (+ `SpotlightDocument`) | Core Spotlight donation, incremental against `spotlight.snapshot`; items live in one domain, so switching it off deletes exactly Alive's items (the domain is deleted once per launch while it is off, independent of `spotlight.snapshot`). Document text is formatted with the language captured on the main actor (`describe(_:lang:locale:)`). Items are app-donated: they show in Spotlight (⌘Space), not in `mdfind` |
+| `SpotlightIndexer` (+ `SpotlightDocument`) | Core Spotlight donation, incremental against `spotlight.snapshot`; items live in one domain, so switching it off deletes exactly Alive's items (the domain is deleted once per launch while it is off, independent of `spotlight.snapshot`). A newer request cancels and waits for the preceding one; cancellation is checked while building documents and before each batch, and completed batches remain in the saved checkpoint. Document text is formatted with the language captured on the main actor (`describe(_:lang:locale:)`). Items are app-donated: they show in Spotlight (⌘Space), not in `mdfind` |
 | `MenuBarContent`, `MenuBarSnapshot` | the menu bar extra (today's saves, streak, pinned, recent, now playing) |
-| `FinderTagSync` | opt-in (`findertags`, off by default): merges Alive tags into the project folder's Finder tags; only tags it added itself (`findertags.cfg`) are ever removed. All writes go through `FinderTagWorker` (one actor); `FinderTagGate` hands out a ticket per request, a newer request or switching it off invalidates queued and running work, which re-checks the ticket before every folder. Runs after tag edits, toggles and every completed catalog publish |
+| `FinderTagSync` | opt-in (`findertags`, off by default): merges Alive tags into the project folder's Finder tags; only tags it added itself (`findertags.cfg`) are ever removed. Ownership records survive unavailable folders and failed tag writes, so reconnecting a drive can still remove Alive's old tags. All writes go through `FinderTagWorker` (one actor); `FinderTagGate` hands out a ticket per request, a newer request or switching it off invalidates queued and running work, which re-checks the ticket before every folder. Runs after tag edits, toggles and every completed catalog publish |
 | `MainWindowPresenter` / `URLCommands` | the main window registers its `openWindow` at start (`MainWindowPresenter.register`), so navigation URLs and the menu bar reopen a closed window. `alive://home`, `sets?q=`, `open?path=` (only sets of the catalog), `latest`, `random`, `rescan`, `samples?q=`, `stat`; pure `parse`/`plan`, then `perform` |
-| `WidgetSnapshot` (AliveUI) | writes `widget/widget.json` (model in `AliveCore/Infra/WidgetSnapshot.swift`), reloads timelines only for the default data folder |
+| `WidgetSnapshot` (AliveUI) | writes `widget/widget.json` (model in `AliveCore/Infra/WidgetSnapshot.swift`). One `WidgetSnapshotPublisher` per app cancels and waits for older work before building and writing, so an older build cannot overwrite a newer snapshot. Unchanged content skips the write; changed content reloads timelines only for the default data folder |
 | `Settings/IntegrationSection`, `Settings/ExtensionsSection` | "Mac 連携" toggles; "Quick Look とウィジェット" enable button (`pluginkit -e use`) |
 
 Cross-feature calls go through these entry points, not through views: `app.sets.select(path:)`,
@@ -169,7 +183,8 @@ Cross-feature calls go through these entry points, not through views: `app.sets.
   budgets; a replacement wrapper without its decoded image cost defeats eviction.
 - **Large previews reduce resolution below 1x to honor the pixel budget.** At that scale,
   `ArrangementRender` downsamples logical geometry uniformly; rounding each track separately
-  would crop the final tracks.
+  would crop the final tracks. Quick Look uses `fitAllTracks` within its bounded bitmap height
+  (at most 1100 pixels), so later tracks remain in the picture instead of being clipped.
 - **Sample row lookup is local to its containing folder.** Folder operations must not build
   full paths for every sample. Case-only folder names still share the case-insensitive lookup.
 

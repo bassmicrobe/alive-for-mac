@@ -68,11 +68,13 @@ struct FinderTagSync {
     // MARK: apply
 
     /// Brings the Finder tags of every folder in `desired` (folder -> Alive tags) in line, plus the
-    /// folders Alive wrote to earlier. Folders that no longer exist are forgotten. Returns how many
-    /// folders were changed.
+    /// folders Alive wrote to earlier. Keep ownership while a folder is unavailable: an external
+    /// volume can return later with the tags Alive added still present. Returns how many folders
+    /// were changed.
     @discardableResult
     func sync(desired: [String: [String]], shouldContinue: () -> Bool = { true }) -> Int {
-        var record = loadRecord()
+        let previousRecord = loadRecord()
+        var record = previousRecord
         var changed = 0
         for dir in Set(desired.keys).union(record.keys).sorted() {
             // Switched off or superseded meanwhile: stop before the next write. What was written
@@ -84,7 +86,6 @@ struct FinderTagSync {
             let url = URL(fileURLWithPath: dir, isDirectory: true)
             var isDir: ObjCBool = false
             guard FileManager.default.fileExists(atPath: dir, isDirectory: &isDir), isDir.boolValue else {
-                record[dir] = nil
                 continue
             }
             do {
@@ -100,7 +101,7 @@ struct FinderTagSync {
                 Diag.fail("finder tags \(dir)", error)
             }
         }
-        saveRecord(record)
+        if record != previousRecord { saveRecord(record) }
         return changed
     }
 

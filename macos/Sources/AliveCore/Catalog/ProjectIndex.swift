@@ -9,7 +9,7 @@ public typealias ScanProgress = @Sendable (_ done: Int, _ total: Int, _ current:
 /// What one scan did — useful for the UI's status line and for tests.
 public struct ScanStats: Equatable, Sendable {
     public var total = 0
-    /// Enabled roots whose top-level directory could not be listed (not readable empty roots).
+    /// Enabled roots whose directory tree could not be fully listed (not readable empty roots).
     public var failedRoots: [String] = []
     /// The subset of `failedRoots` whose folder no longer exists (moved or deleted). An unmounted
     /// `/Volumes/<X>` root is offline, not missing, and is not listed here.
@@ -196,12 +196,14 @@ public final class ProjectIndex: @unchecked Sendable {
         let env = LiveEnvironment.detect(home: home, applicationsDirs: applicationsDirs)
         lock.lock(); _env = env; lock.unlock()
 
+        lock.lock(); let mountGeneration = _mountGeneration; lock.unlock()
         let mounted = mountProvider()
         let known = loadedFacts()
         let startEventId = historyOps.currentEventId()    // before anything is read: nothing slips between
         var stats = ScanStats()
         let cache = cachedEntries()
-        let diff = useHistory ? planDiff(roots: Self.enabled(roots, disabledRoots), cache: cache, stats: &stats) : [:]
+        let diff = useHistory ? planDiff(roots: Self.enabled(roots, disabledRoots), cache: cache, stats: &stats,
+                                         isCancelled: isCancelled) : [:]
         var keep = DiffKeep()
         let files = collectFiles(roots: roots, disabledRoots: disabledRoots, cache: cache, diff: diff, mounted: mounted,
                                  keep: &keep, progress: progress, stats: &stats, isCancelled: isCancelled)
@@ -270,7 +272,10 @@ public final class ProjectIndex: @unchecked Sendable {
         lock.lock()
         _sets = fresh; _history = activity; _generation += 1
         _weightMemo = walked.memo
-        _facts = newFacts.sets; _projectFacts = newFacts.projects; _mounted = mounted; _mountGeneration += 1
+        _facts = newFacts.sets; _projectFacts = newFacts.projects
+        // A mount notification may have published a newer table while the scan was walking.
+        // Its view of the connected drives wins over the scan's earlier snapshot.
+        if _mountGeneration == mountGeneration { _mounted = mounted; _mountGeneration += 1 }
         lock.unlock()
         activity.saveCache(dir: dir)
         // The reuse map follows the file on disk: a failed save leaves it as it was.
@@ -338,7 +343,7 @@ public final class ProjectIndex: @unchecked Sendable {
                                     isCancelled: isCancelled)
             stats.unreadableFolders += r.unreadable
             let missing = r.rootMissing && !VolumeState.isOffline(root, mounted: mounted)
-            if r.rootFailed { stats.failedRoots.append(root) }
+            if r.rootFailed || r.unreadable > 0 { stats.failedRoots.append(root) }
             if missing { stats.missingRoots.append(root) }
             Diag.info("scan: \(root) -> \(files.count - before) sets in \(r.dirs) folders"
                       + (r.unreadable > 0 ? ", \(r.unreadable) folders unreadable" : "")

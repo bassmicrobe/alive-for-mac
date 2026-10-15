@@ -200,6 +200,25 @@ final class ExtensionsTests: XCTestCase {
         XCTAssertEqual(ExtensionState.parse(pluginkitOutput: ""), .notInstalled)
         XCTAssertEqual(ExtensionState.parse(pluginkitOutput: "\n  \n"), .notInstalled)
         XCTAssertEqual(ExtensionState.parse(pluginkitOutput: "(no matches)\n"), .notInstalled)
+        XCTAssertEqual(ExtensionState.parse(pluginkitOutput: "  (no matches)\n"), .notInstalled)
+    }
+
+    func testEnabledCopyIsFoundAfterOtherRegisteredCopies() {
+        let superseded = "!    io.github.x.quicklook(0.2.1)\n"
+        let disabled = "-    io.github.x.quicklook(0.3.0)\n"
+        let enabled = "+    io.github.x.quicklook(0.3.0)\n"
+        XCTAssertEqual(ExtensionState.parse(pluginkitOutput: superseded + enabled), .enabled)
+        XCTAssertEqual(ExtensionState.parse(pluginkitOutput: disabled + enabled), .enabled)
+        XCTAssertEqual(ExtensionState.parse(pluginkitOutput: enabled + superseded), .enabled)
+        XCTAssertEqual(ExtensionState.parse(pluginkitOutput: superseded + disabled), .disabled)
+    }
+
+    func testQueryFailureDoesNotClaimTheExtensionIsAbsentOrDisabled() {
+        XCTAssertEqual(PluginKit.state(from: .init(status: -1, output: "")), .checkFailed)
+        XCTAssertEqual(PluginKit.state(from: .init(status: 1, output: "permission denied")), .checkFailed)
+        XCTAssertEqual(PluginKit.state(from: .init(status: 1, output: "+ io.github.x.quicklook(0.3.0)")), .checkFailed)
+        XCTAssertEqual(PluginKit.state(from: .init(status: 0, output: "")), .notInstalled)
+        XCTAssertEqual(PluginKit.state(from: .init(status: 0, output: "+ io.github.x.quicklook(0.3.0)")), .enabled)
     }
 
     func testBundleIdentifiersMatchThePackagedExtensions() {
