@@ -22,9 +22,9 @@ wrapper. The original C# sources stay in this repository untouched, as the refer
 
 ## Release notes
 
-### Unreleased — 2026-10-15 performance and UI/UX audit
+### [0.3.1](https://github.com/bassmicrobe/alive-for-mac/releases/tag/v0.3.1) — 2026-10-15 performance and UI/UX improvements
 
-These changes are in development; the app version remains 0.3.0.
+991 tests, zero failures, with 11 environment-dependent skips. Native Japanese UI checks on Apple Silicon covered automatic refresh, filters and offline indicators.
 
 - **Responsive scans and catalog protection.** Startup change-history replay has time and event limits, supports cancellation, and falls back to a full scan for large changes. Sample walks also respond to cancellation. Project and sample scans retain previous catalog data when a subtree cannot be read.
 - **Automatic file-change refresh.** Fix project monitoring not starting on normal launch, so saving or adding sets automatically refreshes the catalog.
