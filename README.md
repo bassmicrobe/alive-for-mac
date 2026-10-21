@@ -219,3 +219,9 @@ can read a set without opening Live.
 ## License
 
 [MIT](LICENSE).
+
+## CI runtime maintenance (2026-10-22)
+
+The checkout action uses official `actions/checkout@v7` (internal Node.js 24) instead of v4 (Node.js 20). The macOS app remains Swift; no Node runtime is bundled into the application. Hosted macOS 26 / Ubuntu runners support the action's minimum runner version 2.327.1. See the [official checkout migration notes](https://github.com/actions/checkout/tree/v7).
+
+Build/test triggers, release tag/manual gates, upstream-watch schedule, permissions, and issue/report behavior are unchanged. This maintenance does not create a release, run notarization, or manually trigger upstream issue updates. Existing Swift build/test checks validate the change; release publishing and the scheduled watcher are not executed for validation.
