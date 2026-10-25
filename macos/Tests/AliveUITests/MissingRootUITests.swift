@@ -17,9 +17,9 @@ final class MissingRootUITests: XCTestCase {
 
     func testMissingRootWordingInBothLanguages() {
         XCTAssertEqual(CommonStrings.rootMissingLine.en.replacingOccurrences(of: "%@", with: "~/Dropbox/_sounds"),
-                       "Folder not found: ~/Dropbox/_sounds — it may have been moved or deleted.")
+                       "Folder not found: ~/Dropbox/_sounds")
         XCTAssertEqual(CommonStrings.rootMissingLine.ja.replacingOccurrences(of: "%@", with: "~/Dropbox/_sounds"),
-                       "フォルダが見つかりません: ~/Dropbox/_sounds（移動または削除された可能性があります）")
+                       "フォルダが見つかりません: ~/Dropbox/_sounds")
         XCTAssertEqual(CommonStrings.chooseAgain.ja, "選び直す…")
         XCTAssertEqual(CommonStrings.removeFromList.ja, "登録から外す")
     }
