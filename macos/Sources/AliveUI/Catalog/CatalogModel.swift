@@ -85,7 +85,11 @@ final class CatalogModel {
         watcher.start()
         volumeWatcher = watcher
         let index = index
-        Task { [weak self] in
+        let app = app
+        Task { [weak self, app] in
+            // Feature models hold their owner unowned. Keep it alive across awaits and the
+            // final publication, then release it when this finite operation completes.
+            defer { withExtendedLifetime(app) {} }
             // The catalog is published straight from the cache; plug-in discovery comes after it
             // (the scan that follows does it once at its end — with no roots there is no scan,
             // so it is done here).
@@ -134,16 +138,20 @@ final class CatalogModel {
 
         let settings = app.settings
         let index = index
+        let app = app
         index.settings = settings
-        scanTask = Task { [weak self] in
+        scanTask = Task { [weak self, app] in
+            defer { withExtendedLifetime(app) {} }
             // Two scans on one index would fight over the cache file: wait for the old one to stop.
             await previous?.value
             guard let self, gen == self.generation else { return }
             let stats = await index.scanAsync(
                 roots: settings.roots, disabledRoots: settings.disabledRoots,
                 progress: { done, total, current in
-                    Task { @MainActor in
-                        self.updateProgress(gen, CatalogProgress(done: done, total: total, current: current))
+                    Task { @MainActor [weak self, app] in
+                        withExtendedLifetime(app) {
+                            self?.updateProgress(gen, CatalogProgress(done: done, total: total, current: current))
+                        }
                     }
                 },
                 fullRescan: fullRescan, useHistory: useHistory)
@@ -204,7 +212,9 @@ final class CatalogModel {
         guard !isScanning else { volumesDirty = true; return }
         volumesDirty = false
         let index = index
-        Task { [weak self] in
+        let app = app
+        Task { [weak self, app] in
+            defer { withExtendedLifetime(app) {} }
             let change = await Task.detached(priority: .utility) { index.volumesDidChange() }.value
             guard let self else { return }
             self.mountedVolumes = change.mounted
