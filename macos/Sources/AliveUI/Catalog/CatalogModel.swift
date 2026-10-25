@@ -189,7 +189,7 @@ final class CatalogModel {
         let scanned = index.env
         env = scanned.userLibrary.isEmpty ? (fallbackEnv ?? scanned) : scanned
         history = index.history
-        statuses = hasEnabledRoots ? index.statuses : [:]
+        statuses = hasEnabledRoots ? CatalogReadiness.statuses(index.statuses, after: lastScanStats) : [:]
         offlineReferences = hasEnabledRoots ? index.offlineReferences() : [:]
         revision += 1
     }
