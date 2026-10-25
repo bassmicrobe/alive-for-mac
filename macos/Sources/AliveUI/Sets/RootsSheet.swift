@@ -188,16 +188,7 @@ private struct RootsEditor: View {
 
     /// One settings write and one rescan for any number of edits.
     private func apply() {
-        if draft.projectsChanged {
-            let page = draft.projects
-            app.mutateSettings { $0.roots = page.roots; $0.disabledRoots = page.disabled }
-            app.catalog.rescan()
-        }
-        if draft.samplesChanged {
-            let page = draft.samples
-            app.mutateSettings { $0.sampleRoots = page.roots; $0.disabledSampleRoots = page.disabled }
-            app.samples.rescan()
-        }
+        draft.apply(to: app)
         dismiss()
     }
 }

@@ -233,7 +233,7 @@ final class CatalogModel {
     // MARK: - Roots
 
     /// Adds folders to scan (a file counts as its folder), saves and rescans. Returns the folders
-    /// that were new. Toasts the outcome.
+    /// that were new or switched back on. Already enabled folders stay unchanged. Toasts the outcome.
     @discardableResult
     func addRoots(_ paths: [String]) -> [String] {
         var added: [String] = []
@@ -244,8 +244,14 @@ final class CatalogModel {
                 app.toast(CommonStrings.notAFolder.f(raw), kind: .error)
                 continue
             }
+            if let existing = settings.roots.first(where: { Self.same($0, folder) }) {
+                if settings.disabledRoots.contains(where: { Self.same($0, existing) }) {
+                    settings.disabledRoots.removeAll { Self.same($0, existing) }
+                    added.append(existing)
+                }
+                continue
+            }
             settings.disabledRoots.removeAll { Self.same($0, folder) }
-            if settings.roots.contains(where: { Self.same($0, folder) }) { continue }
             settings.roots.append(folder)
             added.append(folder)
         }

@@ -74,6 +74,30 @@ final class RootsDraft {
     /// with no project folders (that is only a first run not finished yet).
     var canApply: Bool { !projects.roots.isEmpty }
 
+    /// Apply both pages in one settings write. Sample-root changes already start their walk through
+    /// `mutateSettings`; explicitly starting it again would cancel that walk and queue a duplicate.
+    /// With no edits, "Scan" retries only the page the person is looking at.
+    func apply(to app: AppModel) {
+        cancelCounting()
+        if hasChanges {
+            app.mutateSettings {
+                if projectsChanged {
+                    $0.roots = projects.roots
+                    $0.disabledRoots = projects.disabled
+                }
+                if samplesChanged {
+                    $0.sampleRoots = samples.roots
+                    $0.disabledSampleRoots = samples.disabled
+                }
+            }
+            if projectsChanged { app.catalog.rescan() }
+        } else if kind == .projects {
+            app.catalog.rescan()
+        } else {
+            app.samples.rescan()
+        }
+    }
+
     func count(for root: String) -> Int? { counts[key(kind, root)] }
 
     /// Starts the count of `root` unless one is running or done.
