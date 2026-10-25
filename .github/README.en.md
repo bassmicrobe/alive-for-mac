@@ -1,5 +1,11 @@
 <div align="center">
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="../macos/Resources/Branding/alive-logo-dark.svg">
+  <source media="(prefers-color-scheme: light)" srcset="../macos/Resources/Branding/alive-logo-light.svg">
+  <img src="../macos/Resources/Branding/alive-logo-light.svg" alt="Alive for Mac" width="334" height="64">
+</picture>
+
 # Alive for Mac
 
 **A fast, native macOS catalog for your Ableton Live projects, plugins and samples**
