@@ -28,8 +28,10 @@ struct MissingRootRows: View {
                         .help(root)
                     PillButton(title: CommonStrings.chooseAgain.s, icon: .folder) { chooseAgain(root) }
                         .fixedSize()
+                        .accessibilityLabel("\(CommonStrings.chooseAgain.s) \(root)")
                     PillButton(title: CommonStrings.removeFromList.s) { app.catalog.removeRoot(root) }
                         .fixedSize()
+                        .accessibilityLabel("\(CommonStrings.removeFromList.s) \(root)")
                 }
                 .accessibilityElement(children: .contain)
             }
