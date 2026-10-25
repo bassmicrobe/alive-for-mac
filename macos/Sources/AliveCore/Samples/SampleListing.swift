@@ -62,9 +62,12 @@ public enum SampleLister {
         let q = query.trimmingCharacters(in: .whitespaces).lowercased()
         let ctx = Context(index: index, usage: usage, copies: copies, sort: sort)
         var out = SampleListing()
+        guard !isCancelled() else { return out }
 
         guard isFlat(lens: lens, query: query) else {
-            for r in ctx.sortedFolders(index.roots, isRoot: true) { ctx.addTree(&out.rows, r, 0, open) }
+            for r in ctx.sortedFolders(index.roots, isRoot: true) {
+                guard ctx.addTree(&out.rows, r, 0, open, isCancelled: isCancelled) else { return SampleListing() }
+            }
             out.matches = out.rows.count
             return out
         }
@@ -143,11 +146,21 @@ public enum SampleLister {
             SampleRow(id: index.path(of: f), kind: .file(f), depth: depth)
         }
 
-        func addTree(_ rows: inout [SampleRow], _ d: Int, _ depth: Int, _ open: Set<String>) {
+        /// A cancelled tree is discarded by the caller, including rows already added for its roots.
+        func addTree(_ rows: inout [SampleRow], _ d: Int, _ depth: Int, _ open: Set<String>,
+                     isCancelled: () -> Bool) -> Bool {
+            guard !isCancelled() else { return false }
             rows.append(folderRow(d, depth))
-            guard open.contains(index.folders[d].path.lowercased()) else { return }
-            for c in sortedFolders(index.folders[d].children, isRoot: false) { addTree(&rows, c, depth + 1, open) }
-            for f in sortedFiles(index.folders[d].files) { rows.append(fileRow(f, depth + 1)) }
+            guard open.contains(index.folders[d].path.lowercased()) else { return true }
+            for c in sortedFolders(index.folders[d].children, isRoot: false) {
+                guard addTree(&rows, c, depth + 1, open, isCancelled: isCancelled) else { return false }
+            }
+            guard !isCancelled() else { return false }
+            for (i, f) in sortedFiles(index.folders[d].files).enumerated() {
+                if i % 256 == 0, isCancelled() { return false }
+                rows.append(fileRow(f, depth + 1))
+            }
+            return !isCancelled()
         }
 
         func natural(_ a: String, _ b: String) -> ComparisonResult { a.localizedStandardCompare(b) }
