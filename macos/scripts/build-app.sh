@@ -41,6 +41,11 @@ YEAR="$(date +%Y)"
 
 APP="$MACOS_DIR/build/$APP_NAME.app"
 CONTENTS="$APP/Contents"
+ICON_SRC="$MACOS_DIR/Resources/Branding/AppIcon.icns"
+if [[ ! -f "$ICON_SRC" ]]; then
+    echo "error: $ICON_SRC not found; run macos/scripts/generate-app-icon.sh" >&2
+    exit 1
+fi
 
 cd "$MACOS_DIR"
 
@@ -81,28 +86,9 @@ cp "$MACOS_DIR/LICENSE" "$CONTENTS/Resources/LICENSE-macos"
 cp "$MACOS_DIR/NOTICE.md" "$CONTENTS/Resources/NOTICE.md"
 
 # ---------------------------------------------------------------- icon
-ICON_SRC="$REPO_ROOT/src/icons/icon256.ico"
-if [[ -f "$ICON_SRC" ]]; then
-    WORK="$(mktemp -d)"
-    trap 'rm -rf "$WORK"' EXIT
-    ICONSET="$WORK/AppIcon.iconset"
-    mkdir -p "$ICONSET"
-    sips -s format png "$ICON_SRC" --out "$WORK/icon.png" >/dev/null
-    # The source is 256 px: larger sizes would only be upscaled, so the set stops at 256.
-    for size in 16 32 64 128 256; do
-        sips -z "$size" "$size" "$WORK/icon.png" --out "$WORK/s$size.png" >/dev/null
-    done
-    cp "$WORK/s16.png"  "$ICONSET/icon_16x16.png"
-    cp "$WORK/s32.png"  "$ICONSET/icon_16x16@2x.png"
-    cp "$WORK/s32.png"  "$ICONSET/icon_32x32.png"
-    cp "$WORK/s64.png"  "$ICONSET/icon_32x32@2x.png"
-    cp "$WORK/s128.png" "$ICONSET/icon_128x128.png"
-    cp "$WORK/s256.png" "$ICONSET/icon_128x128@2x.png"
-    cp "$WORK/s256.png" "$ICONSET/icon_256x256.png"
-    iconutil -c icns "$ICONSET" -o "$CONTENTS/Resources/AppIcon.icns"
-else
-    echo "warning: $ICON_SRC not found, building without an icon" >&2
-fi
+# The complete 1x/2x icon set is generated from the supplied 1024 px logo.
+# Keep the generated asset in the repository so builds need no SVG renderer.
+cp "$ICON_SRC" "$CONTENTS/Resources/AppIcon.icns"
 
 # ---------------------------------------------------------------- Info.plist
 # .als is declared as Viewer / Alternate: Alive can open sets, but Live stays the default app.
@@ -224,7 +210,7 @@ if [[ $DMG -eq 1 ]]; then
     mkdir -p "$MACOS_DIR/dist" "$MACOS_DIR/build"
     DMG_PATH="$MACOS_DIR/dist/AliveForMac-$VERSION.dmg"
     STAGE="$(mktemp -d "$MACOS_DIR/build/dmg-stage.XXXXXX")"
-    trap 'rm -rf "${WORK:-}" "$STAGE"' EXIT
+    trap 'rm -rf "$STAGE"' EXIT
     ditto "$APP" "$STAGE/$APP_NAME.app"
     ln -s /Applications "$STAGE/Applications"
     # License texts sit next to the app: upstream's verbatim, the port's, the notice.

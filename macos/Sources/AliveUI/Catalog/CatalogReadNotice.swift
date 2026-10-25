@@ -12,7 +12,7 @@ struct CatalogReadNotice: View {
 
     var body: some View {
         VStack(spacing: 8) {
-            if showsGenericLine { genericLine }
+            if showsGenericLine || retainedPreviousCatalog { genericLine }
             if !missingRoots.isEmpty { MissingRootRows(roots: missingRoots) }
         }
         .padding(.horizontal, 14)

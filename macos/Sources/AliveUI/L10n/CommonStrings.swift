@@ -122,11 +122,10 @@ enum CommonStrings: LocalizedStrings {
                     "一部のプロジェクトフォルダを読み込めませんでした。前回のカタログを表示しています（最新の状態とは異なる場合があります）。")
         case .rootMissingTitle: return ("Folder not found", "フォルダが見つかりません")
         case .rootMissingBody:
-            return ("A project folder no longer exists. Choose it again, or remove it from the list.",
-                    "プロジェクトのフォルダが存在しません。選び直すか、登録から外してください。")
+            return ("A project folder is not available on this Mac. For a cloud folder, make it visible on this Mac and rescan. If it moved, choose its new location.",
+                    "このMacでプロジェクトのフォルダが見つかりません。クラウド上にある場合は、このMacで表示できる状態にしてから再スキャンしてください。移動した場合は、新しい場所を選び直してください。")
         case .rootMissingLine:
-            return ("Folder not found: %@ — it may have been moved or deleted.",
-                    "フォルダが見つかりません: %@（移動または削除された可能性があります）")
+            return ("Folder not found: %@", "フォルダが見つかりません: %@")
         case .chooseAgain: return ("Choose again…", "選び直す…")
         case .removeFromList: return ("Remove", "登録から外す")
         case .replaceFolderPrompt: return ("Choose", "選択")

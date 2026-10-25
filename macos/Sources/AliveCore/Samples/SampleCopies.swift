@@ -45,8 +45,9 @@ public struct SampleCopies: Sendable {
         guard !index.files.isEmpty else { return c }
 
         var byKey: [String: [Int]] = [:]
-        for (i, f) in index.files.enumerated() where f.print != 0 {
+        for (i, f) in index.files.enumerated() {
             if i % 4096 == 0, isCancelled() { return c }
+            guard f.print != 0 else { continue }
             byKey["\(f.size)|\(f.print)|\(f.name.lowercased())", default: []].append(i)
         }
 

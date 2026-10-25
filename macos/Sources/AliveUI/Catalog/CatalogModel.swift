@@ -85,7 +85,11 @@ final class CatalogModel {
         watcher.start()
         volumeWatcher = watcher
         let index = index
-        Task { [weak self] in
+        let app = app
+        Task { [weak self, app] in
+            // Feature models hold their owner unowned. Keep it alive across awaits and the
+            // final publication, then release it when this finite operation completes.
+            defer { withExtendedLifetime(app) {} }
             // The catalog is published straight from the cache; plug-in discovery comes after it
             // (the scan that follows does it once at its end — with no roots there is no scan,
             // so it is done here).
@@ -134,16 +138,20 @@ final class CatalogModel {
 
         let settings = app.settings
         let index = index
+        let app = app
         index.settings = settings
-        scanTask = Task { [weak self] in
+        scanTask = Task { [weak self, app] in
+            defer { withExtendedLifetime(app) {} }
             // Two scans on one index would fight over the cache file: wait for the old one to stop.
             await previous?.value
             guard let self, gen == self.generation else { return }
             let stats = await index.scanAsync(
                 roots: settings.roots, disabledRoots: settings.disabledRoots,
                 progress: { done, total, current in
-                    Task { @MainActor in
-                        self.updateProgress(gen, CatalogProgress(done: done, total: total, current: current))
+                    Task { @MainActor [app] in
+                        withExtendedLifetime(app) {
+                            self.updateProgress(gen, CatalogProgress(done: done, total: total, current: current))
+                        }
                     }
                 },
                 fullRescan: fullRescan, useHistory: useHistory)
@@ -181,7 +189,7 @@ final class CatalogModel {
         let scanned = index.env
         env = scanned.userLibrary.isEmpty ? (fallbackEnv ?? scanned) : scanned
         history = index.history
-        statuses = hasEnabledRoots ? index.statuses : [:]
+        statuses = hasEnabledRoots ? CatalogReadiness.statuses(index.statuses, after: lastScanStats) : [:]
         offlineReferences = hasEnabledRoots ? index.offlineReferences() : [:]
         revision += 1
     }
@@ -204,7 +212,9 @@ final class CatalogModel {
         guard !isScanning else { volumesDirty = true; return }
         volumesDirty = false
         let index = index
-        Task { [weak self] in
+        let app = app
+        Task { [weak self, app] in
+            defer { withExtendedLifetime(app) {} }
             let change = await Task.detached(priority: .utility) { index.volumesDidChange() }.value
             guard let self else { return }
             self.mountedVolumes = change.mounted
@@ -233,7 +243,7 @@ final class CatalogModel {
     // MARK: - Roots
 
     /// Adds folders to scan (a file counts as its folder), saves and rescans. Returns the folders
-    /// that were new. Toasts the outcome.
+    /// that were new or switched back on. Already enabled folders stay unchanged. Toasts the outcome.
     @discardableResult
     func addRoots(_ paths: [String]) -> [String] {
         var added: [String] = []
@@ -244,8 +254,14 @@ final class CatalogModel {
                 app.toast(CommonStrings.notAFolder.f(raw), kind: .error)
                 continue
             }
+            if let existing = settings.roots.first(where: { Self.same($0, folder) }) {
+                if settings.disabledRoots.contains(where: { Self.same($0, existing) }) {
+                    settings.disabledRoots.removeAll { Self.same($0, existing) }
+                    added.append(existing)
+                }
+                continue
+            }
             settings.disabledRoots.removeAll { Self.same($0, folder) }
-            if settings.roots.contains(where: { Self.same($0, folder) }) { continue }
             settings.roots.append(folder)
             added.append(folder)
         }

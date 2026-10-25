@@ -23,8 +23,9 @@ extension SampleIndex {
     /// on different drives, so walking them at once halves the wait on two disks.
     ///
     /// `previous` — the index this one replaces. An AIFF it already looked into, with the same
-    /// path and size, keeps its `silent` flag without being opened again, and a content print is
-    /// kept while size and date stay the same: a file that has not changed has nothing new to say.
+    /// path, size and date, keeps its `silent` flag without being opened again, and a content print
+    /// is kept by the same stamp: a file that has not changed has nothing new to say. A v2 cache
+    /// has no dates, so its AIFF flags are kept for that first walk as before.
     /// (The walk itself is repeated in full — listing folders is cheap; that is the incremental
     /// part upstream has too.)
     ///
@@ -159,7 +160,7 @@ extension SampleIndex {
                 f.modified = e.modified
                 if let known, AiffReader.isAiffName(e.name) {
                     let full = combine(p.path, e.name)
-                    if let was = known[full.lowercased()], was.size == e.size {
+                    if let was = known[full.lowercased()], unchangedAiff(was, e) {
                         f.silent = was.silent
                     } else {
                         f.silent = !AiffReader.canRead(path: full)
@@ -173,6 +174,13 @@ extension SampleIndex {
         }
         if batch > 0 { found(batch) }
         return finishTree(all, files)
+    }
+
+    private static func unchangedAiff(_ previous: SampleFile, _ entry: FolderScan.Entry) -> Bool {
+        guard previous.size == entry.size else { return false }
+        guard let oldDate = previous.modified else { return true }   // v2 cache: no dates
+        guard let newDate = entry.modified else { return false }
+        return DotNetTicks.sameInstant(oldDate, newDate)
     }
 
     /// Totals from the bottom up, then only the folders with a sample below them stay.

@@ -1,5 +1,11 @@
 <div align="center">
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="../macos/Resources/Branding/alive-logo-dark.svg">
+  <source media="(prefers-color-scheme: light)" srcset="../macos/Resources/Branding/alive-logo-light.svg">
+  <img src="../macos/Resources/Branding/alive-logo-light.svg" alt="Alive for Mac" width="334" height="64">
+</picture>
+
 # Alive for Mac
 
 **A fast, native macOS catalog for your Ableton Live projects, plugins and samples**
@@ -21,6 +27,17 @@ which version is the latest. It is a Swift/SwiftUI rewrite of the Windows-only o
 wrapper. The original C# sources stay in this repository untouched, as the reference for the port.
 
 ## Release notes
+
+### [0.3.2](https://github.com/bassmicrobe/alive-for-mac/releases/tag/v0.3.2) — 2026-10-25 scan recovery, status fixes and new branding
+
+- **Rescan controls.** Pressing Scan with unchanged folders retries the selected page. Selecting a disabled folder again re-enables it without duplicate registration, and sample-root changes no longer start two scans.
+- **Plugin lists and navigation.** Fix stale rows after catalog updates. Navigation from a set to a named plugin waits for the latest list before selecting it.
+- **Sample cancellation and AIFF updates.** Duplicate detection checks cancellation even for files without fingerprints, as does building large folder trees. Same-size AIFF replacements are checked by modification date so preview support is read again.
+- **Missing-folder guidance.** Explain how to make a cloud folder visible on the Mac before rescanning, and when the previous catalog is being retained. Sets under a confirmed missing folder are excluded from Ready to open until a successful scan after recovery. Recovery buttons include the target path in their accessibility labels.
+- **Async stability.** Keep the owning model alive through startup, scans and drive-change operations so completion callbacks can finish safely.
+- **New logo and icons.** The README logo follows the light or dark theme. The app and About screen use the supplied design as a Retina-ready icon.
+
+See the [audit report](../macos/docs/PERFORMANCE_UIUX_AUDIT_2026-10-25.md) and [branding update record](../macos/docs/BRANDING_UPDATE_2026-10-25.md) for changes and validation scope.
 
 ### [0.3.1](https://github.com/bassmicrobe/alive-for-mac/releases/tag/v0.3.1) — 2026-10-15 performance and UI/UX improvements
 
