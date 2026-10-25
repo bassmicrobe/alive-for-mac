@@ -23,11 +23,21 @@ final class PluginsModel {
 
     /// The last finished snapshot, published once per catalog revision (see `current`).
     private(set) var snapshot: Snapshot?
-    @ObservationIgnored private var rowsMemo: (key: String, rows: [PluginRow])?
+    @ObservationIgnored private var rowsMemo: (key: RowsKey, rows: [PluginRow])?
     @ObservationIgnored private var buildingRevision: Int?
     @ObservationIgnored var snapshotTask: Task<Void, Never>?
     /// `show(pluginNamed:)` arrived before the table it looks in was ready.
     @ObservationIgnored private var pendingShow: String?
+
+    private struct RowsKey: Equatable {
+        let revision: Int
+        let generation: Int
+        let query: String
+        let card: PluginCard?
+        let filter: PluginFilter
+        let sortColumn: PluginColumn?
+        let sortAscending: Bool
+    }
 
     init(app: AppModel) {
         self.app = app
@@ -124,11 +134,14 @@ final class PluginsModel {
 
     /// The rows the list shows: search, summary card and filters, then the chosen order.
     var rows: [PluginRow] {
-        let words = SetSearch.words(in: app.searchText)
-        let key = "\(current.revision)|\(app.searchText)|\(card.map { "\($0.rawValue)" } ?? "-")|\(filter.hashValue)"
-            + "|\(sortColumn?.rawValue ?? "-")|\(sortAscending)"
+        let snapshot = current
+        // The core can publish a newer generation before the UI revision advances.
+        let key = RowsKey(revision: snapshot.revision, generation: snapshot.generation,
+                          query: app.searchText, card: card, filter: filter,
+                          sortColumn: sortColumn, sortAscending: sortAscending)
         if let rowsMemo, rowsMemo.key == key { return rowsMemo.rows }
-        var list = current.table.rows.filter { row in
+        let words = SetSearch.words(in: key.query)
+        var list = snapshot.table.rows.filter { row in
             (card?.passes(row.stat) ?? true) && filter.matches(row.stat) && row.matches(search: words)
         }
         if let sortColumn {
@@ -198,8 +211,13 @@ final class PluginsModel {
         app.searchText = ""
         card = nil
         // The table is built off the main actor: when it is not there yet, the selection follows it.
-        guard snapshot?.revision == app.catalog.revision else { pendingShow = name; ensureSnapshot(); return }
-        guard let row = current.table.row(named: name) else { return }
+        guard let snapshot, snapshot.revision == app.catalog.revision,
+              snapshot.generation == app.catalog.index.generation else {
+            pendingShow = name
+            ensureSnapshot()
+            return
+        }
+        guard let row = snapshot.table.row(named: name) else { return }
         // The plugin must be visible to be selected: drop filters that would hide it.
         if !filter.matches(row.stat) { filter.clear() }
         selectedID = row.id

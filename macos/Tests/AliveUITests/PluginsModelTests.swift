@@ -78,12 +78,31 @@ final class PluginsModelTests: XCTestCase {
         let app = try await makeApp(inventory: standardMachine)
         let index = app.catalog.index
         XCTAssertEqual(app.plugins.snapshot?.generation, index.generation)
+        XCTAssertTrue(app.plugins.rows.contains { $0.name == "Ghost" }, "prime the displayed-row cache")
+        let revision = app.catalog.revision
         // The core publishes again without the UI revision moving: the snapshot is derived anew.
         replaceSets(index, [set("z", [("Zed", "vst3:z")], modified: 50)])
         await app.plugins.settle()
+        XCTAssertEqual(app.catalog.revision, revision)
         XCTAssertEqual(app.plugins.snapshot?.generation, index.generation)
         XCTAssertTrue(app.plugins.rows.contains { $0.name == "Zed" })
         XCTAssertFalse(app.plugins.rows.contains { $0.name == "Ghost" })
+    }
+
+    func testShowPluginWaitsForANewerCoreGenerationAtTheSameUIRevision() async throws {
+        let app = try await makeApp(inventory: standardMachine)
+        let model = app.plugins
+        model.filter.vendors = ["Nobody"]
+        let revision = app.catalog.revision
+        replaceSets(app.catalog.index, [set("z", [("Zed", "vst3:z")], modified: 50)])
+
+        model.show(pluginNamed: "Zed")
+        await model.settle()
+
+        XCTAssertEqual(app.catalog.revision, revision)
+        XCTAssertEqual(model.selectedRow?.name, "Zed")
+        XCTAssertEqual(model.pendingScrollID, model.selectedID)
+        XCTAssertTrue(model.filter.isEmpty, "the deferred selection must clear a filter that hides it")
     }
 
     func testACancelledSnapshotDerivationYieldsNothing() async throws {
