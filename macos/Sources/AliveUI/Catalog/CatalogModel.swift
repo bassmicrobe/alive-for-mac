@@ -148,9 +148,9 @@ final class CatalogModel {
             let stats = await index.scanAsync(
                 roots: settings.roots, disabledRoots: settings.disabledRoots,
                 progress: { done, total, current in
-                    Task { @MainActor [weak self, app] in
+                    Task { @MainActor [app] in
                         withExtendedLifetime(app) {
-                            self?.updateProgress(gen, CatalogProgress(done: done, total: total, current: current))
+                            self.updateProgress(gen, CatalogProgress(done: done, total: total, current: current))
                         }
                     }
                 },
