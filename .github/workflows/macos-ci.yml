@@ -48,6 +48,8 @@ jobs:
     needs: build-test
     if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
     runs-on: macos-26
+    # Two notarization waits (each capped at 60 minutes by build-app.sh) plus the universal build.
+    timeout-minutes: 150
     permissions:
       contents: write
     steps:
@@ -57,6 +59,31 @@ jobs:
         uses: maxim-lobanov/setup-xcode@v1
         with:
           xcode-version: latest-stable
+
+      # Developer ID signing and notarization need all five repository secrets (macos/docs/RELEASING.md).
+      # Without them the release is built exactly as before: ad-hoc signed, and says so.
+      - name: Decide signing mode
+        id: signing
+        env:
+          APPLE_DEVELOPER_ID_P12: ${{ secrets.APPLE_DEVELOPER_ID_P12 }}
+          APPLE_DEVELOPER_ID_P12_PASSWORD: ${{ secrets.APPLE_DEVELOPER_ID_P12_PASSWORD }}
+          APPLE_NOTARY_APPLE_ID: ${{ secrets.APPLE_NOTARY_APPLE_ID }}
+          APPLE_NOTARY_PASSWORD: ${{ secrets.APPLE_NOTARY_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          missing=""
+          for name in APPLE_DEVELOPER_ID_P12 APPLE_DEVELOPER_ID_P12_PASSWORD APPLE_NOTARY_APPLE_ID APPLE_NOTARY_PASSWORD APPLE_TEAM_ID; do
+            if [ -z "${!name}" ]; then
+              missing="$missing $name"
+            fi
+          done
+          if [ -z "$missing" ]; then
+            echo "signed=true" >> "$GITHUB_OUTPUT"
+            echo "All signing secrets are set: the release is Developer ID signed and notarized."
+          else
+            echo "signed=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::Release is ad-hoc signed and not notarized (missing secrets:$missing)"
+          fi
 
       - name: Check packaging script exists
         env:
@@ -73,11 +100,60 @@ jobs:
             exit 1
           fi
 
-      - name: Build app zip and dmg
+      # The certificate lives in a throw-away keychain that is deleted again at the end of the job.
+      - name: Import Developer ID certificate
+        id: keychain
+        if: steps.signing.outputs.signed == 'true'
+        env:
+          P12_BASE64: ${{ secrets.APPLE_DEVELOPER_ID_P12 }}
+          P12_PASSWORD: ${{ secrets.APPLE_DEVELOPER_ID_P12_PASSWORD }}
+          TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          set -euo pipefail
+          keychain="$RUNNER_TEMP/alive-signing.keychain-db"
+          p12="$RUNNER_TEMP/developer-id.p12"
+          keychain_password="$(uuidgen)"
+
+          printf '%s' "$P12_BASE64" | base64 --decode > "$p12"
+          security create-keychain -p "$keychain_password" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$keychain_password" "$keychain"
+          security import "$p12" -P "$P12_PASSWORD" -A -t cert -f pkcs12 -k "$keychain"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$keychain_password" "$keychain" >/dev/null
+          rm -f "$p12"
+          # Put the new keychain first in the search list, keeping the others.
+          security list-keychains -d user -s "$keychain" $(security list-keychains -d user | tr -d '"')
+
+          # The signing identity's name comes from the certificate itself (the one of this team).
+          identity="$(security find-identity -v -p codesigning "$keychain" \
+            | sed -n 's/.*"\(Developer ID Application: [^"]*\)".*/\1/p' \
+            | grep -F "($TEAM_ID)" | head -n 1 || true)"
+          if [ -z "$identity" ]; then
+            echo "::error::No valid 'Developer ID Application' identity for team $TEAM_ID in the .p12 (is it a Developer ID Application certificate with its private key?)."
+            security find-identity -p codesigning "$keychain" || true
+            exit 1
+          fi
+          echo "Signing identity: $identity"
+          echo "identity=$identity" >> "$GITHUB_OUTPUT"
+
+      - name: Build app zip and dmg (ad-hoc signed)
+        if: steps.signing.outputs.signed != 'true'
         working-directory: macos
         run: |
           chmod +x scripts/build-app.sh
           scripts/build-app.sh --zip --dmg
+
+      - name: Build, sign and notarize app zip and dmg
+        if: steps.signing.outputs.signed == 'true'
+        working-directory: macos
+        env:
+          ALIVE_SIGN_IDENTITY: ${{ steps.keychain.outputs.identity }}
+          APPLE_ID: ${{ secrets.APPLE_NOTARY_APPLE_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_NOTARY_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          chmod +x scripts/build-app.sh
+          scripts/build-app.sh --zip --dmg --notarize
 
       - name: Verify universal app and signature
         run: |
@@ -107,6 +183,35 @@ jobs:
           echo "dmg=$dmg" >> "$GITHUB_OUTPUT"
           echo "Built $zip and $dmg"
 
+      # build-app.sh --notarize already checks all of this; this is the independent look at what is
+      # about to be published: Developer ID authority, hardened runtime, and Gatekeeper's verdict.
+      - name: Verify Developer ID signature and notarization
+        if: steps.signing.outputs.signed == 'true'
+        env:
+          DMG_PATH: ${{ steps.pkg.outputs.dmg }}
+        run: |
+          app="macos/build/Alive for Mac.app"
+          info="$(codesign -dvv "$app" 2>&1)"
+          echo "$info" | grep -E '^(Authority|TeamIdentifier|Timestamp)=|^CodeDirectory'
+          if ! echo "$info" | grep -q '^Authority=Developer ID Application'; then
+            echo "::error::The app is not signed by a Developer ID Application certificate."
+            exit 1
+          fi
+          if ! echo "$info" | grep -q 'flags=.*runtime'; then
+            echo "::error::The app is missing the hardened runtime flag."
+            exit 1
+          fi
+          spctl_app="$(spctl -a -vv "$app" 2>&1)" || { echo "$spctl_app"; echo "::error::Gatekeeper rejects the app."; exit 1; }
+          echo "$spctl_app"
+          if ! echo "$spctl_app" | grep -q 'source=Notarized Developer ID'; then
+            echo "::error::The app is not accepted as Notarized Developer ID."
+            exit 1
+          fi
+          xcrun stapler validate "$app"
+          xcrun stapler validate "$DMG_PATH"
+          spctl -a -t open --context context:primary-signature -vv "$DMG_PATH"
+          echo "Notarization: accepted by Apple, ticket stapled to the app and the dmg." | tee -a "$GITHUB_STEP_SUMMARY"
+
       - name: Publish GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -114,6 +219,7 @@ jobs:
           DMG_PATH: ${{ steps.pkg.outputs.dmg }}
           REF_NAME: ${{ github.ref_name }}
           IS_TAG: ${{ startsWith(github.ref, 'refs/tags/v') }}
+          SIGNED: ${{ steps.signing.outputs.signed }}
         run: |
           if [ "$IS_TAG" = "true" ]; then
             tag="$REF_NAME"
@@ -123,10 +229,26 @@ jobs:
             tag="v${version#AliveForMac-}"
           fi
           if gh release view "$tag" >/dev/null 2>&1; then
+            # An existing release keeps its body.
             gh release upload "$tag" "$ZIP_PATH" "$DMG_PATH" --clobber
           else
-            gh release create "$tag" "$ZIP_PATH" "$DMG_PATH" \
-              --target "$GITHUB_SHA" \
-              --title "Alive for Mac $tag" \
-              --generate-notes
+            create_args=(--target "$GITHUB_SHA" --title "Alive for Mac $tag" --generate-notes)
+            if [ "$SIGNED" != "true" ]; then
+              # Prepended to the generated notes.
+              notes_file="$RUNNER_TEMP/release-notes-adhoc.md"
+              cat > "$notes_file" <<'NOTES'
+          > **Not notarized.** This release is ad-hoc signed (the Apple signing credentials were not available to the release workflow), so macOS blocks the first launch. Try to open the app once, then open **System Settings → Privacy & Security** and press **Open Anyway**.
+          >
+          > **公証されていません。** このリリースは ad-hoc 署名のみです（リリース用ワークフローで Apple の署名情報が使えませんでした）。そのため初回起動は macOS にブロックされます。一度アプリを開こうとしてから、**システム設定 → プライバシーとセキュリティ** で **「このまま開く」** を押してください。
+
+          NOTES
+              create_args+=(--notes-file "$notes_file")
+            fi
+            gh release create "$tag" "$ZIP_PATH" "$DMG_PATH" "${create_args[@]}"
           fi
+
+      - name: Delete signing keychain
+        if: always() && steps.signing.outputs.signed == 'true'
+        run: |
+          security delete-keychain "$RUNNER_TEMP/alive-signing.keychain-db" 2>/dev/null || true
+          rm -f "$RUNNER_TEMP/developer-id.p12"
