@@ -49,6 +49,11 @@ final class PlayerModel {
 
     var hasFiles: Bool { !files.isEmpty }
 
+    /// The render "Show in Finder" and Shift+Return act on: the selected row, else the current one.
+    func renderToReveal(selectedID: String?) -> RenderFile? {
+        files.first { $0.id == selectedID } ?? currentFile
+    }
+
     /// The shared player has the current file open (it may be paused).
     var isCurrentOpen: Bool {
         guard let file = currentFile, let url = audio.url else { return false }

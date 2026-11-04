@@ -29,7 +29,7 @@ struct PlayerWindow: View {
         .frame(minWidth: 480, minHeight: 540)
         .background(Theme.bg)
         .preferredColorScheme(.dark)
-        .background(spaceShortcut)
+        .background(shortcuts)
         // Nothing has been played yet: follow the selection, so the window opened from the menu
         // shows the set the person is looking at (paused, like upstream's "autoStart false").
         .task { await followSelectionIfIdle() }
@@ -48,13 +48,20 @@ struct PlayerWindow: View {
         return player.waveform == nil && player.hasFiles ? HomeStrings.waveReading.s : nil
     }
 
-    /// Space plays and pauses while the window has focus.
-    private var spaceShortcut: some View {
-        Button("") { player.togglePlayPause() }
-            .keyboardShortcut(.space, modifiers: [])
-            .opacity(0)
-            .accessibilityHidden(true)
-            .allowsHitTesting(false)
+    /// Space plays and pauses while the window has focus; Shift+Return shows the render in Finder
+    /// (upstream 0bb4915: the selected row, else the one that is playing).
+    private var shortcuts: some View {
+        ZStack {
+            Button("") { player.togglePlayPause() }.keyboardShortcut(.space, modifiers: [])
+            Button("") { revealSelected() }.keyboardShortcut(.return, modifiers: .shift)
+        }
+        .opacity(0)
+        .accessibilityHidden(true)
+        .allowsHitTesting(false)
+    }
+
+    private func revealSelected() {
+        if let file = selected { app.revealInFinder(path: file.path) }
     }
 
     // MARK: - Header
@@ -154,17 +161,13 @@ struct PlayerWindow: View {
 
     // MARK: - Footer
 
-    private var selected: RenderFile? {
-        player.files.first { $0.id == selectedFile } ?? player.currentFile
-    }
+    private var selected: RenderFile? { player.renderToReveal(selectedID: selectedFile) }
 
     private var footer: some View {
         HStack(spacing: 10) {
             Spacer()
-            PillButton(title: HomeStrings.showInFolder.s, icon: .folder) {
-                if let file = selected { app.revealInFinder(path: file.path) }
-            }
-            .disabled(selected == nil)
+            PillButton(title: CommonStrings.showInFinder.s, icon: .folder) { revealSelected() }
+                .disabled(selected == nil)
             PillButton(title: (selected?.pinned ?? false) ? HomeStrings.clearPreview.s : HomeStrings.setAsPreview.s,
                        icon: (selected?.pinned ?? false) ? .starFill : .star) {
                 if let file = selected { Task { await player.togglePin(file) } }
@@ -269,7 +272,7 @@ private struct RenderRow: View {
         .contextMenu {
             Button(HomeStrings.playFile.s, action: onPlay)
             Button(file.pinned ? HomeStrings.clearPreview.s : HomeStrings.setAsPreview.s, action: onPin)
-            Button(HomeStrings.showInFolder.s, action: onReveal)
+            Button(CommonStrings.showInFinder.s, action: onReveal).keyboardShortcut(.return, modifiers: .shift)
         }
     }
 }
