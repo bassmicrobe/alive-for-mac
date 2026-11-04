@@ -20,10 +20,6 @@ final class PlayerPreviewUpstream133Tests: XCTestCase {
         XCTAssertTrue(PreviewSizing.metrics(path: "/p/a.als", key: "", arrangement: a).hasPrefix("1 bar   ·"))
     }
 
-    func testNavigationStringsAreComplete() {
-        assertStringTableIsComplete(PreviewNavStrings.self)
-    }
-
     /// The main run loop gets a turn: the canvas reports after the layout pass, not during it.
     private func letTheCanvasReport() async throws {
         try await Task.sleep(nanoseconds: 60_000_000)

@@ -8,7 +8,7 @@ enum IntegrationStrings: LocalizedStrings {
     case menuBarToggle, menuBarHelp
     case finderTagsToggle, finderTagsHelp
     // Spotlight item text
-    case itemTracks, itemLive
+    case itemTracks, itemTrackOne, itemLive
     // Menu bar extra
     case menuBarTitle
     case todaySaves, streakDays, noActivity
@@ -34,6 +34,7 @@ enum IntegrationStrings: LocalizedStrings {
         case .finderTagsHelp: return ("Alive's tags are written to the project folders as Finder tags. Folders in Dropbox or iCloud Drive sync these changes to your other devices. Finder tags you added yourself are kept.",
                                       "Alive のタグをプロジェクトフォルダに Finder タグとして書き込みます。Dropbox や iCloud Drive 内のフォルダでは、この変更が他のデバイスにも同期されます。ご自身で付けた Finder タグはそのまま残ります。")
         case .itemTracks: return ("%lld tracks", "%lld トラック")
+        case .itemTrackOne: return ("%lld track", "%lld トラック")
         case .itemLive: return ("Live %@", "Live %@")
         case .menuBarTitle: return ("Alive", "Alive")
         case .todaySaves: return ("Saves today: %lld", "今日の保存: %lld 回")

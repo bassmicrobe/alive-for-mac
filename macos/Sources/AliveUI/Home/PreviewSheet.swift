@@ -16,16 +16,11 @@ enum PreviewSizing {
         var parts: [String] = []
         if a.tempo > 0 { parts.append(HomeStrings.previewBPM.f(tempoText(a.tempo))) }
         if !key.isEmpty, a.tempo > 0 { parts.append(key) }
-        // Bars in the set's own time signature (`Arrangement.bars`), the singular with a form of its own.
-        parts.append(count(a.bars, one: .bar1, many: .previewBars))
-        parts.append(count(a.tracks.count, one: .track1, many: .previewTracks))
-        parts.append(count(a.clipCount, one: .clip1, many: .previewClips))
+        // Bars in the set's own time signature (`Arrangement.bars`); "1 bar" has a form of its own.
+        parts.append(HomeStrings.bars(a.bars))
+        parts.append(HomeStrings.tracks(a.tracks.count))
+        parts.append(HomeStrings.clips(a.clipCount))
         return parts.joined(separator: sep)
-    }
-
-    /// "1 bar", "2 bars" (upstream 9ce4b4b `Chrome.Plural`).
-    private static func count(_ n: Int, one: PreviewNavStrings, many: HomeStrings) -> String {
-        n == 1 ? one.f(n) : many.f(n)
     }
 
     /// "150", "127.5", "127.35" — upstream's `0.##`, the same in every system language.
@@ -40,7 +35,7 @@ enum PreviewSizing {
     static func zoomText(_ zoom: Double) -> String {
         var s = String(format: "%.1f", zoom)
         if s.hasSuffix(".0") { s.removeLast(2) }
-        return PreviewNavStrings.zoomValue.f(s)
+        return HomeStrings.previewZoomValue.f(s)
     }
 }
 
@@ -106,7 +101,7 @@ struct PreviewSheet: View {
             PillButton(title: HomeStrings.zoomFit.s) { control.fit() }
                 .disabled(control.isAtFit)
         }
-        .help(PreviewNavStrings.navigationHelp.s)
+        .help(HomeStrings.previewNavigation.s)
     }
 
     /// Esc and ⌘Y close (upstream toggled the preview with the key that opened it), + / - zoom, 0 fits.

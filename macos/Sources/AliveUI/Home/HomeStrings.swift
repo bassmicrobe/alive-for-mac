@@ -21,10 +21,10 @@ enum HomeStrings: LocalizedStrings {
     // Arrangement preview
     case previewReading, previewEmpty, previewBPM, previewBars, previewTracks, previewClips
     case previewBarOne, previewTrackOne, previewClipOne
-    case zoomIn, zoomOut, zoomFit, tallerTracks, zoomLevel
+    case zoomIn, zoomOut, zoomFit, previewZoomValue, previewNavigation
     // Player window
     case playerEmptyTitle, playerEmptyBody, noRenders, colFile, colFolder, colModified
-    case showInFolder, setAsPreview, clearPreview, playFile
+    case setAsPreview, clearPreview, playFile
     case previousSet, nextSet, previousRender, nextRender, volume, mute, unmute
     case waveReading, waveFailed, playerLoading
 
@@ -92,8 +92,10 @@ enum HomeStrings: LocalizedStrings {
         case .zoomIn: return ("Zoom in", "拡大")
         case .zoomOut: return ("Zoom out", "縮小")
         case .zoomFit: return ("Fit to window", "ウィンドウに合わせる")
-        case .tallerTracks: return ("Taller tracks", "トラックを高く")
-        case .zoomLevel: return ("%lld×", "%lld×")
+        case .previewZoomValue: return ("%@×", "%@×")
+        case .previewNavigation:
+            return ("Scroll: tracks   ⇧ Scroll: time   ⌘ Scroll or pinch: zoom   ⌥ Scroll: track height   Middle button drag: move",
+                    "スクロール: トラック   ⇧ スクロール: 時間   ⌘ スクロール／ピンチ: 拡大縮小   ⌥ スクロール: トラックの高さ   中ボタンドラッグ: 移動")
 
         case .playerEmptyTitle: return ("Nothing loaded", "何も読み込まれていません")
         case .playerEmptyBody: return ("Press Play on a project tile, or select a set and press the Space bar.",
@@ -103,7 +105,6 @@ enum HomeStrings: LocalizedStrings {
         case .colFile: return ("File", "ファイル")
         case .colFolder: return ("Folder", "フォルダ")
         case .colModified: return ("Modified", "更新日")
-        case .showInFolder: return ("Show in folder", "フォルダで表示")
         case .setAsPreview: return ("Set as Preview", "プレビューに設定")
         case .clearPreview: return ("Clear preview", "プレビューを解除")
         case .playFile: return ("Play", "再生")
