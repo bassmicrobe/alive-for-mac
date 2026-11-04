@@ -78,7 +78,7 @@ struct IconView: View {
 
     var body: some View {
         icon.image
-            .font(.system(size: size, weight: weight))
+            .font(.system(size: Theme.s(size), weight: weight))
             .imageScale(.medium)
     }
 }

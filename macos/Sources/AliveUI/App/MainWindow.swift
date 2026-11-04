@@ -25,7 +25,7 @@ struct MainWindow: View {
             }
             ToastOverlay(app: app)
         }
-        .frame(minWidth: 1120, minHeight: 600)
+        .frame(minWidth: Theme.s(1120), minHeight: Theme.s(600))
         .background(WindowTransparency(isTransparent: app.prefs.transparency))
         .sheet(item: $app.sheet) { sheet in SheetHost(sheet: sheet) }
         .preferredColorScheme(.dark)
@@ -79,13 +79,13 @@ private struct TopBar: View {
         .animation(Theme.selectAnimation, value: app.catalog.isScanning)
         .padding(.leading, trafficLightInset)
         .padding(.trailing, Theme.pad)
-        .padding(.top, 12)
-        .padding(.bottom, 14)
+        .padding(.top, Theme.s(12))
+        .padding(.bottom, Theme.s(14))
     }
 
     private func bar(foldersLabelled: Bool) -> some View {
         @Bindable var app = app
-        return HStack(spacing: Theme.iconGap + 4) {
+        return HStack(spacing: Theme.iconGap + Theme.s(4)) {
             PillTabs(items: MainTab.allCases.map { PillTabItem(value: $0, title: $0.title) },
                      selection: $app.tab)
                 .fixedSize()
@@ -103,7 +103,7 @@ private struct TopBar: View {
                 ScanStatusPill(progress: app.catalog.progress)
                     .transition(.opacity.combined(with: .scale(scale: 0.96)))
             }
-            Spacer(minLength: 8)
+            Spacer(minLength: Theme.s(8))
             HStack(spacing: Theme.iconGap) {
                 CircleIconButton(icon: .stat, help: CommonStrings.tabStat.s) { openWindow(id: "stat") }
                 if foldersLabelled {
@@ -134,7 +134,7 @@ extension TopBar {
     /// A small dot on the gear while a newer release than the one already seen is out.
     @ViewBuilder fileprivate var updateDot: some View {
         if UpdateModel.shared.hasUnseenUpdate {
-            Circle().fill(Theme.focus).frame(width: 8, height: 8)
+            Circle().fill(Theme.focus).frame(width: Theme.s(8), height: Theme.s(8))
                 .offset(x: 1, y: -1)
                 .allowsHitTesting(false)
                 .accessibilityHidden(true)
@@ -150,7 +150,7 @@ private struct SearchField: View {
 
     var body: some View {
         @Bindable var app = app
-        HStack(spacing: 8) {
+        HStack(spacing: Theme.s(8)) {
             IconView(icon: .magnifier, size: 12)
                 .foregroundStyle(Theme.secondaryText)
             TextField("", text: $app.searchText,
@@ -160,6 +160,7 @@ private struct SearchField: View {
                 .foregroundStyle(Theme.text)
                 .focused($isFocused)
                 .onExitCommand { app.searchText = ""; isFocused = false }
+                .onKeyPress(.downArrow) { isFocused = false; app.focusResults(); return .handled }
                 .accessibilityLabel(CommonStrings.focusSearch.s)
             if !app.searchText.isEmpty {
                 Button { app.searchText = "" } label: { IconView(icon: .close, size: 10) }
@@ -168,8 +169,9 @@ private struct SearchField: View {
                     .accessibilityLabel(CommonStrings.clearSearch.s)
             }
         }
-        .padding(.horizontal, 14)
-        .frame(minWidth: 80, idealWidth: 160, maxWidth: 320, minHeight: Theme.controlH, maxHeight: Theme.controlH)
+        .padding(.horizontal, Theme.s(14))
+        .frame(minWidth: Theme.s(80), idealWidth: Theme.s(160), maxWidth: Theme.s(320),
+               minHeight: Theme.controlH, maxHeight: Theme.controlH)
         .background(Theme.sunken, in: Capsule())
         .focusRing(isFocused, cornerRadius: Theme.controlH / 2)
         .onAppear { releaseInitialFocus() }
@@ -193,9 +195,9 @@ private struct ClearFieldButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .foregroundStyle(hovering ? Theme.text : Theme.secondaryText)
-            .frame(width: 18, height: 18)
+            .frame(width: Theme.s(18), height: Theme.s(18))
             .contentShape(Circle())
-            .focusRing(isFocused, cornerRadius: 9)
+            .focusRing(isFocused, cornerRadius: Theme.s(9))
             .opacity(configuration.isPressed ? 0.6 : 1)
             .onHover { hovering = $0 }
     }
@@ -207,9 +209,9 @@ private struct ScanStatusPill: View {
     let progress: CatalogProgress
 
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: Theme.s(8)) {
             ProgressRing(fraction: progress.fraction)
-                .frame(width: 13, height: 13)
+                .frame(width: Theme.s(13), height: Theme.s(13))
             Text(label)
                 .font(Theme.fSmall)
                 .foregroundStyle(Theme.secondaryText)
@@ -217,8 +219,8 @@ private struct ScanStatusPill: View {
                 .lineLimit(1)
                 .contentTransition(.numericText())
         }
-        .padding(.horizontal, 12)
-        .frame(height: Theme.controlH - 6)
+        .padding(.horizontal, Theme.s(12))
+        .frame(height: Theme.controlH - Theme.s(6))
         .fixedSize()
         .background(Theme.sunken, in: Capsule())
         .overlay(Capsule().strokeBorder(Theme.cardBorder, lineWidth: 1))

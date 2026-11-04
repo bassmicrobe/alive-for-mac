@@ -62,7 +62,7 @@ struct PillButtonStyle: ButtonStyle {
             configuration.label
                 .font(Theme.fButton)
                 .foregroundStyle(foreground)
-                .padding(.horizontal, 16)
+                .padding(.horizontal, Theme.s(16))
                 .frame(minHeight: Theme.controlH)
                 .background(fill, in: Capsule())
                 .overlay(Capsule().strokeBorder(isDimmedPrimary ? Theme.hairline : Theme.cardBorder, lineWidth: 1))
@@ -108,7 +108,7 @@ struct PillButton: View {
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 6) {
+            HStack(spacing: Theme.s(6)) {
                 if let icon { IconView(icon: icon, size: 12) }
                 Text(title)
             }
@@ -184,14 +184,14 @@ struct PillTabs<Value: Hashable>: View {
     @Namespace private var selectionNamespace
 
     var body: some View {
-        HStack(spacing: 2) {
+        HStack(spacing: Theme.s(2)) {
             ForEach(items) { item in
                 PillTab(title: item.title, isSelected: item.value == selection, namespace: selectionNamespace) {
                     withAnimation(Theme.selectAnimation) { selection = item.value }
                 }
             }
         }
-        .padding(3)
+        .padding(Theme.s(3))
         .background(Theme.surface, in: Capsule())
         .overlay(Capsule().strokeBorder(Theme.cardBorder, lineWidth: 1))
     }
@@ -209,8 +209,8 @@ private struct PillTab: View {
             Text(title)
                 .font(Theme.fButton)
                 .foregroundStyle(isSelected ? Theme.onLight : hovering ? Color.white : Theme.secondaryText)
-                .padding(.horizontal, 15)
-                .frame(height: Theme.controlH - 6)
+                .padding(.horizontal, Theme.s(15))
+                .frame(height: Theme.controlH - Theme.s(6))
                 .background {
                     if isSelected {
                         Capsule()
@@ -250,8 +250,8 @@ struct TagPill: View {
         Text(text)
             .font(Theme.fBadge)
             .foregroundStyle(tint ?? Theme.tagText)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 2)
+            .padding(.horizontal, Theme.s(8))
+            .padding(.vertical, Theme.s(2))
             .background((tint ?? Color.white).opacity(0.10), in: Capsule())
             .lineLimit(1)
     }
@@ -285,7 +285,7 @@ struct SectionHeader<Trailing: View>: View {
     var body: some View {
         HStack {
             Text(title).font(Theme.fLabel).foregroundStyle(Theme.secondaryText)
-            Spacer(minLength: 8)
+            Spacer(minLength: Theme.s(8))
             trailing()
         }
     }
@@ -303,7 +303,7 @@ struct EmptyState: View {
     var message: String?
 
     var body: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: Theme.s(10)) {
             IconView(icon: icon, size: 26, weight: .light)
                 .foregroundStyle(Theme.secondaryText)
             Text(title).font(Theme.fHead).foregroundStyle(Theme.text)
@@ -312,7 +312,7 @@ struct EmptyState: View {
                     .font(Theme.fBody)
                     .foregroundStyle(Theme.secondaryText)
                     .multilineTextAlignment(.center)
-                    .frame(maxWidth: 360)
+                    .frame(maxWidth: Theme.s(360))
             }
         }
         .padding(Theme.pad)
@@ -331,7 +331,7 @@ struct SheetFrame<Content: View>: View {
     @ViewBuilder var content: () -> Content
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: Theme.s(14)) {
             HStack {
                 Text(title).font(Theme.fDialogTitle).foregroundStyle(Theme.text)
                 Spacer()
@@ -340,7 +340,7 @@ struct SheetFrame<Content: View>: View {
             content()
         }
         .padding(Theme.pad)
-        .frame(width: width, height: height)
+        .frame(width: Theme.s(width), height: height.map(Theme.s))
         .background(Theme.bg)
         .preferredColorScheme(.dark)
     }
