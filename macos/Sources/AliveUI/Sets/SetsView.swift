@@ -57,7 +57,7 @@ private struct SetsListStrip: View {
     @Environment(AppModel.self) private var app
 
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: Theme.s(8)) {
             // Nothing pinned in the list: the star would have nothing to act on (0bb4915).
             if app.sets.pipeline.hasPinnedRows(pins: app.home.pinned) {
                 PinnedFirstToggle(isOn: app.settings.pinnedFirst) { app.sets.setPinnedFirst($0) }
@@ -65,7 +65,7 @@ private struct SetsListStrip: View {
             ReadyNowToggle(isOn: app.sets.isReadyOnly, count: app.sets.isReadyOnly ? nil : app.sets.readyCount) {
                 app.sets.setReadyOnly($0)
             }
-            Spacer(minLength: 8)
+            Spacer(minLength: Theme.s(8))
             if app.sets.activeFilterCount > 0 {
                 StripButton(title: SetsStrings.clearFilters.s, icon: .close) { app.sets.filter.clear() }
             }
@@ -73,7 +73,7 @@ private struct SetsListStrip: View {
                 app.sets.resetColumns()
             }
         }
-        .frame(height: 26)
+        .frame(height: Theme.s(26))
     }
 }
 
@@ -84,14 +84,14 @@ private struct PinnedFirstToggle: View {
 
     var body: some View {
         Button { set(!isOn) } label: {
-            HStack(spacing: 6) {
+            HStack(spacing: Theme.s(6)) {
                 IconView(icon: isOn ? .starFill : .star, size: 10)
                 Text(SetsStrings.pinnedFirst.s)
             }
             .font(Theme.fSmall)
             .foregroundStyle(isOn ? Theme.onLight : hovering ? Theme.text : Theme.secondaryText)
-            .padding(.horizontal, 12)
-            .frame(height: 24)
+            .padding(.horizontal, Theme.s(12))
+            .frame(height: Theme.s(24))
             .background(isOn ? AnyShapeStyle(Theme.light)
                         : AnyShapeStyle(hovering ? Theme.surfaceHover : Theme.surface), in: Capsule())
         }
@@ -112,8 +112,8 @@ private struct ReadyNowToggle: View {
 
     var body: some View {
         Button { set(!isOn) } label: {
-            HStack(spacing: 6) {
-                Image(systemName: "checkmark.circle").font(.system(size: 11, weight: .medium))
+            HStack(spacing: Theme.s(6)) {
+                Image(systemName: "checkmark.circle").font(Theme.fGlyph(11))
                 Text(SetsStrings.readyNow.s)
                 if let count {
                     Text(SetFormat.readyCount(count)).monospacedDigit().opacity(0.7)
@@ -121,8 +121,8 @@ private struct ReadyNowToggle: View {
             }
             .font(Theme.fSmall)
             .foregroundStyle(isOn ? Theme.onLight : hovering ? Theme.text : Theme.secondaryText)
-            .padding(.horizontal, 12)
-            .frame(height: 24)
+            .padding(.horizontal, Theme.s(12))
+            .frame(height: Theme.s(24))
             .background(isOn ? AnyShapeStyle(Theme.light)
                         : AnyShapeStyle(hovering ? Theme.surfaceHover : Theme.surface), in: Capsule())
         }
@@ -143,14 +143,14 @@ private struct StripButton: View {
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 5) {
+            HStack(spacing: Theme.s(5)) {
                 if let icon { IconView(icon: icon, size: 9) }
                 Text(title)
             }
             .font(Theme.fSmall)
             .foregroundStyle(hovering ? Theme.text : Theme.secondaryText)
-            .padding(.horizontal, 8)
-            .frame(height: 24)
+            .padding(.horizontal, Theme.s(8))
+            .frame(height: Theme.s(24))
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

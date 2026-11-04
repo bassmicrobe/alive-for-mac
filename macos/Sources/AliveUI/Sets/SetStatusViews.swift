@@ -63,10 +63,10 @@ struct ReadinessMark: View {
 
     var body: some View {
         Image(systemName: SetStatusFormat.symbol(status.readiness))
-            .font(.system(size: size, weight: .medium))
+            .font(Theme.fGlyph(size))
             .foregroundStyle(SetStatusFormat.tint(status.readiness))
             .opacity(status.readiness == .ready ? 0.75 : 1)
-            .frame(width: 16, height: 18)
+            .frame(width: Theme.s(16), height: Theme.s(18))
             .help(SetStatusFormat.help(status))
             .accessibilityLabel(SetStatusFormat.label(status.readiness))
     }
@@ -78,9 +78,9 @@ struct StaleRenderMark: View {
 
     var body: some View {
         Image(systemName: "clock.arrow.circlepath")
-            .font(.system(size: size, weight: .medium))
+            .font(Theme.fGlyph(size))
             .foregroundStyle(Theme.secondaryText)
-            .frame(width: 16, height: 18)
+            .frame(width: Theme.s(16), height: Theme.s(18))
             .help(SetsStrings.staleRenderHelp.s)
             .accessibilityLabel(SetsStrings.staleRender.s)
     }
@@ -112,7 +112,7 @@ struct DetailStatus: View {
 
     private func line(symbol: String, tint: Color, text: String, color: Color) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
-            Image(systemName: symbol).font(.system(size: 11, weight: .medium)).foregroundStyle(tint).frame(width: 14)
+            Image(systemName: symbol).font(Theme.fGlyph(11)).foregroundStyle(tint).frame(width: Theme.s(14))
             Text(text).font(Theme.fLabel).foregroundStyle(color).fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 0)
         }

@@ -27,21 +27,21 @@ struct ProjectTile: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             ArrangementThumbnailView(path: set.path)
-                .overlay(alignment: .topTrailing) { starButton.padding(6) }
+                .overlay(alignment: .topTrailing) { starButton.padding(Theme.s(6)) }
                 .overlay(alignment: .bottomTrailing) {
-                    HStack(spacing: 6) {
+                    HStack(spacing: Theme.s(6)) {
                         if let status, status.renderIsStale { TileMark(symbol: "clock.arrow.circlepath", help: SetsStrings.staleRenderHelp.s) }
                         if set.hasRenders { PlayBadge(isPlaying: isPlaying, action: onPlay) }
                     }
-                    .padding(8)
+                    .padding(Theme.s(8))
                 }
                 .overlay(alignment: .bottomLeading) {
                     if let status, status.offlineFiles > 0 {
-                        TileMark(symbol: "externaldrive.badge.xmark", help: SetStatusFormat.help(status)).padding(8)
+                        TileMark(symbol: "externaldrive.badge.xmark", help: SetStatusFormat.help(status)).padding(Theme.s(8))
                     }
                 }
-                .padding(8)
-            VStack(alignment: .leading, spacing: 2) {
+                .padding(Theme.s(8))
+            VStack(alignment: .leading, spacing: Theme.s(2)) {
                 Text(set.name)
                     .font(Theme.fCardTitle)
                     .foregroundStyle(Theme.text)
@@ -54,9 +54,9 @@ struct ProjectTile: View {
                     .monospacedDigit()
                     .help(HomeModel.subtitle(for: set))
             }
-            .padding(.horizontal, 12)
-            .padding(.top, 2)
-            .padding(.bottom, 12)
+            .padding(.horizontal, Theme.s(12))
+            .padding(.top, Theme.s(2))
+            .padding(.bottom, Theme.s(12))
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .background(fill, in: RoundedRectangle(cornerRadius: Self.corner, style: .continuous))
@@ -98,7 +98,7 @@ struct ProjectTile: View {
         Button(action: onTogglePin) {
             IconView(icon: isPinned ? .starFill : .star, size: 13)
                 .foregroundStyle(isPinned ? Theme.lightTop : Theme.text)
-                .frame(width: 26, height: 26)
+                .frame(width: Theme.s(26), height: Theme.s(26))
                 .background(Color.black.opacity(isPinned || hovering ? 0.45 : 0), in: Circle())
                 .contentShape(Circle())
         }
@@ -116,9 +116,9 @@ private struct TileMark: View {
 
     var body: some View {
         Image(systemName: symbol)
-            .font(.system(size: 11, weight: .medium))
+            .font(Theme.fGlyph(11))
             .foregroundStyle(Theme.lightTop)
-            .frame(width: 24, height: 24)
+            .frame(width: Theme.s(24), height: Theme.s(24))
             .background(Color.black.opacity(0.6), in: Circle())
             .overlay(Circle().strokeBorder(Color.white.opacity(0.12), lineWidth: 1))
             .help(help)
@@ -143,11 +143,11 @@ private struct PlayBadge: View {
                 }
                 IconView(icon: isPlaying ? .pause : .play, size: 12)
                     .foregroundStyle(hovering ? Theme.onLight : Theme.lightTop)
-                    .frame(width: 34, height: 34)
+                    .frame(width: Theme.s(34), height: Theme.s(34))
                     .background(hovering ? Theme.light : Color.black.opacity(0.6), in: Circle())
                     .overlay(Circle().strokeBorder(Color.white.opacity(0.12), lineWidth: 1))
             }
-            .frame(width: 34, height: 34)
+            .frame(width: Theme.s(34), height: Theme.s(34))
             .scaleEffect(hovering ? 1.08 : 1)
             .contentShape(Circle())
         }
@@ -170,10 +170,10 @@ struct NewSetTile: View {
 
     var body: some View {
         Button(action: action) {
-            VStack(spacing: 10) {
+            VStack(spacing: Theme.s(10)) {
                 IconView(icon: .plus, size: 15, weight: .semibold)
                     .foregroundStyle(hovering ? Theme.onLight : Theme.secondaryText)
-                    .frame(width: 34, height: 34)
+                    .frame(width: Theme.s(34), height: Theme.s(34))
                     .background(hovering ? Theme.light : Theme.surface, in: Circle())
                 Text(HomeStrings.newLiveSet.s)
                     .font(Theme.fCardTitle)
@@ -185,7 +185,7 @@ struct NewSetTile: View {
             .overlay(
                 RoundedRectangle(cornerRadius: Theme.cardR, style: .continuous)
                     .strokeBorder(hovering ? Theme.secondaryText : Theme.hairline,
-                                  style: StrokeStyle(lineWidth: 1.5, dash: [5, 4]))
+                                  style: StrokeStyle(lineWidth: 1.5, dash: [Theme.s(5), Theme.s(4)]))
             )
             .contentShape(RoundedRectangle(cornerRadius: Theme.cardR, style: .continuous))
         }
@@ -202,22 +202,22 @@ struct NowPlayingStrip: View {
 
     var body: some View {
         let player = app.player
-        HStack(spacing: 12) {
+        HStack(spacing: Theme.s(12)) {
             Button { player.togglePlayPause() } label: {
                 IconView(icon: player.isPlaying ? .pause : .play, size: 13)
                     .foregroundStyle(Theme.onLight)
-                    .frame(width: 32, height: 32)
+                    .frame(width: Theme.s(32), height: Theme.s(32))
                     .background(Theme.light, in: Circle())
             }
             .buttonStyle(.plain)
             .accessibilityLabel(player.isPlaying ? HomeStrings.pauseRender.s : HomeStrings.playRender.s)
             // The name of the set is a link to its tile; a search that hides the tile is cleared (9ce4b4b).
             Button { if let path = player.setPath { app.home.show(path: path) } } label: {
-                VStack(alignment: .leading, spacing: 1) {
+                VStack(alignment: .leading, spacing: Theme.s(1)) {
                     Text(player.currentFile?.name ?? "").font(Theme.fTitle).foregroundStyle(Theme.text).lineLimit(1)
                     Text(player.setName).font(Theme.fSmall).foregroundStyle(Theme.secondaryText).lineLimit(1)
                 }
-                .frame(width: 180, alignment: .leading)
+                .frame(width: Theme.s(180), alignment: .leading)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -231,13 +231,13 @@ struct NowPlayingStrip: View {
         }
         .font(Theme.fSmall)
         .foregroundStyle(Theme.secondaryText)
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
-        .frame(maxWidth: 760)
+        .padding(.horizontal, Theme.s(14))
+        .padding(.vertical, Theme.s(10))
+        .frame(maxWidth: Theme.s(760))
         .background(Theme.surface, in: Capsule())
         .overlay(Capsule().strokeBorder(Color.white.opacity(0.08), lineWidth: 1))
         .shadow(color: .black.opacity(0.45), radius: 18, y: 6)
         .padding(.horizontal, Theme.pad)
-        .padding(.bottom, 16)
+        .padding(.bottom, Theme.s(16))
     }
 }

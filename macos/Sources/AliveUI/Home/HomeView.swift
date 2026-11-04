@@ -18,10 +18,10 @@ struct HomeView: View {
     }
 }
 
-/// How many tiles fit a row.
+/// How many tiles fit a row. The sizes follow the interface scale (computed, never stored).
 enum HomeContentColumns {
-    static let gap: CGFloat = 16
-    static let targetTileWidth: CGFloat = 250
+    static var gap: CGFloat { Theme.s(16) }
+    static var targetTileWidth: CGFloat { Theme.s(250) }
 
     /// upstream: `Math.Max(1, (Width + gap) / (target + gap))` (upstream also caps it at 8; the adaptive grid does not)
     static func count(for width: CGFloat) -> Int {
@@ -35,19 +35,19 @@ private struct HomeContent: View {
     @State private var keyboardActive = false
     @FocusState private var focusedPath: String?
 
-    private static let gap = HomeContentColumns.gap
+    private static var gap: CGFloat { HomeContentColumns.gap }
 
     var body: some View {
         ZStack(alignment: .bottom) {
             ScrollViewReader { scroller in
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 28) {
+                    VStack(alignment: .leading, spacing: Theme.s(28)) {
                         OverviewPanel()
                         projects
                     }
                     .padding(.horizontal, Theme.pad)
-                    .padding(.top, 4)
-                    .padding(.bottom, app.player.isStripVisible ? 96 : Theme.pad)
+                    .padding(.top, Theme.s(4))
+                    .padding(.bottom, app.player.isStripVisible ? Theme.s(96) : Theme.pad)
                 }
                 // Only the tiles are focusable: making the whole scroll view focusable caused
                 // AppKit's structural-region pass to abort. Other controls keep their own keys.
@@ -75,7 +75,7 @@ private struct HomeContent: View {
 
     private var projects: some View {
         let rows = app.home.rows
-        return VStack(alignment: .leading, spacing: 16) {
+        return VStack(alignment: .leading, spacing: Theme.s(16)) {
             projectsHeader
             LazyVGrid(columns: [GridItem(.adaptive(minimum: HomeContentColumns.targetTileWidth), spacing: Self.gap)],
                       spacing: Self.gap) {
@@ -92,14 +92,14 @@ private struct HomeContent: View {
     /// The same height as a project tile (picture 16:9 in an 8 pt frame, then the two text lines).
     private var newSetTile: some View {
         VStack(spacing: 0) {
-            Color.clear.aspectRatio(ThumbnailPipeline.aspect, contentMode: .fit).padding(8)
-            Color.clear.frame(height: 50)
+            Color.clear.aspectRatio(ThumbnailPipeline.aspect, contentMode: .fit).padding(Theme.s(8))
+            Color.clear.frame(height: Theme.s(50))
         }
         .overlay { NewSetTile { app.launchLive() } }
     }
 
     private var projectsHeader: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: Theme.s(10)) {
             Text(HomeStrings.projects.s).font(Theme.fHead).foregroundStyle(Theme.text)
             // Nothing pinned, nothing to put first: the star is not offered (0bb4915).
             if app.home.hasPinned {
@@ -205,7 +205,7 @@ private struct PinnedFirstToggle: View {
         Button(action: action) {
             IconView(icon: isOn ? .starFill : .star, size: 13)
                 .foregroundStyle(isOn ? Theme.light : hovering ? Theme.text : Theme.secondaryText)
-                .frame(width: 26, height: 26)
+                .frame(width: Theme.s(26), height: Theme.s(26))
                 .background(hovering ? Theme.surface : Color.clear, in: Circle())
                 .contentShape(Circle())
         }

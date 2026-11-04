@@ -82,6 +82,10 @@ enum Theme {
     static var fCardTitle: Font { .system(size: s(15), weight: .semibold) }
     /// Smallest caption that stays legible at 100 % (heatmap months, slider captions): never below 11 pt.
     static var fCaption: Font { .system(size: s(11)) }
+    /// The large figure on an Overview card.
+    static var fFigure: Font { .system(size: s(15), weight: .semibold) }
+    /// Medium-weight SF Symbol or caption at `size` points (the base value at 100 %, scaled).
+    static func fGlyph(_ size: CGFloat) -> Font { .system(size: s(size), weight: .medium) }
 
     // MARK: Motion
     static let hoverAnimation = Animation.easeOut(duration: 0.12)

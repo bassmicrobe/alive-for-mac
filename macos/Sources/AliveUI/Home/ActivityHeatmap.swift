@@ -109,11 +109,12 @@ private extension Date {
     }
 }
 
-/// The cell size that makes the grid fit the width (never smaller than 7 or larger than 14 pt).
+/// The cell size that makes the grid fit the width (never smaller than 7 or larger than 14 pt at
+/// 100 %; every size follows the interface scale, so these are computed, not stored).
 struct HeatmapMetrics: Equatable {
-    static let gap: CGFloat = 3
-    static let minCell: CGFloat = 7
-    static let maxCell: CGFloat = 14
+    static var gap: CGFloat { Theme.s(3) }
+    static var minCell: CGFloat { Theme.s(7) }
+    static var maxCell: CGFloat { Theme.s(14) }
 
     let cell: CGFloat
     var step: CGFloat { cell + Self.gap }
@@ -154,9 +155,12 @@ struct HeatmapDayPick: Identifiable {
 /// size measured into @State made the window's structural-region pass loop at start-up.
 struct HeatmapFit: Layout {
     let cols: Int
+    /// The interface scale the sizes below were read at. A layout is not observed: a new value makes
+    /// SwiftUI measure the calendar again after a change of Settings → Interface scale.
+    let scale: CGFloat
 
-    static let monthH: CGFloat = 17
-    static let monthGap: CGFloat = 7
+    static var monthH: CGFloat { Theme.s(17) }
+    static var monthGap: CGFloat { Theme.s(7) }
     /// Where the first row of cells begins.
     static let gridTop = monthH + monthGap
 
@@ -183,11 +187,12 @@ struct ActivityHeatmap: View {
     @State private var pick: HeatmapDayPick?
 
     var body: some View {
-        HeatmapFit(cols: grid.cols) {
+        HeatmapFit(cols: grid.cols, scale: ThemeScale.shared.factor) {
             GeometryReader { proxy in
                 // The cell size is recovered from the size we were given: width = cols * step - gap.
                 let m = HeatmapMetrics(cols: grid.cols, available: proxy.size.width)
-                Canvas { context, _ in draw(&context, m) }
+                let monthFont = Theme.fGlyph(12)
+                Canvas { context, _ in draw(&context, m, monthFont: monthFont) }
                     .onContinuousHover { phase in hover(phase, m) }
                     .onTapGesture { point in tap(at: point, m) }
                     .dayPointer(hovered.map { $0.saves > 0 } ?? false)
@@ -203,9 +208,6 @@ struct ActivityHeatmap: View {
         .accessibilityLabel(HomeStrings.activeDays.s)
     }
 
-    /// Month captions: 12 pt medium, so they stay readable at the calendar's real size.
-    private static let monthFont = Font.system(size: 12, weight: .medium)
-
     private var gridTop: CGFloat { HeatmapFit.gridTop }
 
     /// A day with saves opens the list of its projects; an empty day has nothing to open.
@@ -215,9 +217,10 @@ struct ActivityHeatmap: View {
                               projects: app.home.dayProjects(on: cell.day))
     }
 
-    private func draw(_ context: inout GraphicsContext, _ m: HeatmapMetrics) {
+    /// `monthFont` is 12 pt medium (scaled), so the captions stay readable at the calendar's real size.
+    private func draw(_ context: inout GraphicsContext, _ m: HeatmapMetrics, monthFont: Font) {
         for label in grid.monthLabels {
-            let text = context.resolve(Text(monthName(label.month)).font(Self.monthFont).foregroundStyle(Theme.secondaryText))
+            let text = context.resolve(Text(monthName(label.month)).font(monthFont).foregroundStyle(Theme.secondaryText))
             let width = m.width(cols: grid.cols)
             let labelWidth = text.measure(in: CGSize(width: width, height: HeatmapFit.monthH)).width
             let x = max(0, min(CGFloat(label.col) * m.step, width - labelWidth))
@@ -232,7 +235,7 @@ struct ActivityHeatmap: View {
         }
         if let hovered {
             let rect = CGRect(x: CGFloat(hovered.col) * m.step, y: gridTop + CGFloat(hovered.row) * m.step,
-                              width: m.cell, height: m.cell).insetBy(dx: -1, dy: -1)
+                              width: m.cell, height: m.cell).insetBy(dx: -Theme.s(1), dy: -Theme.s(1))
             context.fill(Path(roundedRect: rect, cornerRadius: radius), with: .color(Theme.lightTop))
         }
     }
