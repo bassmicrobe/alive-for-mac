@@ -115,6 +115,8 @@ public final class PreviewPins: @unchecked Sendable {
     private let dir: String
     private let lock = NSLock()
     private var map: [String: Pin]?     // keyed case-insensitively; the file keeps the original root
+    /// previews.cfg is there but could not be read: nothing is saved over it (see `AppHome.readStore`).
+    private var unread = false
 
     public init(dir: String) { self.dir = dir }
 
@@ -123,7 +125,9 @@ public final class PreviewPins: @unchecked Sendable {
     private func loaded() -> [String: Pin] {
         if let m = map { return m }
         var m: [String: Pin] = [:]
-        for line in AppHome.readLines(filePath) ?? [] {
+        let read = AppHome.readStore(filePath)
+        unread = read.isUnread
+        for line in read.lines {
             guard let tab = line.firstIndex(of: "\t"), tab != line.startIndex else { continue }
             let root = String(line[..<tab])
             m[Self.key(root)] = Pin(root: root, file: String(line[line.index(after: tab)...]))
@@ -161,9 +165,13 @@ public final class PreviewPins: @unchecked Sendable {
     }
 
     private func save(_ m: [String: Pin]) {
+        guard !unread else {
+            Diag.warn("previews.cfg was not read at start; not saving over it")
+            return
+        }
         let lines = m.values.filter { !$0.file.isEmpty }.sorted { $0.root < $1.root }
             .map { "\($0.root)\t\($0.file)" }
-        do { try AppHome.writeAtomically(lines.joined(separator: "\n") + (lines.isEmpty ? "" : "\n"), to: filePath) }
+        do { try AppHome.writeKeepingBackup(lines.joined(separator: "\n") + (lines.isEmpty ? "" : "\n"), to: filePath) }
         catch { Diag.fail("previews.cfg write", error) }
     }
 }

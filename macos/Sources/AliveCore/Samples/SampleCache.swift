@@ -23,9 +23,53 @@ public enum SampleCache {
     }
 
     /// The cache is not critical — the worst case is walking again — but a failure is logged.
-    public static func save(_ index: SampleIndex, dir: String) {
-        do { try AppHome.writeAtomically(encode(index), to: path(dir: dir)) } catch {
+    /// `walked` is when the walk behind `index` ended; it is written behind the roots (see
+    /// `walkedAt`).
+    public static func save(_ index: SampleIndex, dir: String, walked: Date = Date()) {
+        var data = encode(index)
+        data.append(walkTail(walked))
+        do { try AppHome.writeAtomically(data, to: path(dir: dir)) } catch {
             Diag.fail("samples.cache write", error)
+        }
+    }
+
+    // MARK: when it was walked
+
+    /// A mark and the time of the walk (UTC ticks) after the roots — twelve bytes the decoder
+    /// does not reach, so the version stays and a copy of Alive from before reads the file as
+    /// ever. Upstream takes the file's modification time for this (a6c8dc1 `WalkedUtc`); the mark
+    /// keeps the answer when a backup tool, a copy or a restore touches the file.
+    static let walkMark: Int32 = 0x6B6C6177      // "walk"
+    private static let tailBytes = 12
+
+    private static func walkTail(_ walked: Date) -> Data {
+        var w = DotNetWriter()
+        w.int32(walkMark)
+        w.int64(DotNetTicks.utc(walked))
+        return w.data
+    }
+
+    /// When the last whole walk ended: nil without a cache. A cache written before the walk time
+    /// was kept is taken by its modification time, like upstream — only a walk writes it.
+    public static func walkedAt(dir: String) -> Date? {
+        let file = path(dir: dir)
+        guard let stat = FileStat.of(file) else { return nil }
+        if let marked = markedWalk(file, size: stat.size) { return marked }
+        return stat.modified
+    }
+
+    private static func markedWalk(_ file: String, size: Int64) -> Date? {
+        guard size >= Int64(tailBytes), let h = FileHandle(forReadingAtPath: file) else { return nil }
+        defer { try? h.close() }
+        do {
+            try h.seek(toOffset: UInt64(size) - UInt64(tailBytes))
+            guard let tail = try h.read(upToCount: tailBytes), tail.count == tailBytes else { return nil }
+            var r = DotNetReader(tail)
+            guard try r.int32() == walkMark else { return nil }
+            let ticks = try r.int64()
+            return DotNetTicks.isValid(ticks: ticks) ? DotNetTicks.date(utc: ticks) : nil
+        } catch {
+            return nil
         }
     }
 
@@ -121,5 +165,23 @@ public enum SampleCache {
 
     private static func date(_ ticks: Int64) -> Date? {
         ticks > 0 && DotNetTicks.isValid(ticks: ticks) ? DotNetTicks.date(utc: ticks) : nil
+    }
+}
+
+extension SampleIndex {
+    /// How old a whole walk may be before a start walks the library again.
+    public static let walkValidity: TimeInterval = 24 * 3600
+
+    /// Whether a start has to walk the library: the last whole walk is over a day old (or has no
+    /// date, or lies a day in the future — the clock was set back), or the cache lacks a folder
+    /// that is switched on now. It walked on every start — 41 s on 190 thousand samples from a
+    /// cold disk, the first start after a reboot, fighting Live for that disk while it loaded a
+    /// set. A manual rescan and a newly added folder still walk at once (upstream a6c8dc1
+    /// `WalkDue`).
+    public static func walkDue(cached: SampleIndex, roots: [String], disabled: [String],
+                               walkedAt: Date?, now: Date = Date()) -> Bool {
+        guard let walkedAt, abs(now.timeIntervalSince(walkedAt)) <= walkValidity else { return true }
+        let have = cached.roots.map { norm(cached.folders[$0].path).lowercased() }
+        return effective(roots, disabled: disabled).contains { !have.contains(norm($0).lowercased()) }
     }
 }

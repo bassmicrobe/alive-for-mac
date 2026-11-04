@@ -17,12 +17,20 @@ import Foundation
 public struct Activity: Sendable {
     public static let empty = Activity(stamps: [], today: Date())
 
-    /// Local wall-clock instants of saves, ascending.
-    let stamps: [Date]
+    /// One save: when, and the project folder it was made in — "" for a save the history took in
+    /// before it kept folders (upstream a6c8dc1 `Mark`).
+    struct Mark: Equatable, Sendable {
+        var when: Date
+        var project: String
+    }
+
+    /// The saves, ascending by time (local wall-clock instants).
+    let marks: [Mark]
+    var stamps: [Date] { marks.map(\.when) }
     private let byDay: [Date: Int]
     public let hourHistogram: [Int]
 
-    public var total: Int { stamps.count }
+    public var total: Int { marks.count }
     public var activeDays: Int { byDay.count }
 
     public private(set) var first: Date?
@@ -37,32 +45,67 @@ public struct Activity: Sendable {
     public func saves(on day: Date) -> Int { byDay[Calendar.current.startOfDay(for: day)] ?? 0 }
 
     /// The project folders saved in on that day, the busiest first — what a day's cell in the
-    /// year of work opens (upstream a6c8dc1 `ProjectsOn`). Saves the history took in before it
-    /// kept folders name nothing, so a day of those alone gives an empty list.
-    /// CONTRACT: the storage of the per-save project is added by the port of a6c8dc1; until then
-    /// this returns no projects.
-    public func projects(on day: Date) -> [String] { [] }
+    /// year of work opens (upstream a6c8dc1 `ProjectsOn`). The folders are the same strings as
+    /// `SetEntry.projectDir`. Ties keep the order of the first save that day. Saves the history
+    /// took in before it kept folders name nothing, so a day of those alone gives an empty list.
+    public func projects(on day: Date) -> [String] {
+        let cal = Calendar.current
+        let start = cal.startOfDay(for: day)
+        guard let end = cal.date(byAdding: .day, value: 1, to: start) else { return [] }
+        var order: [String] = []                       // first spelling seen, in first-save order
+        var saves: [String: Int] = [:]                 // keyed case-insensitively, like upstream
+        var i = firstMark(onOrAfter: start)
+        while i < marks.count, marks[i].when < end {
+            let project = marks[i].project
+            i += 1
+            if project.isEmpty { continue }
+            let key = project.lowercased()
+            if saves[key] == nil { order.append(project) }
+            saves[key, default: 0] += 1
+        }
+        // The tie-break is spelled out rather than left to the stability of the sort.
+        let rank = Dictionary(uniqueKeysWithValues: order.enumerated().map { ($1.lowercased(), $0) })
+        return order.sorted {
+            let a = saves[$0.lowercased()] ?? 0, b = saves[$1.lowercased()] ?? 0
+            return a != b ? a > b : (rank[$0.lowercased()] ?? 0) < (rank[$1.lowercased()] ?? 0)
+        }
+    }
+
+    /// Position of the first save at or after `t` (the marks are ascending).
+    private func firstMark(onOrAfter t: Date) -> Int {
+        var lo = 0, hi = marks.count
+        while lo < hi {
+            let mid = (lo + hi) / 2
+            if marks[mid].when < t { lo = mid + 1 } else { hi = mid }
+        }
+        return lo
+    }
 
     /// Every active day (start of day) with its number of saves.
     public var days: [Date: Int] { byDay }
 
     // MARK: building
 
-    init(stamps unsorted: [Date], today: Date) {
+    /// Saves with no project folder (a history from before folders were kept, and tests).
+    init(stamps: [Date], today: Date) {
+        self.init(marks: stamps.map { Mark(when: $0, project: "") }, today: today)
+    }
+
+    init(marks unsorted: [Mark], today: Date) {
         let cal = Calendar.current
-        let stamps = unsorted.sorted()
-        self.stamps = stamps
+        let marks = unsorted.sorted { $0.when < $1.when }
+        self.marks = marks
         var byDay: [Date: Int] = [:]
         var hours = [Int](repeating: 0, count: 24)
-        for t in stamps {
-            byDay[cal.startOfDay(for: t), default: 0] += 1
-            hours[cal.component(.hour, from: t)] += 1
+        for m in marks {
+            byDay[cal.startOfDay(for: m.when), default: 0] += 1
+            hours[cal.component(.hour, from: m.when)] += 1
         }
         self.byDay = byDay
         self.hourHistogram = hours
-        guard let firstStamp = stamps.first, let lastStamp = stamps.last else { return }
-        first = firstStamp
-        last = lastStamp
+        guard let firstMark = marks.first, let lastMark = marks.last else { return }
+        first = firstMark.when
+        last = lastMark.when
 
         for (day, n) in byDay where n > busiestSaves || (n == busiestSaves && day < (busiestDay ?? day)) {
             busiestSaves = n; busiestDay = day
@@ -104,27 +147,37 @@ public struct Activity: Sendable {
         // copies of Live at once. Without a key the cache would double on every scan; the
         // filtering is needed within a single walk too (a set outside a "* Project" folder makes
         // its own folder the project, which can be the parent of others' projects).
-        var seen = Set<Int64>()
-        var stamps: [Date] = []
-        func add(_ t: Date) {
-            if sane(t, now: now), seen.insert(DotNetTicks.local(t)).inserted { stamps.append(t) }
+        var seen: [Int64: Int] = [:]          // a moment -> its place in marks
+        var marks: [Mark] = []
+        // A moment already known is not counted again — but if it came without a project (a
+        // history from before folders were kept) and the walk has just found it in a Backup
+        // folder, it gets that folder now (upstream `Add`).
+        func add(_ t: Date, _ project: String) {
+            guard sane(t, now: now) else { return }
+            let key = DotNetTicks.local(t)
+            if let i = seen[key] {
+                if marks[i].project.isEmpty { marks[i].project = project }
+                return
+            }
+            seen[key] = marks.count
+            marks.append(Mark(when: t, project: project))
         }
-        previous?.stamps.forEach(add)
+        previous?.marks.forEach { add($0.when, $0.project) }
 
         // The key is the folder plus the set name: one project folder holds different versions,
-        // each with copies of its own.
+        // each with copies of its own. Each save remembers the project folder it was made in.
         var withCopies = Set<String>()
         for (i, dir) in dirs.enumerated() where i < weights.count {
             for sv in weights[i].saves ?? [] {
-                add(sv.when)
+                add(sv.when, dir)
                 withCopies.insert(dir.lowercased() + "|" + sv.set.lowercased())
             }
         }
         for s in sets where !s.isBackup {
             if withCopies.contains(s.projectDir.lowercased() + "|" + s.name.lowercased()) { continue }
-            add(s.modified)
+            add(s.modified, s.projectDir)
         }
-        return Activity(stamps: stamps, today: now)
+        return Activity(marks: marks, today: now)
     }
 
     /// Does the mark look plausible? The cache accumulates and is never cleaned, so a single
@@ -139,6 +192,11 @@ public struct Activity: Sendable {
     // MARK: cache
 
     static let cacheVersion: Int32 = 1
+    /// The projects follow the moments as a tail behind this mark ("proj"), one folder per moment
+    /// in the same order. Not a new version: a copy of Alive from before would read a new version
+    /// as nothing and, at its next scan, write the history over with only what is left in Backup.
+    /// A tail it simply does not reach (upstream a6c8dc1 `ProjectsMark`).
+    static let projectsMark: Int32 = 0x6A6F7270
     public static func cachePath(dir: String = AppHome.path) -> String { AppHome.file("activity.cache", in: dir) }
 
     /// Read up to the last intact record: a truncated tail is a lost tail, not a reason to throw
@@ -146,27 +204,54 @@ public struct Activity: Sendable {
     public static func loadCache(dir: String = AppHome.path, now: Date = Date()) -> Activity {
         guard let data = FileManager.default.contents(atPath: cachePath(dir: dir)) else { return .empty }
         var r = DotNetReader(data)
-        var stamps: [Date] = []
+        var ticks: [Int64] = []
+        var complete = false
         do {
             guard try r.int32() == cacheVersion else { return .empty }
             let n = Int(try r.int32())
             guard n >= 0, n <= 5_000_000 else { return .empty }
-            for _ in 0..<n {
-                let ticks = try r.int64()
-                if DotNetTicks.isValid(ticks: ticks) { stamps.append(DotNetTicks.date(local: ticks)) }   // damaged record: skipped
-            }
+            for _ in 0..<n { ticks.append(try r.int64()) }
+            complete = true
         } catch {
-            if stamps.isEmpty { Diag.warn("activity.cache unreadable: \(error)") }
+            if ticks.isEmpty { Diag.warn("activity.cache unreadable: \(error)") }
         }
-        return stamps.isEmpty ? .empty : Activity(stamps: stamps, today: now)
+        // The projects are read by the record's place in the file, so a damaged moment (skipped
+        // below) does not shift the folders of the ones after it.
+        let projects = complete ? readProjects(&r, count: ticks.count) : []
+        var marks: [Mark] = []
+        marks.reserveCapacity(ticks.count)
+        for (i, t) in ticks.enumerated() where DotNetTicks.isValid(ticks: t) {
+            marks.append(Mark(when: DotNetTicks.date(local: t), project: i < projects.count ? projects[i] : ""))
+        }
+        return marks.isEmpty ? .empty : Activity(marks: marks, today: now)
     }
 
-    /// Not an accelerator but the only durable copy of the history, hence the atomic write.
+    /// The tail behind `projectsMark`, if this history has one. A tail cut short gives the
+    /// folders it got to; the rest are unnamed.
+    private static func readProjects(_ r: inout DotNetReader, count: Int) -> [String] {
+        guard r.remaining >= 4, (try? r.int32()) == projectsMark else { return [] }
+        var out: [String] = []
+        out.reserveCapacity(min(count, r.remaining))
+        var shared: [String: String] = [:]      // one project is named by thousands of saves
+        for _ in 0..<count {
+            guard let name = try? r.string() else { break }
+            if let known = shared[name] { out.append(known) } else { shared[name] = name; out.append(name) }
+        }
+        return out
+    }
+
+    /// Not an accelerator but the only durable copy of the history, hence the atomic write. The
+    /// folders are written only once at least one save has one: without them the file is the
+    /// old format byte for byte.
     public func saveCache(dir: String = AppHome.path) {
         var w = DotNetWriter()
         w.int32(Activity.cacheVersion)
-        w.int32(Int32(clamping: stamps.count))
-        stamps.forEach { w.int64(DotNetTicks.local($0)) }
+        w.int32(Int32(clamping: marks.count))
+        marks.forEach { w.int64(DotNetTicks.local($0.when)) }
+        if marks.contains(where: { !$0.project.isEmpty }) {
+            w.int32(Activity.projectsMark)
+            marks.forEach { w.string($0.project) }
+        }
         do { try AppHome.writeAtomicallyIfChanged(w.data, to: Activity.cachePath(dir: dir)) } catch {
             Diag.fail("activity.cache write", error)
         }

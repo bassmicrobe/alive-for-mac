@@ -49,6 +49,10 @@ public enum AppHome {
         /// There is a file, but its content cannot be read as text: it was copied to
         /// `<file>.bak` (when possible) and the caller starts from empty.
         case unreadable
+        /// There is a file, but the system would not hand over its bytes (no permission, an I/O
+        /// error). Nothing is known about what it holds, so a store that rewrites it must not
+        /// save over it (see `readStore`).
+        case inaccessible
     }
 
     private static let noticeGate = NSLock()
@@ -72,7 +76,7 @@ public enum AppHome {
         guard let data = FileManager.default.contents(atPath: path) else {
             Diag.warn("\(name) exists but cannot be read")
             noteBackup(path)
-            return .unreadable
+            return .inaccessible
         }
         if data.isEmpty { return .lines([]) }
         if let text = decodeUTF8(data) { return .lines(splitLines(text)) }
@@ -93,7 +97,24 @@ public enum AppHome {
     public static func readLines(_ path: String) -> [String]? {
         switch readConfig(path) {
         case .lines(let l), .recovered(let l): return l
-        case .missing, .unreadable: return nil
+        case .missing, .unreadable, .inaccessible: return nil
+        }
+    }
+
+    /// The lines of a data file for a store that rewrites that file (settings, notes, pins,
+    /// previews). `isUnread` is set when the file is there but could not be read at all: this
+    /// copy then holds defaults, and saving them would put them in place of everything on disk,
+    /// so the store saves nothing until the next start reads the file (upstream `_unread`,
+    /// 9ce4b4b). A file that is read but is not text is different: it was backed up by
+    /// `readConfig` and the store starts empty — overwriting it is the way out, a flag that
+    /// never clears would leave the person unable to save anything.
+    public static func readStore(_ path: String) -> (lines: [String], isUnread: Bool) {
+        switch readConfig(path) {
+        case .lines(let l), .recovered(let l): return (l, false)
+        case .missing, .unreadable: return ([], false)
+        case .inaccessible:
+            Diag.warn("\((path as NSString).lastPathComponent): not read, so nothing will be saved over it")
+            return ([], true)
         }
     }
 
