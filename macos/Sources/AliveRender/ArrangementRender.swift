@@ -282,9 +282,9 @@ public enum ArrangementRender {
 
     /// A midi clip's notes over its body; `origin` is where beat 0 falls, and what lies outside
     /// `plot` is not drawn. Returns how many note boxes were drawn.
-    private static func drawNotes(_ g: CGContext, rect: CGRect, origin: CGFloat, plot: CGRect, clip c: ClipBlock,
-                                  color: RGBColor, pxPerBeat: Double, alpha: Int) -> Int {
-        guard let notes = c.notes else { return 0 }
+    static func drawNotes(_ g: CGContext, rect: CGRect, origin: CGFloat, plot: CGRect, clip c: ClipBlock,
+                          color: RGBColor, pxPerBeat: Double, alpha: Int) -> Int {
+        guard let notes = c.notes, !notes.isEmpty else { return 0 }
         let lo = c.minPitch, hi = c.maxPitch
         let span = max(hi - lo + 1, 6)
         let inner = max(2, rect.height - 1)
@@ -293,14 +293,23 @@ public enum ArrangementRender {
         let loopLen = c.loopLength
         let loop = c.loopOn && loopLen > 0.0001
         let contentAtStart = c.loopStart + c.startRelative
-        var repeats = 1
+        // Only the repetitions that reach the part of the clip on screen are visited: a loop that
+        // runs for hundreds of bars must show its notes wherever the view is, and not scan the
+        // repetitions to the left of it on every redraw.
+        var repeats = 0..<1
         if loop {
-            repeats = Int(((c.length + (contentAtStart - c.loopStart)) / loopLen).rounded(.up)) + 1
-            repeats = min(max(repeats, 1), maxLoopRepeats)
+            var first = Double.infinity, last = -Double.infinity       // the notes' span in clip time
+            for nt in notes {
+                first = min(first, Double(nt.time))
+                last = max(last, Double(nt.time) + Double(max(nt.duration, 0.05)))
+            }
+            repeats = visibleRepeats(clip: c, noteStart: first, noteEnd: last,
+                                     fromBeat: Double(plot.minX - origin) / pxPerBeat,
+                                     toBeat: Double(plot.maxX - origin) / pxPerBeat)
         }
 
         var boxes: [CGRect] = []
-        outer: for k in 0..<repeats {
+        outer: for k in repeats {
             let shift = c.start - contentAtStart + Double(k) * (loop ? loopLen : 0)
             for nt in notes {
                 var s = Double(nt.time) + shift
@@ -320,6 +329,29 @@ public enum ArrangementRender {
         g.setFillColor(cg(color, alpha: alpha))
         g.fill(boxes)
         return boxes.count
+    }
+
+    /// The loop repetitions of a clip whose notes can fall between `fromBeat` and `toBeat` (the
+    /// view, in beats), in order. `noteStart` / `noteEnd` are the earliest start and the latest end
+    /// among the notes, in the clip's own time. A repetition is the clip's content shifted by
+    /// whole loop lengths; the clip holds as many as fit in its length (one more for the partial
+    /// one). The cap on repetitions (`maxLoopRepeats`) applies to those inside the view, so a late
+    /// stretch of a long loop still draws. Empty when nothing is on screen.
+    static func visibleRepeats(clip c: ClipBlock, noteStart: Double, noteEnd: Double,
+                               fromBeat: Double, toBeat: Double) -> Range<Int> {
+        let loopLen = c.loopLength
+        guard c.loopOn, loopLen > 0.0001 else { return 0..<1 }
+        let contentAtStart = c.loopStart + c.startRelative
+        let base = c.start - contentAtStart
+        func index(_ x: Double) -> Int { x.isNaN ? 0 : Int(min(max(x, -1e9), 1e9)) }
+        let total = max(1, index(((c.length + (contentAtStart - c.loopStart)) / loopLen).rounded(.up)) + 1)
+        // Only the part of the clip on screen counts.
+        let from = max(fromBeat, c.start), to = min(toBeat, c.end)
+        guard from <= to else { return 0..<0 }
+        let first = max(0, index(((from - base - noteEnd) / loopLen).rounded(.down)))
+        let last = min(total - 1, index(((to - base - noteStart) / loopLen).rounded(.up)))
+        guard first <= last else { return 0..<0 }
+        return first..<(min(last, first + maxLoopRepeats - 1) + 1)
     }
 
     // MARK: grid, ruler, names
