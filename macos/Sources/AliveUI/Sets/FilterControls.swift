@@ -143,19 +143,19 @@ struct FilterField: View {
     }
 }
 
-/// A date text field whose calendar icon opens a picker; typed text is parsed leniently
-/// ("2026", "2026-08", "2026-08-07") by `SetFilter.parseDate`.
+/// A date text field whose calendar icon opens a month grid; typed text is parsed leniently
+/// ("2026", "2026-08", "2026-08-07") by `SetFilter.parseDate`. An empty field opens the grid with
+/// no day picked.
 struct DateFilterField: View {
     let cue: String
     let upperBound: Bool
     @Binding var date: Date?
     @State private var text = ""
     @State private var showPicker = false
-    @State private var picked = Date()
 
     var body: some View {
         FilterField(cue: cue, text: $text, isInvalid: !text.isEmpty && SetFilter.parseDate(text, upperBound: upperBound) == nil,
-                    leadingIcon: .calendar, onLeadingIcon: { picked = date ?? Date(); showPicker = true })
+                    leadingIcon: .calendar, onLeadingIcon: { showPicker = true })
             .onAppear { text = SetFilter.formatDate(date) }
             .onChange(of: text) { _, new in
                 date = SetFilter.parseDate(new, upperBound: upperBound)
@@ -165,14 +165,10 @@ struct DateFilterField: View {
                 if new == nil, SetFilter.parseDate(text, upperBound: upperBound) != nil { text = "" }
             }
             .popover(isPresented: $showPicker, arrowEdge: .bottom) {
-                DatePicker(cue, selection: $picked, displayedComponents: .date)
-                    .datePickerStyle(.graphical)
-                    .labelsHidden()
-                    .padding(12)
-                    .onChange(of: picked) { _, new in
-                        text = SetFilter.formatDate(new)
-                        showPicker = false
-                    }
+                CalendarGrid(selected: date) { picked in
+                    text = SetFilter.formatDate(picked)
+                    showPicker = false
+                }
             }
     }
 }
