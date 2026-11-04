@@ -46,7 +46,7 @@ struct SetNameCell: View {
                 .help(set.name)
             if set.collapsedCount > 0 {
                 TagPill(text: SetsStrings.moreVersions.f(set.collapsedCount))
-                    .help(SetsStrings.moreVersionsHelp.f(set.collapsedCount))
+                    .help(SetFormat.plural(set.collapsedCount, one: .moreVersionsHelpOne, many: .moreVersionsHelp))
             }
             if !set.error.isEmpty {
                 IconView(icon: .warning, size: 11)

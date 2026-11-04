@@ -83,13 +83,13 @@ struct PluginFiltersSheet: View {
 
     private func footer(_ facets: PluginFacets) -> some View {
         HStack(spacing: 10) {
-            Text(PluginsStrings.filterMatches.f(facets.matches))
+            Text(PluginsFormat.matches(facets.matches))
                 .font(Theme.fBody)
                 .foregroundStyle(facets.matches == 0 ? Theme.errorText : Theme.secondaryText)
             Spacer()
             PillButton(title: PluginsStrings.filterReset.s) { app.plugins.filter.clear() }
                 .disabled(app.plugins.filter.isEmpty)
-            PillButton(title: CommonStrings.done.s, kind: .primary) { dismiss() }
+            PillButton(title: CommonStrings.ok.s, kind: .primary) { dismiss() }
                 .keyboardShortcut(.defaultAction)
         }
         .padding(.top, 4)

@@ -58,7 +58,10 @@ private struct SetsListStrip: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            PinnedFirstToggle(isOn: app.settings.pinnedFirst) { app.sets.setPinnedFirst($0) }
+            // Nothing pinned in the list: the star would have nothing to act on (0bb4915).
+            if app.sets.pipeline.hasPinnedRows(pins: app.home.pinned) {
+                PinnedFirstToggle(isOn: app.settings.pinnedFirst) { app.sets.setPinnedFirst($0) }
+            }
             ReadyNowToggle(isOn: app.sets.isReadyOnly, count: app.sets.isReadyOnly ? nil : app.sets.readyCount) {
                 app.sets.setReadyOnly($0)
             }

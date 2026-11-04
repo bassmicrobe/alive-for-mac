@@ -11,6 +11,11 @@ enum PluginsFormat {
         (n == 1 ? PluginsStrings.setsOne : PluginsStrings.setsMany).f(n)
     }
 
+    /// The Filters window's counter: "1 plugin matches", "12 plugins match".
+    static func matches(_ n: Int) -> String {
+        (n == 1 ? PluginsStrings.filterMatchesOne : PluginsStrings.filterMatches).f(n)
+    }
+
     /// The date the newest set using the plugin was saved; "—" when it is used nowhere.
     static func lastUsed(_ date: Date?, locale: Locale = Localizer.shared.locale) -> String {
         guard let date, date > .distantPast else { return "—" }
