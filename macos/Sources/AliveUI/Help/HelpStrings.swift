@@ -80,7 +80,7 @@ enum HelpStrings: LocalizedStrings {
         case .listEnds: return ("First or last item of the list", "リストの先頭 / 末尾の項目")
         case .previewWheel: return ("Scroll the tracks", "トラックをスクロール")
         case .previewShiftWheel: return ("Move along the time", "時間方向に移動")
-        case .previewCommandWheel: return ("Zoom the time around the pointer (a pinch does too)", "ポインタを中心に時間方向にズーム（ピンチでも可）")
+        case .previewCommandWheel: return ("Zoom the time (a pinch does too)", "時間方向にズーム（ピンチも可）")
         case .previewOptionWheel: return ("Make the tracks taller or lower", "トラックの高さを変更")
         case .previewMiddleDrag: return ("Move both ways", "上下左右に移動")
         case .previewZoomKeys: return ("Zoom in / out / the whole song", "拡大 / 縮小 / 全体表示")
