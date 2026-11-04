@@ -47,6 +47,10 @@ struct SamplesListArea: View {
                 .padding(.vertical, 2)
             }
             .scrollIndicators(.automatic)
+            // Rows and their buttons answer their own clicks; a press on what is left, under the
+            // last row, silences the sample.
+            .contentShape(Rectangle())
+            .onTapGesture { model.emptyClicked() }
             .onChange(of: model.scrollTarget) { _, target in
                 guard let target else { return }
                 withAnimation(Theme.selectAnimation) { proxy.scrollTo(target.id, anchor: .center) }
@@ -64,7 +68,10 @@ struct SamplesListArea: View {
         switch press.key {
         case .upArrow: model.moveSelection(by: -1)
         case .downArrow: model.moveSelection(by: 1)
-        case .rightArrow: return model.treeKey(open: true) ? .handled : .ignored
+        case .rightArrow:
+            // On a sample → plays it from the start; on a folder it opens it.
+            if model.playSelectedFromStart() { return .handled }
+            return model.treeKey(open: true) ? .handled : .ignored
         case .leftArrow: return model.treeKey(open: false) ? .handled : .ignored
         case .space: model.togglePlaySelected()
         case .return:

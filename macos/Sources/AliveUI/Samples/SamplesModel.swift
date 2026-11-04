@@ -51,6 +51,10 @@ final class SamplesModel {
     var auditioned: String?
     @ObservationIgnored var startedPath: String?
     @ObservationIgnored var lastStart = Date.distantPast
+    /// The level samples are auditioned at, 0...1 (`Settings.previewVolume`, a6c8dc1). The slider
+    /// under the wave moves it; settings.cfg follows a moment after the last change (+Volume).
+    var previewVolume = 0.8
+    @ObservationIgnored var volumeSaveTask: Task<Void, Never>?
 
     // MARK: scanning
     @ObservationIgnored var started = false
@@ -86,6 +90,7 @@ final class SamplesModel {
 
     init(app: AppModel) {
         self.app = app
+        previewVolume = Self.clampedVolume(app.settings.previewVolume)
     }
 
     // MARK: - Toolbar contract

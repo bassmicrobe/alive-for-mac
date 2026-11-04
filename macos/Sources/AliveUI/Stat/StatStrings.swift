@@ -16,13 +16,18 @@ enum StatStrings: LocalizedStrings {
     // Toolbar
     case spin, resetView, presetAngle, presetFront, presetSide, presetTop, presetHelp
     // Cloud
-    case projectsCount, hintRotate, hintZoom, hintPan, hintOpen, hintNoFolders, hintNothing, cloudLabel
+    case projectsCount, projectsCountOne, hintRotate, hintZoom, hintPan, hintOpen, hintNoFolders, hintNothing, cloudLabel
     case cloudHelp, noProjectSelected, nextProject, previousProject
     // Inspector
     case inspectorEmptyTitle, inspectorEmptyBody, note, files, plugins, noPlugins, showInList
 
     var en: String { text.en }
     var ja: String { text.ja }
+
+    /// "1 project" / "12 projects": the status line under the cloud (9ce4b4b, Chrome.Plural upstream).
+    static func projects(_ count: Int) -> String {
+        count == 1 ? projectsCountOne.s : projectsCount.f(count)
+    }
 
     private var text: (en: String, ja: String) {
         switch self {
@@ -69,6 +74,7 @@ enum StatStrings: LocalizedStrings {
         case .presetTop: return ("Top view (X and Z)", "上面（X と Z）")
         case .presetHelp: return ("Camera presets", "カメラのプリセット")
         case .projectsCount: return ("%lld projects", "%lld プロジェクト")
+        case .projectsCountOne: return ("1 project", "1 プロジェクト")
         case .hintRotate: return ("drag — rotate", "ドラッグで回転")
         case .hintZoom: return ("scroll or pinch — zoom", "スクロールかピンチで拡大縮小")
         case .hintPan: return ("right drag — pan", "右ドラッグで移動")

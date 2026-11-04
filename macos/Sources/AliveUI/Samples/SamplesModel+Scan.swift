@@ -60,13 +60,22 @@ extension SamplesModel {
                 self.pendingReveal = nil
                 self.reveal(path)
             }
-            self.syncRoots(force: true, manual: false)
+            self.syncRoots(force: true, manual: false, atStartup: true)
         }
+    }
+
+    /// The quiet walk of a session. Upstream walks only when the last whole walk is over a day old or
+    /// a switched-on root is missing from the cache (SampleIndex.WalkDue), so a start does not fight
+    /// Live for the disk. That decision belongs to Core; until its entry is merged this walks every
+    /// time (notes/E1.md has the exact replacement). F5, a new folder and a returning volume still
+    /// go straight to `startScan`.
+    func walkAtStartup() {
+        startScan(manual: false)
     }
 
     /// The list of folders changed (added, removed, switched on or off in the roots sheet): the tree
     /// follows at once, the walk follows behind. A no-op when nothing that counts changed.
-    func syncRoots(force: Bool = false, manual: Bool = true) {
+    func syncRoots(force: Bool = false, manual: Bool = true, atStartup: Bool = false) {
         guard started, isLoaded else { return }
         let roots = effectiveRoots
         let key = roots.joined(separator: "\n")
@@ -79,7 +88,7 @@ extension SamplesModel {
             return
         }
         adopt(index.only(app.settings.sampleRoots, disabled: app.settings.disabledSampleRoots))
-        startScan(manual: manual)
+        if atStartup { walkAtStartup() } else { startScan(manual: manual) }
     }
 
     func adopt(_ fresh: SampleIndex) {
