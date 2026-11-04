@@ -11,7 +11,7 @@
 - **アレンジメントのプレビュー。** トラック名付き、クリップ名なし。トラックは名前より低くならず、多いときはスクロール。操作は Live と同じ（ホイール、`⇧` / `⌘` / `⌥` + ホイール、中ボタンのドラッグ、ピンチ）。小節はセットの拍子で数えます。
 - **プレーヤー。** `⇧Return` でレンダーを Finder に表示。読み込み途中や壊れた音声ファイルでも波形の表示が止まらず、`alive.log` に記録します。
 - **サンプルの試聴。** 波形の下に試聴の音量スライダー（レンダーの音量とは別、設定に保存）。`→` で選択中のサンプルを頭から再生、空いた場所のクリックで停止。起動時のサンプルフォルダの読み直しは、前回から 1 日以上経ったとき、またはフォルダが増えたときだけ。
-- **設定ファイルの保護。** 各 `.cfg` は保存のたびに前の版を `.bak` として残します。読めなかったファイルを空の内容で上書きしません。
+- **設定ファイルの保護。** 各 `.cfg` は保存のたびに前の版を `.bak` として残します（文字コードの違うファイルの元のデータは `.orig` に退避）。読めなかったファイルを空の内容で上書きせず、起動時に知らせます。
 - **スキャン中のフォルダ追加。** 実行中のスキャンを止めず、終わった直後に追加分を読みます。
 - **公証。** リリースは Developer ID で署名し、Apple の公証を受けています。初回起動の「このまま開く」は不要になりました。手順は [RELEASING.md](RELEASING.md)。
 - **全体監査。** Codex と各レビュアーによる監査で見つかった問題を修正しました。詳細は[監査レポート](AUDIT_2026-11-04.md)。
@@ -33,7 +33,7 @@ Upstream Alive 1.3.1–1.3.3, notarization, and a full audit:
 - **Arrangement preview:** track names, no clip captions, tracks never lower than their name (scrolls when there are many), Live-like navigation (wheel, `⇧` / `⌘` / `⌥` + wheel, middle-button drag, pinch); bars in the set's time signature.
 - **Player:** `⇧Return` shows the render in Finder; a busy or truncated audio file no longer stops the waveform and is logged.
 - **Sample audition:** a volume slider under the wave (separate from the render player, saved); `→` plays the selected sample from the start; a click on empty space stops it. Sample folders are re-read at launch only when the last walk is a day old or a folder was added.
-- **Config safety:** every `.cfg` save keeps the previous version as `.bak`; a file that could not be read is never overwritten with an empty one.
+- **Config safety:** every `.cfg` save keeps the previous version as `.bak` (the original of a file in another encoding is kept as `.orig`); a file that could not be read is never overwritten with an empty one, and launch says so.
 - **Adding a folder during a scan** no longer cancels it; the new folder is scanned right after.
 - **Notarization:** releases are Developer ID signed and notarized by Apple; the first launch no longer needs Open Anyway. See [RELEASING.md](RELEASING.md).
 - **Full audit:** issues found by Codex and the reviewer agents are fixed; see the [audit report](AUDIT_2026-11-04.md).
