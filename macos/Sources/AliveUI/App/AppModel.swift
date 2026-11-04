@@ -46,6 +46,7 @@ final class AppModel {
     /// sounds never overlap. Its errors surface as toasts.
     @ObservationIgnored let audio = AudioPlayback()
     @ObservationIgnored private var started = false
+    @ObservationIgnored private var toldSettingsUnread = false
     @ObservationIgnored private let widgetPublisher = WidgetSnapshotPublisher()
 
     @ObservationIgnored lazy var prefs = AppPreferences(app: self)
@@ -98,18 +99,28 @@ final class AppModel {
     /// A failed write is logged and shown; the in-memory value stays.
     func mutateSettings(_ change: (inout AppSettings) -> Void) {
         var next = settings
+        // A settings.cfg that could not be read at start is read again: if that works, this change
+        // goes on top of what the file holds instead of the defaults this session started with.
+        var recovered = false
+        if next.isUnread {
+            let fresh = AppSettings.load(dir: dataDir)
+            if !fresh.isUnread { next = fresh; recovered = true }
+        }
         change(&next)
         guard next != settings else { return }
         let groupingChanged = next.groupByFolder != settings.groupByFolder
         let sampleRootsChanged = next.sampleRoots != settings.sampleRoots
             || next.disabledSampleRoots != settings.disabledSampleRoots
+        let rootsChanged = recovered && (next.roots != settings.roots || next.disabledRoots != settings.disabledRoots)
         let previous = settings
         settings = next
+        if recovered { Diag.info("settings.cfg is readable again; its content is back") }
         if next.uiScale != previous.uiScale { ThemeScale.shared.apply(percent: next.uiScale) }
         saveSettings()
         integration.settingsDidChange(from: previous)
         if groupingChanged { catalog.settingsDidChange() }
         if sampleRootsChanged { samples.syncRoots() }
+        if rootsChanged { catalog.rescan() }
     }
 
     func saveSettings() {
@@ -118,6 +129,11 @@ final class AppModel {
         } catch {
             Diag.fail("save settings.cfg", error)
             toast(CommonStrings.settingsSaveFailed.f(error.localizedDescription), kind: .error)
+        }
+        // `save` leaves an unread file alone (and logs it); the person is told once.
+        if settings.isUnread, !toldSettingsUnread {
+            toldSettingsUnread = true
+            toast(CommonStrings.settingsUnread.s, kind: .error)
         }
     }
 

@@ -21,7 +21,7 @@ enum CommonStrings: LocalizedStrings {
     case comingSoonTitle, comingSoonBody
     // Toasts
     case liveNotFound, liveOpenFailed, liveLaunchFailed, audioFailed, folderOpenFailed
-    case pathMissing, settingsSaveFailed, dataFileBackedUp, rootAdded, rootsAdded, alreadyWatching, notAFolder
+    case pathMissing, settingsSaveFailed, settingsUnread, dataFileBackedUp, rootAdded, rootsAdded, alreadyWatching, notAFolder
     // Scan status and first run
     case scanning, scanProgress
     case emptyRootsTitle, emptyRootsBody, addProjectsFolder, chooseFolderPrompt, chooseFolderMessage
@@ -90,6 +90,9 @@ enum CommonStrings: LocalizedStrings {
         case .folderOpenFailed: return ("Could not open the folder: %@", "フォルダを開けませんでした: %@")
         case .pathMissing: return ("The file no longer exists: %@", "ファイルが見つかりません: %@")
         case .settingsSaveFailed: return ("Could not save settings: %@", "設定を保存できませんでした: %@")
+        case .settingsUnread:
+            return ("settings.cfg can't be read right now, so changes are kept only until you quit.",
+                    "settings.cfg を今読み込めないため、変更は終了するまでしか保持されません。")
         case .dataFileBackedUp:
             return ("“%1$@” was not a plain UTF-8 text file. The original was kept as “%1$@.bak”.",
                     "「%1$@」は通常の UTF-8 テキストではありませんでした。元のファイルは「%1$@.bak」として残してあります。")

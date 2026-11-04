@@ -27,6 +27,7 @@ enum SetsStrings: LocalizedStrings {
     case calendarPrevious, calendarNext, calendarToday
     // Tags and notes
     case tagsTitle, tagsLabel, noteLabel, notePlaceholder, tagCue, removeTag, addTag, save, appliesToProject, setGone
+    case notesUnreadable, notesWriteFailed
     // Folders
     case rootsTitle, rootsProjectsTab, rootsSamplesTab, rootsHint, rootsSamplesHint
     case rootsEmpty, rootsSamplesEmpty, rootsDropHint, rootsDropRelease, rootsFromLive, rootsProjectsMark
@@ -172,6 +173,12 @@ enum SetsStrings: LocalizedStrings {
         case .save: return ("Save", "保存")
         case .appliesToProject: return ("Applies to the whole project folder “%@”", "プロジェクトフォルダ「%@」全体に適用されます")
         case .setGone: return ("This set is no longer in the catalog.", "このセットはカタログにありません。")
+        case .notesUnreadable:
+            return ("Couldn't save: notes.cfg can't be read right now. Your text is kept.",
+                    "保存できません：notes.cfg を今読み込めません。入力した内容はそのまま残っています。")
+        case .notesWriteFailed:
+            return ("Couldn't save notes.cfg. Your text is kept.",
+                    "notes.cfg を保存できませんでした。入力した内容はそのまま残っています。")
 
         case .rootsTitle: return ("Where to look", "探す場所")
         case .rootsProjectsTab: return ("Projects", "プロジェクト")

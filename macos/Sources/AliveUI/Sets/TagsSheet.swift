@@ -11,6 +11,8 @@ struct TagsSheet: View {
     @State private var draft = ""
     @State private var note = ""
     @State private var loaded = false
+    /// Why the last Save did not go through; the sheet stays open with the text the person typed.
+    @State private var saveError: String?
     @FocusState private var noteFocused: Bool
 
     private var set: SetEntry? { app.sets.set(at: path) }
@@ -50,6 +52,10 @@ struct TagsSheet: View {
                         }
                         .focusRing(noteFocused, cornerRadius: Theme.cardR - 2)
                 }
+                if let saveError {
+                    Text(saveError).font(Theme.fBody).foregroundStyle(Theme.errorText)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
                 HStack {
                     // Two lines, so the folder the tags apply to is not cut off; a leading space in a
                     // real folder name is dropped from the text only (the help keeps the full name).
@@ -88,6 +94,8 @@ struct TagsSheet: View {
     private func load() {
         guard !loaded, let set else { return }
         loaded = true
+        // A notes file that could not be read at start would show this project's tags empty.
+        app.sets.meta.reloadIfUnread()
         tags = app.sets.tags(of: set)
         note = app.sets.note(of: set)
     }
@@ -96,8 +104,11 @@ struct TagsSheet: View {
         guard let set else { dismiss(); return }
         // A word typed and Save pressed at once: the tag has to be kept.
         let final = TagInput.commit(draft: draft, into: tags)
-        app.sets.meta.set(set.projectDir, tags: final, note: note)
-        dismiss()
+        switch app.sets.meta.set(set.projectDir, tags: final, note: note) {
+        case .saved: dismiss()
+        case .unread: saveError = SetsStrings.notesUnreadable.s
+        case .failed: saveError = SetsStrings.notesWriteFailed.s
+        }
     }
 }
 

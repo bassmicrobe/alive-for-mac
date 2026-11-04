@@ -115,7 +115,7 @@ public final class PreviewPins: @unchecked Sendable {
     private let dir: String
     private let lock = NSLock()
     private var map: [String: Pin]?     // keyed case-insensitively; the file keeps the original root
-    /// previews.cfg is there but could not be read: nothing is saved over it (see `AppHome.readStore`).
+    /// previews.cfg is there but could not be read: nothing is saved over it until a read works (see `AppHome.readStore`).
     private var unread = false
 
     public init(dir: String) { self.dir = dir }
@@ -124,16 +124,32 @@ public final class PreviewPins: @unchecked Sendable {
 
     private func loaded() -> [String: Pin] {
         if let m = map { return m }
-        var m: [String: Pin] = [:]
         let read = AppHome.readStore(filePath)
         unread = read.isUnread
-        for line in read.lines {
-            guard let tab = line.firstIndex(of: "\t"), tab != line.startIndex else { continue }
-            let root = String(line[..<tab])
-            m[Self.key(root)] = Pin(root: root, file: String(line[line.index(after: tab)...]))
-        }
+        let m = Self.parse(read.lines)
         map = m
         return m
+    }
+
+    private static func parse(_ lines: [String]) -> [String: Pin] {
+        var m: [String: Pin] = [:]
+        for line in lines {
+            guard let tab = line.firstIndex(of: "\t"), tab != line.startIndex else { continue }
+            let root = String(line[..<tab])
+            m[key(root)] = Pin(root: root, file: String(line[line.index(after: tab)...]))
+        }
+        return m
+    }
+
+    /// The pins to change: when the file could not be read at start, it is read again first, and
+    /// if that works the change goes on top of what the file holds. Lock held.
+    private func loadedForEdit() -> [String: Pin] {
+        let m = loaded()
+        guard unread else { return m }
+        let read = AppHome.readStore(filePath)
+        guard !read.isUnread else { return m }
+        unread = false
+        return Self.parse(read.lines)
     }
 
     public func get(_ projectRoot: String) -> String {
@@ -143,7 +159,7 @@ public final class PreviewPins: @unchecked Sendable {
 
     public func set(_ projectRoot: String, file: String) {
         lock.lock(); defer { lock.unlock() }
-        var m = loaded()
+        var m = loadedForEdit()
         m[Self.key(projectRoot)] = Pin(root: projectRoot, file: file)
         map = m
         save(m)
@@ -151,7 +167,7 @@ public final class PreviewPins: @unchecked Sendable {
 
     public func clear(_ projectRoot: String) {
         lock.lock(); defer { lock.unlock() }
-        var m = loaded()
+        var m = loadedForEdit()
         m[Self.key(projectRoot)] = nil
         map = m
         save(m)

@@ -11,7 +11,7 @@ public final class HomeStore: @unchecked Sendable {
     private let dir: String
     private let lock = NSLock()
     private var loadedPins: [String]?
-    /// home.cfg is there but could not be read: nothing is saved over it (see `AppHome.readStore`).
+    /// home.cfg is there but could not be read: nothing is saved over it until a read works (see `AppHome.readStore`).
     private var unread = false
 
     public init(dir: String) { self.dir = dir }
@@ -20,25 +20,41 @@ public final class HomeStore: @unchecked Sendable {
 
     private func pinsLocked() -> [String] {
         if let p = loadedPins { return p }
-        var pins: [String] = []
         let read = AppHome.readStore(filePath)
         unread = read.isUnread
-        for raw in read.lines {
+        let pins = Self.parse(read.lines)
+        loadedPins = pins
+        return pins
+    }
+
+    private static func parse(_ lines: [String]) -> [String] {
+        var pins: [String] = []
+        for raw in lines {
             let line = raw.trimmingCharacters(in: .whitespaces)
             if line.isEmpty || line.hasPrefix("#") { continue }
             guard let eq = line.firstIndex(of: "=") else { continue }
             let val = String(line[line.index(after: eq)...])
-            if line[..<eq] == "pin", !val.isEmpty, !Self.contains(pins, val) { pins.append(val) }
+            if line[..<eq] == "pin", !val.isEmpty, !contains(pins, val) { pins.append(val) }
         }
-        loadedPins = pins
         return pins
+    }
+
+    /// The pins to change: when the file could not be read at start, it is read again first, and
+    /// if that works the change goes on top of what the file holds. Lock held.
+    private func pinsForEditLocked() -> [String] {
+        let pins = pinsLocked()
+        guard unread else { return pins }
+        let read = AppHome.readStore(filePath)
+        guard !read.isUnread else { return pins }
+        unread = false
+        return Self.parse(read.lines)
     }
 
     private static func contains(_ list: [String], _ v: String) -> Bool {
         list.contains { $0.caseInsensitiveCompare(v) == .orderedSame }
     }
 
-    /// The file could not be read at start, so pins changed since are kept in memory only.
+    /// The file could not be read (yet), so pins changed since are kept in memory only.
     public var isUnread: Bool {
         lock.lock(); defer { lock.unlock() }
         _ = pinsLocked()
@@ -61,7 +77,7 @@ public final class HomeStore: @unchecked Sendable {
     public func togglePin(_ path: String) -> Bool {
         guard !path.isEmpty else { return false }
         lock.lock(); defer { lock.unlock() }
-        var pins = pinsLocked()
+        var pins = pinsForEditLocked()
         let nowPinned: Bool
         if let i = pins.firstIndex(where: { $0.caseInsensitiveCompare(path) == .orderedSame }) {
             pins.remove(at: i); nowPinned = false

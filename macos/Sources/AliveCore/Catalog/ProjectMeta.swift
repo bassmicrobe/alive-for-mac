@@ -1,6 +1,16 @@
 // Port of src/ProjectMeta.cs
 import Foundation
 
+/// How a change to the tags and notes ended, so the one who asked can tell the person.
+public enum StoreSave: Equatable, Sendable {
+    case saved
+    /// The file could not be read, so nothing was written over it and the change was not taken
+    /// (see `AppHome.readStore`): saving later reads the file again first.
+    case unread
+    /// The write itself failed (logged).
+    case failed
+}
+
 /// Tags and notes written by the user, in `notes.cfg` next to the settings — data about
 /// projects, not a program setting.
 ///
@@ -25,7 +35,7 @@ public final class ProjectMeta: @unchecked Sendable {
     private var byDir: [String: Entry]?    // keyed lowercased
     /// notes.cfg is there but could not be read (another program held it). Saving then would put
     /// the few entries made since in place of every tag and note on disk, so nothing is saved
-    /// until the next start reads the file (upstream `_unread`, 9ce4b4b).
+    /// until the file has been read (upstream `_unread`, 9ce4b4b; here a save reads it again).
     private var unread = false
 
     /// The tag set may have grown — time for the window to rebuild its list. Called on the
@@ -40,10 +50,16 @@ public final class ProjectMeta: @unchecked Sendable {
 
     private func loaded() -> [String: Entry] {
         if let m = byDir { return m }
-        var m: [String: Entry] = [:]
         let read = AppHome.readStore(filePath)
         unread = read.isUnread
-        for raw in read.lines {
+        let m = Self.parse(read.lines)
+        byDir = m
+        return m
+    }
+
+    private static func parse(_ lines: [String]) -> [String: Entry] {
+        var m: [String: Entry] = [:]
+        for raw in lines {
             let line = raw.trimmingCharacters(in: .whitespaces)
             if line.isEmpty || line.hasPrefix("#") { continue }
             guard let eq = line.firstIndex(of: "=") else { continue }
@@ -60,13 +76,38 @@ public final class ProjectMeta: @unchecked Sendable {
             else { continue }
             m[d.lowercased()] = e
         }
-        byDir = m
         return m
+    }
+
+    /// Reads notes.cfg again after it could not be read; nil while it still cannot be. On success
+    /// the memory holds what the file holds and saving is allowed again. Lock held.
+    private func rereadLocked() -> [String: Entry]? {
+        let read = AppHome.readStore(filePath)
+        guard !read.isUnread else { return nil }
+        let m = Self.parse(read.lines)
+        byDir = m
+        unread = false
+        return m
+    }
+
+    /// Tries to read notes.cfg again when it could not be read at start (the person opening the
+    /// tags sheet should see the real tags, not an empty copy). True when this copy is now the
+    /// file's, or was all along.
+    @discardableResult
+    public func reloadIfUnread() -> Bool {
+        lock.lock()
+        _ = loaded()
+        guard unread else { lock.unlock(); return true }
+        let recovered = rereadLocked() != nil
+        let callback = recovered ? onChanged : nil
+        lock.unlock()
+        callback?()
+        return recovered
     }
 
     // MARK: access
 
-    /// The file could not be read at start, so edits made since are kept in memory only.
+    /// The file could not be read (yet), so nothing is saved over it.
     public var isUnread: Bool {
         lock.lock(); defer { lock.unlock() }
         _ = loaded()
@@ -103,19 +144,41 @@ public final class ProjectMeta: @unchecked Sendable {
     }
 
     /// Replaces tags and note of a project folder; empty ones drop the entry.
-    public func set(_ dir: String, tags: [String], note: String) {
-        guard !dir.isEmpty else { return }
+    ///
+    /// While notes.cfg is unread nothing may be saved over it, so the file is read again first:
+    /// if that works, the change goes on top of what the file holds and the other entries stay.
+    /// If it still fails, the change is not taken and `.unread` comes back — the caller keeps the
+    /// person's text and says so. An entry the file already had for this folder, which the person
+    /// could not see while the file was unread, is not thrown away: its tags are kept next to the
+    /// new ones, and its note stays when the new one is empty.
+    @discardableResult
+    public func set(_ dir: String, tags: [String], note: String) -> StoreSave {
+        guard !dir.isEmpty else { return .saved }
         lock.lock()
         var m = loaded()
+        let wasUnread = unread
+        if wasUnread {
+            guard let fresh = rereadLocked() else {
+                lock.unlock()
+                Diag.warn("notes.cfg was not read at start; not saving over it")
+                return .unread
+            }
+            m = fresh
+        }
         var e = Entry(dir: dir)
         e.tags = Self.parseTags(tags.joined(separator: ","), merging: [])
         e.note = note.trimmingCharacters(in: .whitespacesAndNewlines)
+        if wasUnread, let unseen = m[dir.lowercased()] {
+            e.tags = Self.parseTags(Self.joinTags(unseen.tags), merging: e.tags)
+            if e.note.isEmpty { e.note = unseen.note }
+        }
         m[dir.lowercased()] = e.isEmpty ? nil : e
         byDir = m
-        save(m)
+        let outcome = save(m)
         let callback = onChanged
         lock.unlock()
         callback?()
+        return outcome
     }
 
     // MARK: text helpers
@@ -156,10 +219,10 @@ public final class ProjectMeta: @unchecked Sendable {
         return out
     }
 
-    private func save(_ m: [String: Entry]) {
+    private func save(_ m: [String: Entry]) -> StoreSave {
         guard !unread else {
             Diag.warn("notes.cfg was not read at start; not saving over it")
-            return
+            return .unread
         }
         var lines = ["# Alive - tags and notes, one project folder per key"]
         for e in m.values.sorted(by: { $0.dir < $1.dir }) where !e.isEmpty {
@@ -167,6 +230,7 @@ public final class ProjectMeta: @unchecked Sendable {
             if !e.note.isEmpty { lines.append("note=\(e.dir)\t\(Self.escape(e.note))") }
         }
         do { try AppHome.writeKeepingBackup(lines.joined(separator: "\n") + "\n", to: filePath) }
-        catch { Diag.fail("notes.cfg write", error) }
+        catch { Diag.fail("notes.cfg write", error); return .failed }
+        return .saved
     }
 }
