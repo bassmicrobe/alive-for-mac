@@ -18,6 +18,8 @@ import time
 def main():
     keychain = str(Path(os.environ["RUNNER_TEMP"]) / "alive-signing.keychain-db")
     p12 = Path(os.environ["RUNNER_TEMP"]) / "developer-id.p12"
+    compatible_p12 = Path(os.environ["RUNNER_TEMP"]) / "developer-id-compatible.p12"
+    pem = Path(os.environ["RUNNER_TEMP"]) / "developer-id-private.pem"
     keychain_password = secrets.token_hex(32)
     sensitive = [keychain_password] + [os.environ[name] for name in (
         "P12_BASE64", "P12_PASSWORD", "NOTARY_PASSWORD", "NOTARY_APPLE_ID"
@@ -33,7 +35,8 @@ def main():
     def run(args, data=None):
         result = subprocess.run(args, input=data, capture_output=True)
         if result.returncode:
-            raise RuntimeError(sanitized(result.stdout + result.stderr))
+            # stdout may contain decrypted private-key material from OpenSSL.
+            raise RuntimeError(sanitized(result.stderr))
         return result.stdout
 
     def security(*args):
@@ -49,10 +52,29 @@ def main():
         with p12.open("xb") as handle:
             os.chmod(p12, 0o600)
             handle.write(base64.b64decode("".join(os.environ["P12_BASE64"].split()), validate=True))
+        password_input = os.environ["P12_PASSWORD"].encode() + b"\n"
+        run(["openssl", "pkcs12", "-in", str(p12), "-noout", "-passin", "stdin"], password_input)
+        print("p12 password verified by OpenSSL.", flush=True)
+        # OpenSSL 3/4's default PBES2 PKCS#12 can be rejected by macOS Security
+        # with a misleading passphrase error. Re-encode only the runner's copy
+        # with the PBE/MAC algorithms supported by SecKeychainItemImport.
+        private_data = run(["openssl", "pkcs12", "-in", str(p12), "-nodes",
+                            "-passin", "stdin"], password_input)
+        with pem.open("xb") as handle:
+            os.chmod(pem, 0o600)
+            handle.write(private_data)
+        try:
+            with compatible_p12.open("xb") as handle:
+                os.chmod(compatible_p12, 0o600)
+            run(["openssl", "pkcs12", "-export", "-in", str(pem),
+                 "-out", str(compatible_p12), "-keypbe", "PBE-SHA1-3DES",
+                 "-certpbe", "PBE-SHA1-3DES", "-macalg", "SHA1", "-passout", "stdin"], password_input)
+        finally:
+            pem.unlink(missing_ok=True)
         security("create-keychain", "-p", keychain_password, keychain)
         security("set-keychain-settings", "-lut", "21600", keychain)
         security("unlock-keychain", "-p", keychain_password, keychain)
-        security("import", str(p12), "-P", os.environ["P12_PASSWORD"],
+        security("import", str(compatible_p12), "-P", os.environ["P12_PASSWORD"],
                  "-T", "/usr/bin/codesign", "-t", "cert", "-f", "pkcs12", "-k", keychain)
         security("set-key-partition-list", "-S", "apple-tool:,apple:,codesign:",
                  "-s", "-k", keychain_password, keychain)
@@ -122,6 +144,8 @@ def main():
             handle.write(f"identity={identity}\nkeychain={keychain}\n")
     finally:
         p12.unlink(missing_ok=True)
+        compatible_p12.unlink(missing_ok=True)
+        pem.unlink(missing_ok=True)
 
 
 if __name__ == "__main__":

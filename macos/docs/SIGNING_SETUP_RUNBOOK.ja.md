@@ -88,6 +88,20 @@ GitHub は Secret の値を後から読み戻せない。ローカル署名に�
 秘密鍵付き identity がキーチェーンに保存できているか確認する。
 クリップボードが別の内容に変わったら、推測した値で既存 Secret を上書きしない。
 
+### OpenSSL 3/4 で作った p12 の互換性
+
+今回、OpenSSL 4.0.3 の既定形式で作った p12 は、パスワードが正しくても macOS の
+`SecKeychainItemImport` が「The user name or passphrase you entered is not correct」で拒否した。
+オフラインのダミー証明書で、既定形式の取り込み失敗・互換形式の取り込み成功を再現済み。
+パスワードの誤りと即断せず、まず OpenSSL の MAC 検証で一致を確認する。
+
+OpenSSL で書き出す場合の互換オプションは
+`-keypbe PBE-SHA1-3DES -certpbe PBE-SHA1-3DES -macalg SHA1`。
+パスワードは引き続き `-passout stdin` で渡す。
+CI の `ci-signing.py` は元の p12 を OpenSSL で検証した後、runner 内の一時コピーを
+この形式に変換する。GitHub Secret 自体は変更しない。一時的に復号した PEM と
+互換 p12 も、成功・失敗の両方で削除する。復号した標準出力をエラーログに出さない。
+
 ## 4. Apple ID、Team ID、App 用パスワード
 
 登録名は次の5つ。値の確認は所有者と、対象チームのメンバーシップ詳細で行う。

@@ -280,4 +280,4 @@ jobs:
         if: always() && steps.signing.outputs.signed == 'true'
         run: |
           security delete-keychain "$RUNNER_TEMP/alive-signing.keychain-db" 2>/dev/null || true
-          rm -f "$RUNNER_TEMP/developer-id.p12"
+          rm -f "$RUNNER_TEMP/developer-id.p12" "$RUNNER_TEMP/developer-id-compatible.p12" "$RUNNER_TEMP/developer-id-private.pem"
