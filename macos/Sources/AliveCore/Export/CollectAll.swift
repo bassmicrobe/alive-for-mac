@@ -210,7 +210,7 @@ public enum CollectAll {
             try fm.createDirectory(atPath: root, withIntermediateDirectories: true)
             var result = CollectResult(output: plan.outputPath)
             var rewrites = plan.rewrites
-            try putProjectInfo(set, root: root)
+            result.failed += try putProjectInfo(set, root: root)
 
             var done = 0
             for d in plan.copy {
@@ -285,30 +285,41 @@ public enum CollectAll {
     /// Live decides a folder is a project by the presence of "Ableton Project Info". If the
     /// original has none (the set lies on its own), an empty one is made: Live writes its own
     /// into it on the first save.
-    static func putProjectInfo(_ set: SetEntry, root: String) throws {
+    ///
+    /// The folder itself has to be a real folder (`lstat`): a link named "Ableton Project Info"
+    /// could lead anywhere (`~/.ssh`), and its children would pass the per-child link check.
+    /// A folder that was not followed is returned, so the result can say so.
+    static func putProjectInfo(_ set: SetEntry, root: String) throws -> [CollectFailure] {
         let fm = FileManager.default
         let dst = (root as NSString).appendingPathComponent(projectInfo)
         let src = (set.projectDir as NSString).appendingPathComponent(projectInfo)
-        var isDir: ObjCBool = false
-        guard fm.fileExists(atPath: src, isDirectory: &isDir), isDir.boolValue,
+        var st = stat()
+        let found = lstat(src, &st) == 0
+        if found, (st.st_mode & S_IFMT) == S_IFLNK {
+            Diag.warn("collect: project info: skipped a link (\(src))")
+            try fm.createDirectory(atPath: dst, withIntermediateDirectories: true)
+            // The system's own words for "refused to follow a link" (what O_NOFOLLOW reports).
+            return [CollectFailure(name: projectInfo, path: src, reason: POSIXError(.ELOOP).localizedDescription)]
+        }
+        guard found, (st.st_mode & S_IFMT) == S_IFDIR,
               let names = try? fm.contentsOfDirectory(atPath: src), !names.isEmpty else {
             try fm.createDirectory(atPath: dst, withIntermediateDirectories: true)
-            return
+            return []
         }
         try fm.createDirectory(atPath: dst, withIntermediateDirectories: true)
         do {
             for n in names where !n.hasPrefix(".") {
-                // A link in a project's info folder is not followed: it could point anywhere
-                // (a private key), and nothing there needs to be a link.
-                var st = stat()
-                guard lstat((src as NSString).appendingPathComponent(n), &st) == 0,
-                      (st.st_mode & S_IFMT) != S_IFLNK else {
-                    Diag.info("collect: project info: skipped a link (\(n))")
+                // A link in a project's info folder is not followed either: it could point
+                // anywhere (a private key), and nothing there needs to be a link.
+                let child = (src as NSString).appendingPathComponent(n)
+                guard lstat(child, &st) == 0, (st.st_mode & S_IFMT) != S_IFLNK else {
+                    Diag.warn("collect: project info: skipped a link (\(child))")
                     continue
                 }
-                try put((src as NSString).appendingPathComponent(n), to: (dst as NSString).appendingPathComponent(n), anyFolder: true)
+                try put(child, to: (dst as NSString).appendingPathComponent(n), anyFolder: true)
             }
         } catch { Diag.info("collect: project info: \(error.localizedDescription)") }
+        return []
     }
 
     /// The plan was made a moment ago; the file system may have moved since. What is copied
