@@ -259,6 +259,25 @@ struct WaveView: View {
     }
 }
 
+/// How loud samples sound, right under the wave (a6c8dc1). Only for a file the player can play; the
+/// level is remembered between runs and never moves the render player's.
+struct PreviewVolumeSlider: View {
+    let model: SamplesModel
+
+    var body: some View {
+        let volume = model.previewVolume
+        HStack(spacing: 8) {
+            IconView(icon: volume <= 0 ? .volume0 : volume < 0.5 ? .volumeLow : .volumeHigh, size: 12)
+                .foregroundStyle(Theme.secondaryText)
+                .frame(width: 22, height: 22)
+                .accessibilityHidden(true)
+            ScrubBar(value: volume, label: SamplesStrings.previewVolume.s) { model.setPreviewVolume($0) }
+        }
+        .frame(height: 26)
+        .help(SamplesStrings.previewVolume.s)
+    }
+}
+
 private struct WaveWidthKey: PreferenceKey {
     static let defaultValue: CGFloat = 0
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = nextValue() }

@@ -1,7 +1,7 @@
 // Mac-only: hearing a sample (upstream: PlaySample / StopSample / ToggleSample / AuditionSelection in
 // src/SamplesTab.cs). One sound at a time: it goes through the app-wide player `app.audio`, which
 // the render player shares. Nothing here starts on its own: only a click, an arrow key, Space or the
-// panel's wave.
+// panel's wave. The level is the audition volume (+Volume), not the render player's.
 import Foundation
 import AliveCore
 
@@ -32,6 +32,7 @@ extension SamplesModel {
         }
         // A failure is reported by AppModel's `audio.onError`.
         startedPath = app.audio.play(url: URL(fileURLWithPath: path)) ? path : nil
+        applyPreviewVolume()
         auditioned = path
         lastStart = Date()
     }
@@ -52,6 +53,20 @@ extension SamplesModel {
     func togglePlaySelected() {
         if let f = selectedFile { toggle(file: f) } else { stop() }
     }
+
+    /// → on a sample plays it from the start, as Live's browser does (Space still toggles; a6c8dc1).
+    /// False when the selection is not a sample: → then opens a folder. A file only Live plays is
+    /// still a sample — the key is used and nothing sounds.
+    func playSelectedFromStart() -> Bool {
+        guard let f = selectedFile else { return false }
+        if index.files[f].canPreview { play(file: f) }
+        return true
+    }
+
+    /// A press on nothing — under the rows, on the panel, on the window around them — silences the
+    /// sample, as a press on an empty spot does upstream (a6c8dc1). A render stays: `stop()` only
+    /// ends what this tab started.
+    func emptyClicked() { stop() }
 
     /// A click on a row. A sample plays the moment it is selected, the way Live's browser previews;
     /// a folder stops it. A click on the row that is already selected plays its sample again — but
@@ -105,6 +120,7 @@ extension SamplesModel {
     func leave() {
         stop()
         auditioned = nil
+        if volumeSaveTask != nil { flushPreviewVolume() }
     }
 
     /// The file a drag out of the list carries.

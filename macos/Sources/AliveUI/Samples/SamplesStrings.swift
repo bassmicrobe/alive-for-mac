@@ -18,6 +18,7 @@ enum SamplesStrings: LocalizedStrings {
     case noSamplesTitle, noSamplesBody, noMatchTitle, noMatchBody, clearSearch
     // Rows and menus
     case play, stop, expand, collapse, folderItems, waveSeek, showInTree, copyPath, playing, notPlayable, dragHelp
+    case previewVolume
     // Panel
     case panelNoSelection, panelNoSelectionHint, panelSamples, panelUsed, panelProjects, panelLastUsed
     case panelCreated, panelCopies, panelDuration, panelFormat, panelByMonth, panelMostUsed
@@ -86,6 +87,7 @@ enum SamplesStrings: LocalizedStrings {
         case .clearSearch: return ("Clear search", "検索をクリア")
         case .folderItems: return ("%lld items", "%lld 個の項目")
         case .waveSeek: return ("Playback position", "再生位置")
+        case .previewVolume: return ("Audition volume", "試聴の音量")
         case .play: return ("Play", "再生")
         case .stop: return ("Stop", "停止")
         case .expand: return ("Expand", "展開")

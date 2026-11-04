@@ -11,6 +11,10 @@ struct SamplesPanel: View {
                 .padding(Theme.panelPad + 2)
                 .frame(maxWidth: .infinity, alignment: .topLeading)
         }
+        // Its links, wave and slider answer their own clicks; a press on any other spot of the
+        // panel silences the sample.
+        .contentShape(Rectangle())
+        .onTapGesture { model.emptyClicked() }
         .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.cardR, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: Theme.cardR, style: .continuous).strokeBorder(Theme.cardBorder, lineWidth: 1))
     }
@@ -121,7 +125,11 @@ private struct SamplePanel: View {
         let others = model.copiesForPanel.others(of: file)
         VStack(alignment: .leading, spacing: 16) {
             PanelHeader(title: s.name, trailing: SampleFormat.sampleSize(s.size))
-            WaveView(model: model, file: s, path: path)
+            // The volume sits right under what is heard, not at the bottom of the panel.
+            VStack(alignment: .leading, spacing: 4) {
+                WaveView(model: model, file: s, path: path)
+                if s.canPreview { PreviewVolumeSlider(model: model) }
+            }
             PathLink(model: model, path: path)
             VStack(spacing: 6) {
                 if let info = model.info, info.path == path {
