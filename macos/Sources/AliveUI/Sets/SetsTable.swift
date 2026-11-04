@@ -73,8 +73,17 @@ struct SetsTable: View {
             return .handled
         }
         // The table's own Home / End only scroll; upstream moves the selection (a6c8dc1).
-        .onKeyPress(.home) { app.sets.selectEdge(first: true); return .handled }
-        .onKeyPress(.end) { app.sets.selectEdge(first: false); return .handled }
+        // Only the plain keys; ⇧Home / ⇧End keep the table's own range selection.
+        .onKeyPress(.home, phases: [.down, .repeat]) { press in
+            guard press.modifiers.isEmpty else { return .ignored }
+            app.sets.selectEdge(first: true)
+            return .handled
+        }
+        .onKeyPress(.end, phases: [.down, .repeat]) { press in
+            guard press.modifiers.isEmpty else { return .ignored }
+            app.sets.selectEdge(first: false)
+            return .handled
+        }
         .background(TableScrollBridge(request: app.sets.scrollRequest, rows: pipeline.flattened(expanded: app.sets.expandedDirs)))
     }
 

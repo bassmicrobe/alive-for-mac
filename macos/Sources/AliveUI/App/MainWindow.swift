@@ -165,7 +165,13 @@ private struct SearchField: View {
                 .foregroundStyle(Theme.text)
                 .focused($isFocused)
                 .onExitCommand { app.searchText = ""; isFocused = false }
-                .onKeyPress(.downArrow) { isFocused = false; app.focusResults(); return .handled }
+                // Only a plain ↓ with something to enter: otherwise the field keeps the key (⌥↓, ⇧↓, an empty list).
+                .onKeyPress(.downArrow, phases: [.down, .repeat]) { press in
+                    guard press.modifiers.isEmpty, app.shownCount > 0 else { return .ignored }
+                    isFocused = false
+                    app.focusResults()
+                    return .handled
+                }
                 .accessibilityLabel(CommonStrings.focusSearch.s)
             if !app.searchText.isEmpty {
                 Button { app.searchText = "" } label: { IconView(icon: .close, size: 10) }
