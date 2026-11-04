@@ -98,7 +98,7 @@ def main():
                     if not chunk:
                         break
                     output.extend(chunk)
-                    if not sent and re.search(rb"(?:app-specific\s+)?password\s*:", output, re.I):
+                    if not sent and re.search(rb"App-specific password(?: for [^\r\n:]+)?\s*:", output, re.I):
                         password = os.environ["NOTARY_PASSWORD"]
                         if "\n" in password or "\r" in password:
                             raise RuntimeError("Unexpected newline in app-specific password")

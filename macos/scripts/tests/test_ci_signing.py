@@ -33,7 +33,7 @@ import getpass, os, sys
 assert '--password' not in sys.argv
 assert os.environ['NOTARY_PASSWORD'] not in sys.argv
 assert sys.stdin.isatty()
-password = getpass.getpass('App-specific password: ')
+password = getpass.getpass('App-specific password for ' + os.environ['NOTARY_APPLE_ID'] + ': ')
 assert password == os.environ['NOTARY_PASSWORD']
 if os.environ.get('SIMULATE_FAILURE'):
     print('Rejected ' + password)

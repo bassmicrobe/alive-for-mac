@@ -23,7 +23,7 @@ on:
         default: false
 
 concurrency:
-  group: macos-ci-${{ github.ref }}
+  group: macos-ci-${{ github.ref }}-${{ github.event_name }}
   # A release run on a tag is never cancelled by a newer run: it would leave the release half made.
   cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
 
