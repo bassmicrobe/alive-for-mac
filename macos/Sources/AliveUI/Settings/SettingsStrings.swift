@@ -27,8 +27,8 @@ enum SettingsStrings: LocalizedStrings {
                                     "Alive の表示はすぐに切り替わります。macOS のメニューとファイルダイアログは、アプリを再起動すると切り替わります。")
         case .appearance: return ("Appearance", "外観")
         case .interfaceScale: return ("Interface scale", "インターフェースの大きさ")
-        case .interfaceScaleHelp: return ("Text and controls. The window follows at once; a few parts fully resize the next time you open the app.",
-                                          "文字とコントロールの大きさです。ウィンドウにはすぐ反映されます。一部はアプリを開き直すと完全に切り替わります。")
+        case .interfaceScaleHelp: return ("Text and controls. The window follows at once.",
+                                          "文字とコントロールの大きさです。ウィンドウにはすぐ反映されます。")
         case .scalePercent: return ("%lld%%", "%lld%%")
         case .transparency: return ("Transparent window", "ウィンドウを透明にする")
         case .transparencyHelp: return ("Blurs what is behind the window, like upstream's glass.",

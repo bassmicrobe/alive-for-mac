@@ -22,7 +22,7 @@ struct ProjectTile: View {
     @State private var hovering = false
     private var isFocused: Bool { focus.wrappedValue == set.path }
 
-    private static let corner = Theme.cardR
+    private static var corner: CGFloat { Theme.cardR }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {

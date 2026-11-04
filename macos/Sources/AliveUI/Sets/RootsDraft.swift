@@ -70,6 +70,14 @@ final class RootsDraft {
     var samplesChanged: Bool { samples != original.samples }
     var hasChanges: Bool { projectsChanged || samplesChanged }
 
+    /// Every folder that was switched on is still on: the project list only grew. A scan that is
+    /// already running has no use for being cancelled then; it finishes and the new folders follow.
+    private var projectsOnlyGrew: Bool {
+        original.projects.roots.filter(original.projects.isEnabled).allSatisfy { root in
+            projects.index(of: root) != nil && projects.isEnabled(root)
+        }
+    }
+
     /// Scan may be pressed with nothing in the sample list (no sample folders is a state), but not
     /// with no project folders (that is only a first run not finished yet).
     var canApply: Bool { !projects.roots.isEmpty }
@@ -90,7 +98,9 @@ final class RootsDraft {
                     $0.disabledSampleRoots = samples.disabled
                 }
             }
-            if projectsChanged { app.catalog.rescan() }
+            if projectsChanged {
+                if projectsOnlyGrew { app.catalog.rescanAfterCurrent() } else { app.catalog.rescan() }
+            }
         } else if kind == .projects {
             app.catalog.rescan()
         } else {

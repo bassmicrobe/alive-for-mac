@@ -78,7 +78,8 @@ private struct RootsEditor: View {
         }
     }
 
-    private static let rowPitch = Theme.rowPillH + 6
+    /// Computed, never stored: the interface scale changes while the app runs.
+    private static var rowPitch: CGFloat { Theme.rowPillH + 6 }
     private static let maxListHeight: CGFloat = 264
 
     /// The list is as tall as its rows, up to a bound; past it, it scrolls. (A list that always

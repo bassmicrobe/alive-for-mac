@@ -8,7 +8,7 @@ import AliveCore
 private enum CellStyle {
     /// Every cell is at least this tall, so the row pitch is the shared `Theme.rowH` rhythm of
     /// Plugins and Samples whatever a cell holds (the table adds its own row padding).
-    static let height: CGFloat = Theme.rowH - 8
+    static var height: CGFloat { Theme.rowH - 8 }
 }
 
 /// Text cell with the table's vertical rhythm. Metadata is `secondaryText` (AA on hover and
