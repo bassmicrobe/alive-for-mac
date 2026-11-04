@@ -48,12 +48,20 @@ extension AppHome {
     }
 
     /// Copies the current file to `<file>.bak` through a part file, so the older backup stays
-    /// whole until the new one is complete.
+    /// whole until the new one is complete. An empty current file (a stump left by a crash, or a
+    /// file emptied by hand) is not a version worth keeping: it would push the good `.bak` out,
+    /// so the earlier one stays.
     private static func keepAsBackup(_ path: String) {
         let backup = path + ".bak"
         let name = (path as NSString).lastPathComponent
         do {
             let current = try Data(contentsOf: URL(fileURLWithPath: path))
+            if current.isEmpty {
+                if let kept = FileStat.of(backup), kept.size > 0 {
+                    Diag.warn("\(name) is empty; the earlier \(name).bak is kept")
+                }
+                return
+            }
             let part = try writeBeside(backup, current, tag: "part")
             do { try swapIn(part, over: backup) } catch { unlink(part); throw error }
         } catch {
