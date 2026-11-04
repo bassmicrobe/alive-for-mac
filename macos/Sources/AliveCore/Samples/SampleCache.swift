@@ -24,7 +24,8 @@ public enum SampleCache {
 
     /// The cache is not critical — the worst case is walking again — but a failure is logged.
     /// `walked` is when the walk behind `index` ended; it is written behind the roots (see
-    /// `walkedAt`).
+    /// `walkedAt`). A walk that did not cover every root passes `.distantPast`, so `walkDue` is
+    /// true at the next start.
     public static func save(_ index: SampleIndex, dir: String, walked: Date = Date()) {
         var data = encode(index)
         data.append(walkTail(walked))

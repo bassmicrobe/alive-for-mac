@@ -43,6 +43,19 @@ extension SampleIndex {
                              mountedNow: (() -> Set<String>)? = nil,
                              progress: ((Int) -> Void)? = nil,
                              isCancelled: @escaping () -> Bool = { false }) -> SampleIndex {
+        buildReporting(roots: roots, disabled: disabled, previous: previous, mounted: mounted,
+                       mountedNow: mountedNow, progress: progress, isCancelled: isCancelled).index
+    }
+
+    /// `build`, and the roots that are still there but could not be walked whole (a folder that
+    /// denied listing): they stand in the result with the subtree of `previous`, so the walk is not
+    /// a whole one and must not be stamped as one (`SampleCache.save(walked:)`). An offline volume
+    /// is not on this list: its return walks by itself.
+    public static func buildReporting(roots: [String], disabled: [String], previous: SampleIndex? = nil,
+                                      mounted: Set<String>? = nil,
+                                      mountedNow: (() -> Set<String>)? = nil,
+                                      progress: ((Int) -> Void)? = nil,
+                                      isCancelled: @escaping () -> Bool = { false }) -> (index: SampleIndex, incompleteRoots: [String]) {
         let walk = effective(roots, disabled: disabled)
         var known: [String: SampleFile] = [:]
         if let previous {
@@ -51,27 +64,28 @@ extension SampleIndex {
             }
         }
         let counter = FoundCounter(progress)
-        let trees = Parallel.map(count: walk.count, isCancelled: isCancelled) { i in
+        let results = Parallel.map(count: walk.count, isCancelled: isCancelled) { i -> (tree: SampleIndex?, incomplete: Bool) in
             if let mounted, VolumeState.isOffline(walk[i], mounted: mounted) {
-                return SampleIndex.kept(root: walk[i], from: previous)
+                return (SampleIndex.kept(root: walk[i], from: previous), false)
             }
             let tree = SampleIndex.walk(root: walk[i], known: known, found: counter.add, isCancelled: isCancelled)
-            if isCancelled() { return tree }
+            if isCancelled() { return (tree, false) }
             // The drive may have gone away during the walk: what was read is then not to be trusted.
             if let mounted, VolumeState.isOffline(walk[i], mounted: mountedNow?() ?? mounted) {
-                return SampleIndex.kept(root: walk[i], from: previous)
+                return (SampleIndex.kept(root: walk[i], from: previous), false)
             }
-            if let tree { return tree }
+            if let tree { return (tree, false) }
             // A denied subfolder makes the whole walk incomplete. Keep the root, including its
             // old samples, instead of interpreting a partial listing as their deletion.
             if !FileManager.default.fileExists(atPath: walk[i]) {
-                return nil
+                return (nil, false)
             }
-            return SampleIndex.kept(root: walk[i], from: previous)
+            return (SampleIndex.kept(root: walk[i], from: previous), true)
         }
-        var idx = SampleIndex.combining(trees.compactMap { $0 })
+        var idx = SampleIndex.combining(results.compactMap { $0?.tree })
         if !isCancelled() { SamplePrints.take(&idx, known: known, isCancelled: isCancelled) }
-        return idx
+        let incomplete = zip(walk, results).compactMap { root, result in result?.incomplete == true ? root : nil }
+        return (idx, incomplete)
     }
 
     /// The tree of a root that cannot be walked right now: the one the previous index had, else an

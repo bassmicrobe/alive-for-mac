@@ -63,7 +63,9 @@ extension SamplesModel {
                 self.pendingReveal = nil
                 self.reveal(path)
             }
-            self.syncRoots(force: true, manual: false, atStartup: true)
+            let asked = self.walkOnStart
+            self.walkOnStart = false
+            self.syncRoots(force: true, manual: asked, atStartup: !asked)
         }
     }
 
@@ -148,12 +150,15 @@ extension SamplesModel {
         scanTask = Task { [weak self] in
             let began = Date()
             let fresh = await SampleWalkQueue.run { () -> SampleIndex? in
-                let built = SampleIndex.build(roots: roots, disabled: off, previous: previous,
-                                              mounted: VolumeState.mountedVolumeNames(),
-                                              mountedNow: { VolumeState.mountedVolumeNames() },
-                                              progress: relay.report, isCancelled: { flag.isCancelled })
+                let (built, incomplete) = SampleIndex.buildReporting(
+                    roots: roots, disabled: off, previous: previous,
+                    mounted: VolumeState.mountedVolumeNames(),
+                    mountedNow: { VolumeState.mountedVolumeNames() },
+                    progress: relay.report, isCancelled: { flag.isCancelled })
                 guard !flag.isCancelled else { return nil }
-                SampleCache.save(built, dir: dir)
+                // A root that would not open stands there with its old samples: that is not a whole
+                // walk, so the next start tries again instead of waiting a day.
+                SampleCache.save(built, dir: dir, walked: incomplete.isEmpty ? Date() : .distantPast)
                 return built
             }
             guard let self else { return }

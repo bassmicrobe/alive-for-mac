@@ -63,6 +63,8 @@ final class SamplesModel {
     @ObservationIgnored var scannedKey: String?
     /// When the cache on disk was last walked (read with it at start; nil without a cache).
     @ObservationIgnored var cachedWalkDate: Date?
+    /// A rescan was asked for before the tab started: the start then walks even if the cache is fresh.
+    @ObservationIgnored var walkOnStart = false
     @ObservationIgnored var restartRequested = false
     @ObservationIgnored var scanFlag: SampleCancelFlag?
     @ObservationIgnored var scanTask: Task<Void, Never>?
@@ -115,7 +117,7 @@ final class SamplesModel {
 
     /// Reads the library again (⌘R on this tab). A walk under way is called off and started anew.
     func rescan() {
-        guard started else { start(); return }        // the first start walks by itself
+        guard started else { walkOnStart = true; start(); return }        // a start alone walks only when it is due
         guard hasEnabledRoots else { return }
         scannedKey = effectiveRoots.joined(separator: "\n")
         startScan(manual: true)
