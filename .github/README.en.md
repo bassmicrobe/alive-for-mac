@@ -28,6 +28,14 @@ wrapper. The original C# sources stay in this repository untouched, as the refer
 
 ## Release notes
 
+### [0.4.0](https://github.com/bassmicrobe/alive-for-mac/releases/tag/v0.4.0) — 2026-11-04 upstream 1.3.1–1.3.3 and notarization
+
+- **Upstream 1.3.1–1.3.3 ported.** Interface scale (75 / 100 / 125 %), click a day in the activity calendar to see the projects saved on it, keyboard-driven calendar in Filters, one search rule for Home and Sets, copy a set's plugin list, time on same-day versions, arrangement preview that zooms and scrolls like Live (track names, bars in the set's time signature), audition volume / `→` plays from the start / click on empty space stops, `.cfg` files keep their previous version as `.bak`, sample folders re-read at launch at most once a day.
+- **Notarization.** Releases are signed with a Developer ID and notarized by Apple; the first launch no longer needs Open Anyway.
+- **Audit.** Issues found by the full audit (Codex and the reviewer agents) are fixed.
+
+See the [release notes 0.4.0](../macos/docs/RELEASE_0.4.0.md) and the [audit report](../macos/docs/AUDIT_2026-11-04.md).
+
 ### [0.3.2](https://github.com/bassmicrobe/alive-for-mac/releases/tag/v0.3.2) — 2026-10-25 scan recovery, status fixes and new branding
 
 - **Rescan controls.** Pressing Scan with unchanged folders retries the selected page. Selecting a disabled folder again re-enables it without duplicate registration, and sample-root changes no longer start two scans.
@@ -77,8 +85,8 @@ See the [audit report](../macos/docs/PERFORMANCE_UIUX_AUDIT_2026-10-05.md) for d
 
 1. Download `AliveForMac-<version>.dmg` from [Releases](https://github.com/bassmicrobe/alive-for-mac/releases/latest).
 2. Open the DMG and drag **Alive for Mac** onto the **Applications** folder.
-3. Allow the first launch. The app is **ad-hoc signed and not notarized**, so Gatekeeper blocks it the first time.
-   - On macOS 15 (Sequoia) and later, right-click → Open no longer bypasses this. Instead:
+3. Check the first launch. Release DMGs from 0.4.0 on are **signed with a Developer ID and notarized by Apple**: copy the app to Applications and open it, no Gatekeeper steps needed.
+   - Only if a release says it is **ad-hoc signed / not notarized** does Gatekeeper block the first launch. On macOS 15 (Sequoia) and later, right-click → Open no longer bypasses this. Instead:
      1. Try to open **Alive for Mac** from Applications once (it will be blocked).
      2. Open **System Settings → Privacy & Security**, scroll down to the message that "Alive for Mac" was blocked, and press **Open Anyway**.
      3. Confirm in the dialog (password or Touch ID is requested).
@@ -94,18 +102,18 @@ The DMG also contains the license files (`LICENSE`, `LICENSE-macos`, `NOTICE.md`
 ## Features
 
 - **Home.** Every project is a tile with a picture of its arrangement. Star projects, play the render
-  lying next to a set, see your year in Live (active days, streak, record, peak hour).
+  lying next to a set, see your year in Live (active days, streak, record, peak hour). Click a day in the calendar to see which projects you saved on it.
 - **Sets.** Tempo, key, Live version, tracks, plugins, files and project size at a glance. Versions
-  (`v1`, `final`, `final 2`, ...) fold into one row. Filters, search, configurable columns, and tags and
-  notes kept per project. New sets show up on their own.
+  (`v1`, `final`, `final 2`, ...) fold into one row. Filters (the date picker is a keyboard-driven calendar), search with the same rule as Home (name, folder, plugins, render names, tags, note), configurable columns, and tags and
+  notes kept per project. Versions saved on the same day show the time; "copy list" in the inspector copies the set's plugins (installed / missing). New sets show up on their own.
 - **Plugins.** Audio Units, VST and VST3 in one list: who makes each one, how many sets use it,
   installed or not. The list comes from Live's plugin database or from the plugin folders (Settings). Missing plugins are shown as a calm state, never as one error per plugin.
 - **Samples.** Which sample folders you actually use and which you never touched, by project.
-  Never used, most used, duplicates. Click to audition, drag into Live.
+  Never used, most used, duplicates. Click to audition, drag into Live. `→` plays the selected sample from the start, a click on empty space stops it, and the slider under its wave sets the audition level (separate from the render player). The sample folders are re-read at launch at most once a day.
 - **Rescue.** If a set will not open, Alive reads Live's log and names the plugin it crashed on, or
   finds it by switching plugins off one by one in a copy of the set. The original is never touched.
 - **Export.** Collect everything a set needs into one folder or `.zip`, like *Collect All and Save*.
-- **Preview and player.** The whole arrangement in Live's clip colours; play the render next to the set.
+- **Preview and player.** The whole arrangement in Live's clip colours, with the track names. It moves like Live's arrangement: the wheel scrolls the tracks, `⇧` + wheel the time, `⌘` + wheel zooms, `⌥` + wheel sets the track height, the middle button drags, pinch zooms. Bars are counted in the set's time signature. Play the render next to the set; `⇧Return` shows it in Finder.
 - **Stat.** Your library as a cloud of dots; choose what axes, size and colour show.
 - **Ready to open.** Narrow Sets down to the ones that open right now: every file found, every plugin installed, every drive connected (the "Ready to open" button on Sets, or Readiness in Filters). The inspector says what is missing.
 - **External drives.** Files on an unplugged `/Volumes/<name>` drive are shown as *not connected*, not as missing, and catch up when you plug it in again; sample folders show an Offline badge. If a project folder itself was moved or deleted, Alive says "Folder not found" and lets you choose it again or remove it from the list.
@@ -118,6 +126,8 @@ The DMG also contains the license files (`LICENSE`, `LICENSE-macos`, `NOTICE.md`
 - **Desktop widget.** Streak, activity heatmap and recent sets on your desktop ([needs enabling](#enabling-quick-look-and-the-widget)).
 - **`alive://` URLs** for Shortcuts ("Open URLs") and scripts:
   `alive://home`, `alive://sets?q=<text>`, `alive://open?path=<path of an .als>` (only sets in the catalog; opens in Live), `alive://latest` (opens the most recently modified set in Live), `alive://random` (selects a random project), `alive://rescan`, `alive://samples?q=<text>`, `alive://stat`
+- **Interface scale.** Settings → Appearance: 75, 100 or 125 %, applied at once to the main surfaces (toolbar, Home, Sets, inspector, Settings, Help); a few windows such as Stat, Rescue and the player do not scale yet ([differences](../macos/PARITY.md)).
+- **Config safety.** Every `.cfg` save keeps the previous version as `.bak`, and a file that could not be read is never overwritten with an empty one.
 - **English and Japanese**, switchable at runtime (Settings → Language: System / English / 日本語).
 
 ## Enabling Quick Look and the widget
@@ -144,7 +154,9 @@ The same list is in the app under Help (`⌘?`).
 | `⌘,` | Settings | `⌘T` | Tags and notes |
 | `⌘?` | Help | `⌥⌘R` | Rescue a set |
 | `⌃⌘F` / `⌘M` / `⌘Q` | Full screen / minimize / quit | `⌘E` | Export (collect all) |
-| `⌘N` | Launch Live | | |
+| `⌘N` | Launch Live | `⇧Return` | Show the render in Finder (player) |
+| `↓` (search field) | Into the results | `Home` / `End` | First / last row |
+| `→` (Samples) | Play the selected sample from the start | wheel / `⇧` / `⌘` / `⌥` + wheel | Preview: tracks / time / zoom / track height |
 
 On the Samples tab: `←` `→` collapse or expand a folder, `Space` auditions, `Return` opens a folder or
 shows a sample in the tree, `⇧Return` reveals it in Finder.
@@ -169,7 +181,9 @@ A Swift package (`swift-tools-version:5.10`). Verified with Xcode 27 (Swift 6.4)
 cd macos
 swift build                 # debug build
 swift test                  # unit tests
-scripts/build-app.sh        # universal "Alive for Mac.app" in macos/build/ (ad-hoc signed)
+scripts/build-app.sh        # universal "Alive for Mac.app" in macos/build/ (ad-hoc signed by default)
+ALIVE_SIGN_IDENTITY="Developer ID Application: …" scripts/build-app.sh --zip --dmg --notarize
+                            # sign with a Developer ID, notarize with Apple and staple (docs/RELEASING.md)
 scripts/build-app.sh --native   # host architecture only, faster
 scripts/build-app.sh --zip      # also macos/dist/AliveForMac-<version>.zip
 scripts/build-app.sh --dmg      # also macos/dist/AliveForMac-<version>.dmg (combine with --zip if you like)
