@@ -17,7 +17,7 @@ struct CatalogEmptyState: View {
     private var readFailed: Bool { !failedRoots.isEmpty || unreadableFolders > 0 }
 
     var body: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: Theme.s(16)) {
             if loading {
                 ProgressView().controlSize(.small)
                 Text(CommonStrings.scanning.s).font(Theme.fHead).foregroundStyle(Theme.text)
@@ -28,15 +28,15 @@ struct CatalogEmptyState: View {
                 Text(onlyMissing ? CommonStrings.rootMissingBody.s : readFailed ? CommonStrings.catalogReadFailedBody.s : CommonStrings.noSetsBody.s)
                     .font(Theme.fBody).foregroundStyle(Theme.secondaryText)
                     .multilineTextAlignment(.center)
-                    .frame(maxWidth: 460)
-                if !missingRoots.isEmpty { MissingRootRows(roots: missingRoots).frame(maxWidth: 520) }
+                    .frame(maxWidth: Theme.s(460))
+                if !missingRoots.isEmpty { MissingRootRows(roots: missingRoots).frame(maxWidth: Theme.s(520)) }
                 let others = failedRoots.filter { r in !missingRoots.contains(r) }
                 if !others.isEmpty {
                     Text(others.map(SetFormat.homeAbbreviated).joined(separator: "\n"))
                         .font(Theme.fSmall).foregroundStyle(Theme.secondaryText)
                         .lineLimit(3).truncationMode(.middle)
                         .multilineTextAlignment(.center)
-                        .frame(maxWidth: 460)
+                        .frame(maxWidth: Theme.s(460))
                         .help(others.joined(separator: "\n"))
                         .accessibilityLabel(others.joined(separator: "\n"))
                 } else if missingRoots.isEmpty, unreadableFolders > 0 {
@@ -44,7 +44,7 @@ struct CatalogEmptyState: View {
                         .font(Theme.fSmall).foregroundStyle(Theme.secondaryText)
                 }
             }
-            HStack(spacing: 10) {
+            HStack(spacing: Theme.s(10)) {
                 PillButton(title: CommonStrings.scanFolders.s, icon: .folder, kind: .primary) {
                     app.presentScanFolders()
                 }

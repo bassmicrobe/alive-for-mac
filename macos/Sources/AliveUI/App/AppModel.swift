@@ -31,6 +31,8 @@ final class AppModel {
     var toasts: [ToastMessage] = []
     /// Bumped by ⌘F; the toolbar's search field focuses itself when it changes.
     var searchFocusRequest = 0
+    /// Bumped by ↓ in the search field: the active tab's list takes the keyboard (see `focusResults`).
+    var resultsFocusRequest = 0
     /// Files handed to the app by Finder ("Open With", `open -a`) that wait for the catalog.
     private(set) var pendingOpenPaths: [String] = []
     /// Paths whose folder was just added as a root: select them once that scan is done.
@@ -66,6 +68,7 @@ final class AppModel {
         self.dataDir = dataDir
         settings = AppSettings.load(dir: dataDir)
         Localizer.shared.preference = LanguagePreference(configValue: settings.lang)
+        ThemeScale.shared.apply(percent: settings.uiScale)
         audio.onError = { [weak self] error in
             MainActor.assumeIsolated {
                 self?.toast(CommonStrings.audioFailed.f(error.localizedDescription), kind: .error)
@@ -102,6 +105,7 @@ final class AppModel {
             || next.disabledSampleRoots != settings.disabledSampleRoots
         let previous = settings
         settings = next
+        if next.uiScale != previous.uiScale { ThemeScale.shared.apply(percent: next.uiScale) }
         saveSettings()
         integration.settingsDidChange(from: previous)
         if groupingChanged { catalog.settingsDidChange() }
@@ -308,6 +312,11 @@ final class AppModel {
     func togglePinSelected() { withSelectedSet { togglePin(path: $0) } }
 
     func focusSearch() { searchFocusRequest += 1 }
+
+    /// ↓ in the search field: on into what it found, as from a browser's address bar (a6c8dc1
+    /// `IntoResults`). The list of the active tab takes the keyboard and picks its first row when
+    /// nothing is selected; a list that wants this watches `resultsFocusRequest`.
+    func focusResults() { resultsFocusRequest += 1 }
 
     // MARK: - Internals
 

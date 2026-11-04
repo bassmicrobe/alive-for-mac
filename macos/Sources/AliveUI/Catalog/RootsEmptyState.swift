@@ -8,8 +8,8 @@ struct RootsEmptyState: View {
 
     var body: some View {
         let suggestions = RootSuggestions.make(env: app.catalog.env, existingRoots: app.settings.roots)
-        VStack(spacing: 22) {
-            VStack(spacing: 10) {
+        VStack(spacing: Theme.s(22)) {
+            VStack(spacing: Theme.s(10)) {
                 IconView(icon: .folder, size: 30, weight: .light)
                     .foregroundStyle(Theme.textDim)
                 Text(CommonStrings.emptyRootsTitle.s)
@@ -19,7 +19,7 @@ struct RootsEmptyState: View {
                     .font(Theme.fBody)
                     .foregroundStyle(Theme.textDim)
                     .multilineTextAlignment(.center)
-                    .frame(maxWidth: 380)
+                    .frame(maxWidth: Theme.s(380))
             }
             PillButton(title: CommonStrings.addProjectsFolder.s, icon: .plus, kind: .primary) {
                 chooseFolders()
@@ -44,14 +44,14 @@ private struct SuggestionList: View {
     let add: (RootSuggestion) -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: Theme.s(6)) {
             SectionHeader(CommonStrings.suggestionsTitle.s)
-                .padding(.horizontal, 6)
+                .padding(.horizontal, Theme.s(6))
             ForEach(suggestions) { suggestion in
                 SuggestionRow(suggestion: suggestion) { add(suggestion) }
             }
         }
-        .frame(width: 420)
+        .frame(width: Theme.s(420))
     }
 }
 
@@ -61,7 +61,7 @@ private struct SuggestionRow: View {
 
     var body: some View {
         Button(action: add) {
-            HStack(spacing: 10) {
+            HStack(spacing: Theme.s(10)) {
                 IconView(icon: .folder, size: 13)
                     .foregroundStyle(Theme.textDim)
                 Text(suggestion.display())
@@ -69,12 +69,12 @@ private struct SuggestionRow: View {
                     .foregroundStyle(Theme.text)
                     .lineLimit(1)
                     .truncationMode(.middle)
-                Spacer(minLength: 8)
+                Spacer(minLength: Theme.s(8))
                 Text(CommonStrings.addSuggestion.s)
                     .font(Theme.fSmall)
                     .foregroundStyle(Theme.textDim)
             }
-            .padding(.horizontal, 14)
+            .padding(.horizontal, Theme.s(14))
             .frame(height: Theme.rowPillH)
             .contentShape(Rectangle())
         }

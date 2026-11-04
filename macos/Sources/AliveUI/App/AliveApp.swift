@@ -16,13 +16,13 @@ public struct AliveApp: App {
             MainWindow().environment(app)
         }
         .windowStyle(.hiddenTitleBar)
-        .defaultSize(width: 1240, height: 780)
+        .defaultSize(width: Theme.s(1240), height: Theme.s(780))
         .commands { AppCommands(app: app) }
 
         Window(CommonStrings.windowStat.s, id: "stat") {
             StatWindow().environment(app).preferredColorScheme(.dark)
         }
-        .defaultSize(width: 1320, height: 820)
+        .defaultSize(width: Theme.s(1320), height: Theme.s(820))
 
         Window(CommonStrings.windowPlayer.s, id: "player") {
             PlayerWindow().environment(app).preferredColorScheme(.dark)
