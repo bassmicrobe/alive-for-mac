@@ -12,10 +12,16 @@ on:
       - "macos/**"
       - ".github/workflows/macos-ci.yml"
   workflow_dispatch:
+    inputs:
+      allow_adhoc_overwrite:
+        description: "Let an ad-hoc signed (not notarized) build replace the files of a release that already exists"
+        type: boolean
+        default: false
 
 concurrency:
   group: macos-ci-${{ github.ref }}
-  cancel-in-progress: true
+  # A release run on a tag is never cancelled by a newer run: it would leave the release half made.
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
 
 jobs:
   build-test:
@@ -53,7 +59,10 @@ jobs:
     permissions:
       contents: write
     steps:
+      # The whole history: the build number is `git rev-list --count HEAD`, and a shallow clone makes it 1.
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
 
       - name: Select latest Xcode
         uses: maxim-lobanov/setup-xcode@v1
@@ -61,7 +70,9 @@ jobs:
           xcode-version: latest-stable
 
       # Developer ID signing and notarization need all five repository secrets (macos/docs/RELEASING.md).
-      # Without them the release is built exactly as before: ad-hoc signed, and says so.
+      # With none of them the release is built exactly as before: ad-hoc signed, and says so. With some
+      # but not all, the job stops: that is a mistake in the secrets, not a choice, and a half-set
+      # configuration must not quietly publish an unnotarized build.
       - name: Decide signing mode
         id: signing
         env:
@@ -72,17 +83,23 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
           missing=""
+          present=0
           for name in APPLE_DEVELOPER_ID_P12 APPLE_DEVELOPER_ID_P12_PASSWORD APPLE_NOTARY_APPLE_ID APPLE_NOTARY_PASSWORD APPLE_TEAM_ID; do
             if [ -z "${!name}" ]; then
               missing="$missing $name"
+            else
+              present=$((present + 1))
             fi
           done
           if [ -z "$missing" ]; then
             echo "signed=true" >> "$GITHUB_OUTPUT"
             echo "All signing secrets are set: the release is Developer ID signed and notarized."
-          else
+          elif [ "$present" -eq 0 ]; then
             echo "signed=false" >> "$GITHUB_OUTPUT"
             echo "::warning::Release is ad-hoc signed and not notarized (missing secrets:$missing)"
+          else
+            echo "::error::Only some of the five Apple signing secrets are set (missing:$missing). Set all of them to sign and notarize, or none of them for an ad-hoc build."
+            exit 1
           fi
 
       - name: Check packaging script exists
@@ -108,6 +125,8 @@ jobs:
           P12_BASE64: ${{ secrets.APPLE_DEVELOPER_ID_P12 }}
           P12_PASSWORD: ${{ secrets.APPLE_DEVELOPER_ID_P12_PASSWORD }}
           TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          NOTARY_APPLE_ID: ${{ secrets.APPLE_NOTARY_APPLE_ID }}
+          NOTARY_PASSWORD: ${{ secrets.APPLE_NOTARY_PASSWORD }}
         run: |
           set -euo pipefail
           keychain="$RUNNER_TEMP/alive-signing.keychain-db"
@@ -136,6 +155,15 @@ jobs:
           echo "Signing identity: $identity"
           echo "identity=$identity" >> "$GITHUB_OUTPUT"
 
+          # The notarization credentials go into the same throw-away keychain as a profile, so that
+          # build-app.sh (a long-running process, up to two waits of an hour) passes notarytool a profile
+          # name and never the app-specific password on a command line. Only this short command has it
+          # as an argument; it also checks the credentials with Apple now, not after the build.
+          xcrun notarytool store-credentials alive-ci-notary \
+            --apple-id "$NOTARY_APPLE_ID" --team-id "$TEAM_ID" --password "$NOTARY_PASSWORD" \
+            --keychain "$keychain"
+          echo "keychain=$keychain" >> "$GITHUB_OUTPUT"
+
       - name: Build app zip and dmg (ad-hoc signed)
         if: steps.signing.outputs.signed != 'true'
         working-directory: macos
@@ -148,9 +176,8 @@ jobs:
         working-directory: macos
         env:
           ALIVE_SIGN_IDENTITY: ${{ steps.keychain.outputs.identity }}
-          APPLE_ID: ${{ secrets.APPLE_NOTARY_APPLE_ID }}
-          APPLE_APP_PASSWORD: ${{ secrets.APPLE_NOTARY_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          ALIVE_NOTARY_KEYCHAIN_PROFILE: alive-ci-notary
+          ALIVE_NOTARY_KEYCHAIN: ${{ steps.keychain.outputs.keychain }}
         run: |
           chmod +x scripts/build-app.sh
           scripts/build-app.sh --zip --dmg --notarize
@@ -220,6 +247,7 @@ jobs:
           REF_NAME: ${{ github.ref_name }}
           IS_TAG: ${{ startsWith(github.ref, 'refs/tags/v') }}
           SIGNED: ${{ steps.signing.outputs.signed }}
+          ALLOW_ADHOC_OVERWRITE: ${{ inputs.allow_adhoc_overwrite }}
         run: |
           if [ "$IS_TAG" = "true" ]; then
             tag="$REF_NAME"
@@ -229,6 +257,15 @@ jobs:
             tag="v${version#AliveForMac-}"
           fi
           if gh release view "$tag" >/dev/null 2>&1; then
+            # A re-run without the signing secrets would put ad-hoc files over a notarized release
+            # (and `--clobber` replaces them in place): only on an explicit request.
+            if [ "$SIGNED" != "true" ]; then
+              if [ "$ALLOW_ADHOC_OVERWRITE" != "true" ]; then
+                echo "::error::Release $tag already exists and this build is ad-hoc signed and not notarized, so it would replace the release's files. Set the Apple signing secrets, or run the workflow by hand with allow_adhoc_overwrite."
+                exit 1
+              fi
+              echo "::warning::Replacing the files of release $tag with an ad-hoc signed, not notarized build (allow_adhoc_overwrite)."
+            fi
             # An existing release keeps its body.
             gh release upload "$tag" "$ZIP_PATH" "$DMG_PATH" --clobber
           else

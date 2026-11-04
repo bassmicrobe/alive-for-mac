@@ -15,9 +15,14 @@
 #   ALIVE_SIGN_IDENTITY     e.g. "Developer ID Application: Name (TEAMID)". Set: both app extensions
 #                           and the app are signed with it (hardened runtime, secure timestamp,
 #                           entitlements kept). Unset: ad-hoc signing, as always.
-#   --notarize credentials  ALIVE_NOTARY_KEYCHAIN_PROFILE (a `notarytool store-credentials` profile),
-#                           or APPLE_ID + APPLE_APP_PASSWORD + APPLE_TEAM_ID.
-#                           ALIVE_NOTARY_TIMEOUT (default 60m) limits each wait for Apple.
+#   --notarize credentials  ALIVE_NOTARY_KEYCHAIN_PROFILE (a `notarytool store-credentials` profile;
+#                           ALIVE_NOTARY_KEYCHAIN = the keychain file that holds it, when it is not in
+#                           the default search list: what CI does, so the password never sits on the
+#                           command line of a long-running process), or APPLE_ID + APPLE_APP_PASSWORD +
+#                           APPLE_TEAM_ID. ALIVE_NOTARY_TIMEOUT (default 60m) limits each wait for Apple.
+#
+# --zip, --dmg and --notarize make a release artifact: they need the universal build and stop if it
+# fails, instead of falling back to the host architecture.
 #
 # The app carries two app extensions (Contents/PlugIns): AliveQuickLook (Space on an .als in
 # Finder) and AliveWidget (desktop widget). SwiftPM has no extension product type, so they are
@@ -54,6 +59,7 @@ if [[ $NOTARIZE -eq 1 ]]; then
     fi
     if [[ -n "${ALIVE_NOTARY_KEYCHAIN_PROFILE:-}" ]]; then
         NOTARY_AUTH=(--keychain-profile "$ALIVE_NOTARY_KEYCHAIN_PROFILE")
+        if [[ -n "${ALIVE_NOTARY_KEYCHAIN:-}" ]]; then NOTARY_AUTH+=(--keychain "$ALIVE_NOTARY_KEYCHAIN"); fi
     elif [[ -n "${APPLE_ID:-}" && -n "${APPLE_APP_PASSWORD:-}" && -n "${APPLE_TEAM_ID:-}" ]]; then
         NOTARY_AUTH=(--apple-id "$APPLE_ID" --password "$APPLE_APP_PASSWORD" --team-id "$APPLE_TEAM_ID")
     else
@@ -156,11 +162,14 @@ fi
 
 echo "==> swift build -c release ${ARCH_FLAGS[*]:-(native)}"
 if ! swift build -c release ${ARCH_FLAGS[@]+"${ARCH_FLAGS[@]}"}; then
-    if [[ $NATIVE -eq 0 ]]; then
+    if [[ $NATIVE -eq 0 && $ZIP -eq 0 && $DMG -eq 0 && $NOTARIZE -eq 0 ]]; then
         echo "warning: universal build failed, falling back to the host architecture" >&2
         ARCH_FLAGS=()
         swift build -c release
     else
+        if [[ $NATIVE -eq 0 ]]; then
+            echo "error: the universal build failed; --zip, --dmg and --notarize do not fall back to the host architecture" >&2
+        fi
         exit 1
     fi
 fi
