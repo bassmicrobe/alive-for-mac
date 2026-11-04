@@ -193,9 +193,10 @@ final class ArrangementCanvasView: NSView {
     // The middle button drags both ways at once.
     override func otherMouseDown(with event: NSEvent) {
         guard event.buttonNumber == 2, makeSpace() != nil else { return super.otherMouseDown(with: event) }
+        // A second press before the release would push the cursor again and pop it once.
+        if panFrom == nil { NSCursor.closedHand.push() }
         panFrom = pixelPoint(event)
         panStart = (viewport.scrollX, viewport.scrollY)
-        NSCursor.closedHand.push()
     }
 
     override func otherMouseDragged(with event: NSEvent) {
@@ -251,6 +252,7 @@ final class ArrangementCanvasView: NSView {
     /// Thin bars that show where the view stands, and fade away when it stops moving.
     private func paintScrollers(_ g: CGContext, _ space: ArrangementSpace) {
         guard scrollerAlpha > 0.01 else { return }
+        g.setShouldAntialias(true)      // the text pass leaves it off; the bars are rounded
         let k = CGFloat(space.options.scale)
         let plot = space.plot
         g.setFillColor(CGColor(gray: 1, alpha: 0.38 * scrollerAlpha))

@@ -60,6 +60,9 @@ public struct ArrangementViewport: Equatable, Sendable {
     public private(set) var lanesFitted = true
     /// The whole song across: kept through a resize until a zoom.
     public private(set) var fitted = true
+    /// The pixel density (`RenderOptions.scale`) the measures above are in; zero until the first
+    /// `ensure`. A window moved to a screen of another density is measured in other pixels.
+    public private(set) var scale = 0.0
 
     public init() {}
 
@@ -106,9 +109,22 @@ public struct ArrangementViewport: Equatable, Sendable {
     /// scroll inside the content.
     public mutating func ensure(in s: ArrangementSpace) {
         guard s.trackCount > 0 else { return }
+        adopt(scale: s.options.scale)
         if pxPerBeat <= 0 || fitted { pxPerBeat = fitPx(s) }
         if laneH <= 0 || lanesFitted { laneH = defaultLane(s) }
         clamp(in: s)
+    }
+
+    /// Every measure is in pixels: on a screen of another density each grows by the same factor, so
+    /// the same part of the song stays in view at the same zoom.
+    private mutating func adopt(scale new: Double) {
+        defer { scale = new }
+        guard scale > 0, new > 0, new != scale else { return }
+        let factor = new / scale
+        pxPerBeat *= factor
+        scrollX *= factor
+        scrollY *= factor
+        laneH = Int((Double(laneH) * factor).rounded())
     }
 
     /// Back to the whole song, the fitted track height and the top left.
