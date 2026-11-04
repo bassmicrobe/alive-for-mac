@@ -36,6 +36,13 @@ public struct Activity: Sendable {
     /// How many saves fell on this day.
     public func saves(on day: Date) -> Int { byDay[Calendar.current.startOfDay(for: day)] ?? 0 }
 
+    /// The project folders saved in on that day, the busiest first — what a day's cell in the
+    /// year of work opens (upstream a6c8dc1 `ProjectsOn`). Saves the history took in before it
+    /// kept folders name nothing, so a day of those alone gives an empty list.
+    /// CONTRACT: the storage of the per-save project is added by the port of a6c8dc1; until then
+    /// this returns no projects.
+    public func projects(on day: Date) -> [String] { [] }
+
     /// Every active day (start of day) with its number of saves.
     public var days: [Date: Int] { byDay }
 

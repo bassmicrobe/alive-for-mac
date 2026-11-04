@@ -58,6 +58,12 @@ public struct Settings: Equatable, Sendable {
 
     /// Mac-only: UI language, `system`, `en` or `ja`.
     public var lang = Settings.systemLang
+    /// The app's own scale on top of the display's, in percent (upstream `uiscale`, 1.3.3).
+    public var uiScale = 100
+    public static let uiScales = [75, 100, 125]
+    /// How loud a sample auditions on the Samples tab, 0...1 (upstream `previewvolume`, 1.3.1).
+    /// Separate from the render player's volume: a sample is heard in passing, a render is listened to.
+    public var previewVolume = 0.8
 
     // Mac-only integration (keys `spotlight`, `menubar`, `findertags`)
     /// Index the sets in Spotlight.
@@ -163,9 +169,19 @@ public struct Settings: Equatable, Sendable {
         case "lastupdatecheck": lastUpdateCheck = v
         case "seenupdate": seenUpdate = v
         case "lang": lang = Settings.allowedLangs.contains(v) ? v : Settings.systemLang
+        case "uiscale": if let n = Int(v), Settings.uiScales.contains(n) { uiScale = n }
+        case "previewvolume": if let d = Double(v) { previewVolume = min(1, max(0, d)) }
         default: return false
         }
         return true
+    }
+
+    /// Upstream writes `previewvolume` as "0.###" (invariant culture): no trailing zeros, no locale.
+    static func shortDecimal(_ d: Double) -> String {
+        var s = String(format: "%.3f", locale: nil, d)
+        while s.hasSuffix("0") { s.removeLast() }
+        if s.hasSuffix(".") { s.removeLast() }
+        return s
     }
 
     // Paths are matched case-insensitively (default macOS volumes are case-insensitive too).
@@ -209,6 +225,8 @@ public struct Settings: Equatable, Sendable {
         flag("checkupdates", checkUpdates)
         opt("lastupdatecheck", lastUpdateCheck); opt("seenupdate", seenUpdate)
         flag("spotlight", spotlight); flag("menubar", menuBar); flag("findertags", finderTags)
+        out.append("uiscale=\(uiScale)")
+        out.append("previewvolume=\(Settings.shortDecimal(previewVolume))")
         out.append("lang=\(lang)")
         out.append(contentsOf: unknownLines)
         return out.joined(separator: "\n") + "\n"
