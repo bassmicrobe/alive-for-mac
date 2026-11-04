@@ -57,6 +57,9 @@ final class CatalogModel {
     /// A rescan was asked for before the cache was read: it runs right after, so the cache can
     /// neither be published over a fresh result nor be read while a scan writes the index.
     @ObservationIgnored private var rescanAfterLoad = false
+    /// Folders were added while a scan ran: that scan finishes (its results reach the caches), then
+    /// one more runs over the new roots (upstream `_rescanPending`).
+    @ObservationIgnored private var rescanAfterScan = false
 
     init(app: AppModel) {
         self.app = app
@@ -126,6 +129,7 @@ final class CatalogModel {
             return
         }
         let useHistory = fromHistory && diffPending
+        rescanAfterScan = false           // this scan reads the roots as they are now
         generation += 1
         let gen = generation
         let previous = scanTask
@@ -159,6 +163,15 @@ final class CatalogModel {
         }
     }
 
+    /// Like `rescan`, for roots that were *added*: a scan that is already running is left alone
+    /// and the new roots are scanned right after it. Cancelling it would throw its parsing away
+    /// (the caches are written when a scan ends) — on a first scan of a big library that is
+    /// minutes — and nothing in the running scan needs the new roots.
+    func rescanAfterCurrent() {
+        guard isScanning else { return rescan() }
+        rescanAfterScan = true
+    }
+
     private func updateProgress(_ gen: Int, _ next: CatalogProgress) {
         guard gen == generation, isScanning else { return }
         // Updates hop threads and can arrive out of order; the count only grows within one scan.
@@ -177,6 +190,9 @@ final class CatalogModel {
         Diag.info("catalog: \(stats.total) sets (\(stats.parsed) parsed, \(stats.reused) cached) in "
                   + String(format: "%.1f", stats.seconds) + " s" + (stats.cancelled ? ", cancelled" : "")
                   + (stats.retainedPreviousCatalog ? ", previous catalog retained" : ""))
+        // The follow-up scan is the one that is "ready": Finder-opened paths and reselection wait
+        // for the roots they were added with.
+        if rescanAfterScan { return rescan() }
         app.catalogDidBecomeReady()
         if volumesDirty { volumesChanged() }
     }
@@ -269,7 +285,7 @@ final class CatalogModel {
             if !paths.isEmpty { app.toast(CommonStrings.alreadyWatching.s) }
             return []
         }
-        commit(settings)
+        commit(settings, adds: true)
         let names = added.map { ($0 as NSString).lastPathComponent }
         app.toast(added.count == 1 ? CommonStrings.rootAdded.f(names[0]) : CommonStrings.rootsAdded.f(added.count))
         return added
@@ -321,12 +337,15 @@ final class CatalogModel {
         guard settings.roots.contains(where: { Self.same($0, path) }) else { return }
         settings.disabledRoots.removeAll { Self.same($0, path) }
         if !enabled { settings.disabledRoots.append(path) }
-        commit(settings)
+        commit(settings, adds: enabled)
     }
 
-    private func commit(_ settings: AppSettings) {
+    /// `adds`: the change brings folders in (never takes any away), so a running scan may finish
+    /// first. Removing or switching off restarts at once: sets of a folder that is gone must not
+    /// linger in the list until a scan is done.
+    private func commit(_ settings: AppSettings, adds: Bool = false) {
         app.mutateSettings { $0 = settings }
-        rescan()
+        if adds { rescanAfterCurrent() } else { rescan() }
     }
 
     // MARK: - Helpers
