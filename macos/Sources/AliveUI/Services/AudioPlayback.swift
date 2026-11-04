@@ -151,9 +151,15 @@ final class AudioPlayback {
             self.failed = failed
         }
 
+        /// `flag` is false when playback stopped because the audio could not be decoded: that is an
+        /// error to report, not the end of the file.
         func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
             nonisolated(unsafe) let player = player
-            Task { @MainActor in finished(player) }
+            if flag {
+                Task { @MainActor in finished(player) }
+            } else {
+                Task { @MainActor in failed(player, nil) }
+            }
         }
 
         func audioPlayerDecodeErrorDidOccur(_ player: AVAudioPlayer, error: Error?) {
