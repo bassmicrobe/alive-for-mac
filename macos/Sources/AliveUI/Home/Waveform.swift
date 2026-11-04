@@ -10,6 +10,9 @@ struct Waveform: Equatable, Sendable {
     var min: [Float] = []
     var max: [Float] = []
     var ok = false
+    /// The read stopped before the end (an error, or fewer frames than the header promised): the
+    /// columns it never reached are flat. Shown, but not remembered.
+    var isPartial = false
     var duration: TimeInterval = 0
 
     static let failed = Waveform()
@@ -84,7 +87,7 @@ enum WaveformReader {
         let cacheKey = WaveformCache.key(path: path, buckets: buckets)
         if let cacheKey, let hit = WaveformCache.shared.get(cacheKey) { return hit }
         let wave = decode(path: path, buckets: buckets, isCancelled: isCancelled)
-        if wave.ok, let cacheKey { WaveformCache.shared.put(cacheKey, wave) }
+        if wave.ok, !wave.isPartial, let cacheKey { WaveformCache.shared.put(cacheKey, wave) }
         return wave
     }
 
@@ -97,11 +100,17 @@ enum WaveformReader {
             Diag.warn("wave: \(path): \(error.localizedDescription)")
             return .failed
         }
-        guard let buffer = AVAudioPCMBuffer(pcmFormat: file.processingFormat, frameCapacity: chunkFrames) else { return .failed }
+        guard let buffer = AVAudioPCMBuffer(pcmFormat: file.processingFormat, frameCapacity: chunkFrames) else {
+            Diag.warn("wave: \(path): no buffer for \(file.processingFormat)")
+            return .failed
+        }
 
         let total = file.length
         let rate = file.processingFormat.sampleRate
-        guard total > 0, rate > 0 else { return .failed }
+        guard total > 0, rate > 0 else {
+            Diag.warn("wave: \(path): \(total) frames at \(rate) Hz")
+            return .failed
+        }
 
         var lo = [Float](repeating: 0, count: buckets)
         var hi = [Float](repeating: 0, count: buckets)
@@ -116,8 +125,14 @@ enum WaveformReader {
                 break
             }
             let n = Int(buffer.frameLength)
-            if n == 0 { break }
-            guard let data = buffer.floatChannelData else { return .failed }
+            if n == 0 {
+                Diag.warn("wave: \(path): ended at frame \(frame) of \(total)")
+                break
+            }
+            guard let data = buffer.floatChannelData else {
+                Diag.warn("wave: \(path): not decoded to float samples")
+                return .failed
+            }
             BucketSegments.forEach(frame: frame, count: n, total: total, buckets: buckets) { bucket, offset, length in
                 var mn = Float.greatestFiniteMagnitude, mx = -Float.greatestFiniteMagnitude
                 for c in 0..<channels {
@@ -134,9 +149,12 @@ enum WaveformReader {
             }
             frame += AVAudioFramePosition(n)
         }
-        guard frame > 0 else { return .failed }
+        guard frame > 0 else {
+            Diag.warn("wave: \(path): nothing could be read")
+            return .failed
+        }
         // Columns the read never reached (a truncated file) stay flat.
         return Waveform(min: lo.map { Swift.max(-1, Swift.min(0, $0)) }, max: hi.map { Swift.min(1, Swift.max(0, $0)) },
-                        ok: true, duration: Double(total) / rate)
+                        ok: true, isPartial: frame < total, duration: Double(total) / rate)
     }
 }
