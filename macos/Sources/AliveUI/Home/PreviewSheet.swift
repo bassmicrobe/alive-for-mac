@@ -1,47 +1,12 @@
-// Port of src/PreviewDialog.cs (PreviewDialog + ArrangementView): the whole arrangement large —
-// tracks, their colours and clips on a ruler — with zoom and scroll added for the Mac.
+// Port of src/PreviewDialog.cs (PreviewDialog): the whole arrangement large — tracks, their colours
+// and clips on a ruler — moved about as Live's arrangement is (upstream a6c8dc1). The canvas and its
+// navigation are `ArrangementCanvasView`; this file is the sheet around it and the caption.
 import AliveCore
 import AliveRender
 import SwiftUI
 
-/// Sizes of the preview picture. Pure so the limits can be tested.
+/// Texts of the preview. Pure so they can be tested.
 enum PreviewSizing {
-    static let zoomSteps = [1, 2, 4, 8, 16, 32]
-    /// A picture is never wider than this many pixels (a bitmap of many megabytes is not a preview).
-    static let maxPixelWidth = 16_000
-    static let maxPixels = 48_000_000
-    /// Point height per track when "taller tracks" is on.
-    static let tallLane = 14.0
-
-    struct Plan: Equatable {
-        /// Size of the picture on screen, in points.
-        var points: CGSize
-        /// Pixels per point (2 on Retina while it fits; below 1 for very large arrangements).
-        var scale: Double
-        var pixelWidth: Int { max(1, Int((points.width * scale).rounded(.down))) }
-        var pixelHeight: Int { max(1, Int((points.height * scale).rounded(.down))) }
-    }
-
-    static func plan(view: CGSize, zoomIndex: Int, trackCount: Int, taller: Bool, backingScale: Double) -> Plan {
-        let zoom = zoomSteps[min(max(zoomIndex, 0), zoomSteps.count - 1)]
-        let width = max(80, view.width) * Double(zoom)
-        var height = max(80, view.height)
-        if taller {
-            let options = RenderOptions.preview(scale: 1, minLane: tallLane)
-            height = max(height, Double(ArrangementRender.fullHeight(trackCount: trackCount, options: options)) + 24)
-        }
-        var scale = max(1, backingScale)
-        while scale > 1, width * scale > Double(maxPixelWidth) || width * scale * height * scale > Double(maxPixels) {
-            scale -= 1
-        }
-        // Even at 1x a very wide picture is cut down instead of allocating gigabytes.
-        let cappedWidth = min(width, Double(maxPixelWidth))
-        // Tall arrangements can exceed the area budget even at 1x. Keep their scrollable
-        // point size, reducing bitmap resolution uniformly so every track remains reachable.
-        scale = min(scale, sqrt(Double(maxPixels) / (cappedWidth * height)))
-        return Plan(points: CGSize(width: cappedWidth, height: height), scale: scale)
-    }
-
     /// The metrics line under the path: tempo, key and the size of the arrangement. Never contains
     /// the path (that has its own line), so nothing can push these out through truncation.
     static func metrics(path: String, key: String, arrangement a: Arrangement?) -> String {
@@ -51,18 +16,31 @@ enum PreviewSizing {
         var parts: [String] = []
         if a.tempo > 0 { parts.append(HomeStrings.previewBPM.f(tempoText(a.tempo))) }
         if !key.isEmpty, a.tempo > 0 { parts.append(key) }
-        parts.append(HomeStrings.previewBars.f(a.bars))
-        parts.append(HomeStrings.previewTracks.f(a.tracks.count))
-        parts.append(HomeStrings.previewClips.f(a.clipCount))
+        // Bars in the set's own time signature (`Arrangement.bars`), the singular with a form of its own.
+        parts.append(count(a.bars, one: .bar1, many: .previewBars))
+        parts.append(count(a.tracks.count, one: .track1, many: .previewTracks))
+        parts.append(count(a.clipCount, one: .clip1, many: .previewClips))
         return parts.joined(separator: sep)
     }
 
-    /// "150", "127.5", "127.35" — upstream's `0.##`.
+    /// "1 bar", "2 bars" (upstream 9ce4b4b `Chrome.Plural`).
+    private static func count(_ n: Int, one: PreviewNavStrings, many: HomeStrings) -> String {
+        n == 1 ? one.f(n) : many.f(n)
+    }
+
+    /// "150", "127.5", "127.35" — upstream's `0.##`, the same in every system language.
     static func tempoText(_ bpm: Double) -> String {
         var s = String(format: "%.2f", bpm)
         while s.hasSuffix("0") { s.removeLast() }
         if s.hasSuffix(".") { s.removeLast() }
         return s
+    }
+
+    /// The zoom label: "1×" for the whole song across, "2.5×" zoomed in.
+    static func zoomText(_ zoom: Double) -> String {
+        var s = String(format: "%.1f", zoom)
+        if s.hasSuffix(".0") { s.removeLast(2) }
+        return PreviewNavStrings.zoomValue.f(s)
     }
 }
 
@@ -71,28 +49,10 @@ struct PreviewSheet: View {
 
     @Environment(AppModel.self) private var app
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.displayScale) private var displayScale
     @State private var arrangement: Arrangement?
-    @State private var viewSize: CGSize = .zero
-    @State private var zoomIndex = 0
-    @State private var taller = false
-    @State private var picture: PicturePlan?
+    @State private var control = PreviewCanvasControl()
     /// Looked up once per catalog revision, not on every body evaluation.
     @State private var entry: SetEntry?
-
-    private struct PicturePlan {
-        var image: CGImage
-        var plan: PreviewSizing.Plan
-    }
-
-    private struct RenderKey: Hashable {
-        var loaded: Bool
-        var width: Int
-        var height: Int
-        var zoom: Int
-        var taller: Bool
-        var scale: Double
-    }
 
     private var title: String { entry?.name ?? ((path as NSString).lastPathComponent as NSString).deletingPathExtension }
     private var directory: String { entry?.directory ?? (path as NSString).deletingLastPathComponent }
@@ -109,8 +69,11 @@ struct PreviewSheet: View {
         .preferredColorScheme(.dark)
         .background(shortcuts)
         .task(id: app.catalog.revision) { entry = app.catalog.sets.first { $0.path == path } }
-        .task { arrangement = await app.home.previewLoader.load(path) }
-        .task(id: renderKey) { await render() }
+        // Another set never shows the last one's picture while it is read (upstream 9ce4b4b).
+        .task(id: path) {
+            arrangement = nil
+            arrangement = await app.home.previewLoader.load(path)
+        }
     }
 
     // MARK: - Header
@@ -134,20 +97,16 @@ struct PreviewSheet: View {
 
     private var zoomControls: some View {
         HStack(spacing: 6) {
-            CircleIconButton(icon: .viewList, help: HomeStrings.tallerTracks.s, isActive: taller) { taller.toggle() }
-            Text(HomeStrings.zoomLevel.f(PreviewSizing.zoomSteps[zoomIndex]))
-                .font(Theme.fLabel).foregroundStyle(Theme.secondaryText).monospacedDigit().frame(width: 36)
-            CircleIconButton(icon: .minimize, help: HomeStrings.zoomOut.s) { zoom(by: -1) }
-                .disabled(zoomIndex == 0)
-            CircleIconButton(icon: .plus, help: HomeStrings.zoomIn.s) { zoom(by: +1) }
-                .disabled(zoomIndex == PreviewSizing.zoomSteps.count - 1)
-            PillButton(title: HomeStrings.zoomFit.s) { zoomIndex = 0; taller = false }
-                .disabled(zoomIndex == 0 && !taller)
+            Text(PreviewSizing.zoomText(control.zoom))
+                .font(Theme.fLabel).foregroundStyle(Theme.secondaryText).monospacedDigit().frame(minWidth: 36)
+            CircleIconButton(icon: .minimize, help: HomeStrings.zoomOut.s) { control.zoomOut() }
+                .disabled(control.zoom <= 1.001)
+            CircleIconButton(icon: .plus, help: HomeStrings.zoomIn.s) { control.zoomIn() }
+                .disabled(control.zoom >= control.maxZoom - 0.001)
+            PillButton(title: HomeStrings.zoomFit.s) { control.fit() }
+                .disabled(control.isAtFit)
         }
-    }
-
-    private func zoom(by delta: Int) {
-        zoomIndex = min(max(zoomIndex + delta, 0), PreviewSizing.zoomSteps.count - 1)
+        .help(PreviewNavStrings.navigationHelp.s)
     }
 
     /// Esc and ⌘Y close (upstream toggled the preview with the key that opened it), + / - zoom, 0 fits.
@@ -155,10 +114,10 @@ struct PreviewSheet: View {
         ZStack {
             Button("") { dismiss() }.keyboardShortcut(.cancelAction)
             Button("") { dismiss() }.keyboardShortcut("y", modifiers: .command)
-            Button("") { zoom(by: +1) }.keyboardShortcut("+", modifiers: [])
-            Button("") { zoom(by: +1) }.keyboardShortcut("=", modifiers: [])
-            Button("") { zoom(by: -1) }.keyboardShortcut("-", modifiers: [])
-            Button("") { zoomIndex = 0 }.keyboardShortcut("0", modifiers: [])
+            Button("") { control.zoomIn() }.keyboardShortcut("+", modifiers: [])
+            Button("") { control.zoomIn() }.keyboardShortcut("=", modifiers: [])
+            Button("") { control.zoomOut() }.keyboardShortcut("-", modifiers: [])
+            Button("") { control.fit() }.keyboardShortcut("0", modifiers: [])
         }
         .opacity(0)
         .accessibilityHidden(true)
@@ -174,9 +133,6 @@ struct PreviewSheet: View {
         }
         .overlay(RoundedRectangle(cornerRadius: Theme.cardR, style: .continuous).strokeBorder(Theme.cardBorder, lineWidth: 1))
         .clipShape(RoundedRectangle(cornerRadius: Theme.cardR, style: .continuous))
-        .background(GeometryReader { proxy in
-            Color.clear.onChange(of: proxy.size, initial: true) { _, size in viewSize = size }
-        })
     }
 
     @ViewBuilder private var content: some View {
@@ -185,18 +141,8 @@ struct PreviewSheet: View {
                 hint(ReadErrorLog.note(error, of: path))
             } else if !a.hasContent {
                 hint(HomeStrings.previewEmpty.s)
-            } else if let picture {
-                ScrollView([.horizontal, .vertical]) {
-                    Image(decorative: picture.image, scale: picture.plan.scale)
-                        .resizable()
-                        .interpolation(.high)
-                        .frame(width: picture.plan.points.width, height: picture.plan.points.height)
-                        .padding(12)
-                }
-                .scrollIndicators(.visible)
-                .gesture(MagnifyGesture().onEnded { value in
-                    if value.magnification > 1.2 { zoom(by: +1) } else if value.magnification < 0.83 { zoom(by: -1) }
-                })
+            } else {
+                PreviewCanvas(path: path, arrangement: a, control: control)
             }
         } else {
             hint(HomeStrings.previewReading.s)
@@ -205,39 +151,5 @@ struct PreviewSheet: View {
 
     private func hint(_ text: String) -> some View {
         Text(text).font(Theme.fBody).foregroundStyle(Theme.secondaryText)
-    }
-
-    // MARK: - Rendering
-
-    private var plan: PreviewSizing.Plan {
-        PreviewSizing.plan(view: viewInset, zoomIndex: zoomIndex, trackCount: arrangement?.tracks.count ?? 0,
-                           taller: taller, backingScale: displayScale)
-    }
-
-    /// The picture keeps a margin inside the card, like upstream's 12 px.
-    private var viewInset: CGSize {
-        CGSize(width: max(0, viewSize.width - 24), height: max(0, viewSize.height - 24))
-    }
-
-    private var renderKey: RenderKey {
-        let p = plan
-        return RenderKey(loaded: arrangement?.hasContent == true, width: p.pixelWidth, height: p.pixelHeight,
-                         zoom: zoomIndex, taller: taller, scale: p.scale)
-    }
-
-    private func render() async {
-        guard let a = arrangement, a.hasContent, viewSize.width > 100 else { return }
-        let plan = plan
-        // Debounced: a window being resized asks for a new size at every frame.
-        try? await Task.sleep(nanoseconds: 120_000_000)
-        if Task.isCancelled { return }
-        let options = RenderOptions.preview(scale: plan.scale, minLane: taller ? PreviewSizing.tallLane : 2)
-        let (w, h) = (plan.pixelWidth, plan.pixelHeight)
-        let image = await Task.detached(priority: .userInitiated) {
-            ArrangementRender.makeImage(a, width: w, height: h, options: options)
-        }.value
-        if Task.isCancelled { return }
-        guard let image else { return }
-        picture = PicturePlan(image: image, plan: plan)
     }
 }

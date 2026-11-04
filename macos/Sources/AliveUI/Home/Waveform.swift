@@ -89,9 +89,15 @@ enum WaveformReader {
     }
 
     private static func decode(path: String, buckets: Int, isCancelled: () -> Bool) -> Waveform {
-        guard let file = try? AVAudioFile(forReading: URL(fileURLWithPath: path)),
-              let buffer = AVAudioPCMBuffer(pcmFormat: file.processingFormat, frameCapacity: chunkFrames)
-        else { return .failed }
+        // Asked off the main thread (the player, a sample's panel). A file that is busy, cut short
+        // or on a drive that was pulled out must end in `.failed` or a shorter envelope and a line
+        // in the log, never in an error nobody handles (upstream 9ce4b4b).
+        let file: AVAudioFile
+        do { file = try AVAudioFile(forReading: URL(fileURLWithPath: path)) } catch {
+            Diag.warn("wave: \(path): \(error.localizedDescription)")
+            return .failed
+        }
+        guard let buffer = AVAudioPCMBuffer(pcmFormat: file.processingFormat, frameCapacity: chunkFrames) else { return .failed }
 
         let total = file.length
         let rate = file.processingFormat.sampleRate
@@ -105,7 +111,10 @@ enum WaveformReader {
 
         while frame < total {
             if isCancelled() { return .failed }
-            do { try file.read(into: buffer, frameCount: chunkFrames) } catch { break }
+            do { try file.read(into: buffer, frameCount: chunkFrames) } catch {
+                Diag.warn("wave: \(path): stopped at frame \(frame) of \(total): \(error.localizedDescription)")
+                break
+            }
             let n = Int(buffer.frameLength)
             if n == 0 { break }
             guard let data = buffer.floatChannelData else { return .failed }

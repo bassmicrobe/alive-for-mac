@@ -94,8 +94,7 @@ public enum PreviewPage {
     /// The arrangement as PNG data, or nil when the set has nothing to draw.
     public static func pictureData(for a: Arrangement, width: Int = 1500) -> Data? {
         guard a.hasContent, !a.tracks.isEmpty else { return nil }
-        let options = RenderOptions(showNames: true, showRuler: true, showClipNames: false,
-                                    minLane: 6, maxLane: 26, scale: 2)
+        let options = RenderOptions(showNames: true, showRuler: true, minLane: 6, maxLane: 26, scale: 2)
         let natural = ArrangementRender.fullHeight(trackCount: a.tracks.count, options: options)
         let height = min(max(natural, 300), 1100)
         guard let image = ArrangementRender.makeImage(a, width: width, height: height, options: options,
