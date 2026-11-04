@@ -3,10 +3,34 @@
 import AppKit
 import SwiftUI
 
+/// One cap of a combination: a key symbol as it is printed ("⌘", "Space"), or a word that is not
+/// a key and follows the language ("Wheel", "Click").
+enum KeyLabel: ExpressibleByStringLiteral {
+    case symbol(String)
+    case word(HelpStrings)
+
+    init(stringLiteral value: String) { self = .symbol(value) }
+
+    var text: String {
+        switch self {
+        case .symbol(let s): return s
+        case .word(let w): return w.s
+        }
+    }
+
+    /// Stable across languages.
+    var identity: String {
+        switch self {
+        case .symbol(let s): return s
+        case .word(let w): return w.en
+        }
+    }
+}
+
 struct ShortcutRow: Identifiable {
-    let keys: [String]
+    let keys: [KeyLabel]
     let action: HelpStrings
-    var id: String { keys.joined() + action.en }
+    var id: String { keys.map(\.identity).joined() + action.en }
 }
 
 struct ShortcutGroup: Identifiable {
@@ -40,17 +64,18 @@ let shortcutGroups: [ShortcutGroup] = [
     ]),
     ShortcutGroup(title: .groupPreview, rows: [
         ShortcutRow(keys: ["⌘", "Y"], action: .arrangementPreview),
-        ShortcutRow(keys: ["Wheel"], action: .previewWheel),
-        ShortcutRow(keys: ["⇧", "Wheel"], action: .previewShiftWheel),
-        ShortcutRow(keys: ["⌘", "Wheel"], action: .previewCommandWheel),
-        ShortcutRow(keys: ["⌥", "Wheel"], action: .previewOptionWheel),
-        ShortcutRow(keys: ["Middle drag"], action: .previewMiddleDrag),
+        ShortcutRow(keys: [.word(.keyWheel)], action: .previewWheel),
+        ShortcutRow(keys: ["⇧", .word(.keyWheel)], action: .previewShiftWheel),
+        ShortcutRow(keys: ["⌘", .word(.keyWheel)], action: .previewCommandWheel),
+        ShortcutRow(keys: ["⌥", .word(.keyWheel)], action: .previewOptionWheel),
+        ShortcutRow(keys: [.word(.keyMiddleDrag)], action: .previewMiddleDrag),
+        ShortcutRow(keys: ["+", "-", "0"], action: .previewZoomKeys),
     ]),
     ShortcutGroup(title: .groupSamples, rows: [
         ShortcutRow(keys: ["Space"], action: .sampleAudition),
         ShortcutRow(keys: ["→"], action: .samplePlay),
         ShortcutRow(keys: ["←"], action: .sampleCollapse),
-        ShortcutRow(keys: ["Click"], action: .sampleEmptyClick),
+        ShortcutRow(keys: [.word(.keyClick)], action: .sampleEmptyClick),
         ShortcutRow(keys: ["↩"], action: .sampleOpen),
         ShortcutRow(keys: ["⇧", "↩"], action: .sampleReveal),
     ]),
@@ -171,7 +196,7 @@ private struct GroupCard: View {
                             .lineLimit(2)
                         Spacer(minLength: Theme.s(6))
                         HStack(spacing: Theme.s(3)) {
-                            ForEach(Array(row.keys.enumerated()), id: \.offset) { _, key in KeyCap(text: key) }
+                            ForEach(Array(row.keys.enumerated()), id: \.offset) { _, key in KeyCap(text: key.text) }
                         }
                     }
                 }
