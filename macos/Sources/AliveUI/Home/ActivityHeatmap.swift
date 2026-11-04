@@ -125,6 +125,29 @@ struct HeatmapMetrics: Equatable {
 
     func width(cols: Int) -> CGFloat { CGFloat(cols) * step - Self.gap }
     var height: CGFloat { CGFloat(HeatmapGrid.rows) * step - Self.gap }
+
+    /// Where a cell is drawn, in the canvas's coordinates (below the month captions).
+    func rect(col: Int, row: Int) -> CGRect {
+        CGRect(x: CGFloat(col) * step, y: HeatmapFit.gridTop + CGFloat(row) * step, width: cell, height: cell)
+    }
+}
+
+extension HeatmapGrid {
+    /// The cell under a point of the canvas, or nil between cells, over the captions and outside the range.
+    func cell(at point: CGPoint, metrics m: HeatmapMetrics) -> HeatmapCell? {
+        let y = point.y - HeatmapFit.gridTop
+        guard point.x >= 0, y >= 0, point.x.truncatingRemainder(dividingBy: m.step) < m.cell,
+              y.truncatingRemainder(dividingBy: m.step) < m.cell else { return nil }
+        return cell(col: Int(point.x / m.step), row: Int(y / m.step))
+    }
+}
+
+/// A day of the calendar that was clicked: where its list opens and what it holds.
+struct HeatmapDayPick: Identifiable {
+    let cell: HeatmapCell
+    let rect: CGRect
+    let projects: [DayProject]
+    var id: Date { cell.day }
 }
 
 /// Sizes its one child to the calendar for the proposed width, without any state feedback: a
@@ -134,6 +157,8 @@ struct HeatmapFit: Layout {
 
     static let monthH: CGFloat = 17
     static let monthGap: CGFloat = 7
+    /// Where the first row of cells begins.
+    static let gridTop = monthH + monthGap
 
     static func size(cols: Int, available: CGFloat) -> CGSize {
         let m = HeatmapMetrics(cols: cols, available: available)
@@ -151,8 +176,11 @@ struct HeatmapFit: Layout {
 }
 
 struct ActivityHeatmap: View {
+    @Environment(AppModel.self) private var app
     let grid: HeatmapGrid
     @Binding var hovered: HeatmapCell?
+    /// The day whose projects are listed (a click on a day with saves, a6c8dc1).
+    @State private var pick: HeatmapDayPick?
 
     var body: some View {
         HeatmapFit(cols: grid.cols) {
@@ -161,6 +189,14 @@ struct ActivityHeatmap: View {
                 let m = HeatmapMetrics(cols: grid.cols, available: proxy.size.width)
                 Canvas { context, _ in draw(&context, m) }
                     .onContinuousHover { phase in hover(phase, m) }
+                    .onTapGesture { point in tap(at: point, m) }
+                    .dayPointer(hovered.map { $0.saves > 0 } ?? false)
+                    .popover(item: $pick, attachmentAnchor: .rect(.rect(pick?.rect ?? .zero)), arrowEdge: .bottom) { pick in
+                        DayProjectsList(pick: pick) { path in
+                            self.pick = nil
+                            app.home.show(path: path)
+                        }
+                    }
             }
         }
         .accessibilityElement(children: .ignore)
@@ -170,7 +206,14 @@ struct ActivityHeatmap: View {
     /// Month captions: 12 pt medium, so they stay readable at the calendar's real size.
     private static let monthFont = Font.system(size: 12, weight: .medium)
 
-    private var gridTop: CGFloat { HeatmapFit.monthH + HeatmapFit.monthGap }
+    private var gridTop: CGFloat { HeatmapFit.gridTop }
+
+    /// A day with saves opens the list of its projects; an empty day has nothing to open.
+    private func tap(at point: CGPoint, _ m: HeatmapMetrics) {
+        guard let cell = grid.cell(at: point, metrics: m), cell.saves > 0 else { return }
+        pick = HeatmapDayPick(cell: cell, rect: m.rect(col: cell.col, row: cell.row),
+                              projects: app.home.dayProjects(on: cell.day))
+    }
 
     private func draw(_ context: inout GraphicsContext, _ m: HeatmapMetrics) {
         for label in grid.monthLabels {
@@ -197,10 +240,7 @@ struct ActivityHeatmap: View {
     private func hover(_ phase: HoverPhase, _ m: HeatmapMetrics) {
         switch phase {
         case .active(let point):
-            let y = point.y - gridTop
-            let inside = y >= 0 && point.x.truncatingRemainder(dividingBy: m.step) < m.cell
-                && y.truncatingRemainder(dividingBy: m.step) < m.cell
-            let next = inside ? grid.cell(col: Int(point.x / m.step), row: Int(y / m.step)) : nil
+            let next = grid.cell(at: point, metrics: m)
             if next != hovered { hovered = next }
         case .ended:
             if hovered != nil { hovered = nil }

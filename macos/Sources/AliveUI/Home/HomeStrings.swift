@@ -9,14 +9,18 @@ enum HomeStrings: LocalizedStrings {
     case readySets, readySetsHelp
     case overview, activeDays, streak, noStreak, record, peakHour, onDisk
     case nothingSaved, saveOne, saveMany, daysShort, overviewCollapse, overviewExpand
+    // A day of the calendar, clicked
+    case dayNotRecorded, dayProjectGone
     // Projects
-    case projects, pinnedFirstOn, pinnedFirstOff, nothingIndexed, noMatches
+    case projects, shownProjectOne, shownProjectMany
+    case pinnedFirstOn, pinnedFirstOff, nothingIndexed, noMatches
     case newLiveSet, newLiveSetHelp, noArrangement, thumbUnreadable
     case playRender, pauseRender, openPlayer, pinProject, unpin, showDetails, pinnedBadge
     // Now playing strip
     case nowPlayingSeek, stopPlayback, showSet
     // Arrangement preview
     case previewReading, previewEmpty, previewBPM, previewBars, previewTracks, previewClips
+    case previewBarOne, previewTrackOne, previewClipOne
     case zoomIn, zoomOut, zoomFit, tallerTracks, zoomLevel
     // Player window
     case playerEmptyTitle, playerEmptyBody, noRenders, colFile, colFolder, colModified
@@ -49,7 +53,12 @@ enum HomeStrings: LocalizedStrings {
         case .overviewCollapse: return ("Collapse overview", "概要を閉じる")
         case .overviewExpand: return ("Expand overview", "概要を開く")
 
+        case .dayNotRecorded: return ("Projects were not recorded that day", "この日のプロジェクトは記録されていません")
+        case .dayProjectGone: return ("Not in the catalog any more", "カタログにありません")
+
         case .projects: return ("Projects", "プロジェクト")
+        case .shownProjectOne: return ("%lld project shown", "%lld 件のプロジェクトを表示")
+        case .shownProjectMany: return ("%lld projects shown", "%lld 件のプロジェクトを表示")
         case .pinnedFirstOn: return ("Pinned projects first (click to sort by date only)",
                                      "ピン留めを先頭に表示中（クリックで日付順のみ）")
         case .pinnedFirstOff: return ("Show pinned projects first", "ピン留めを先頭に表示")
@@ -77,6 +86,9 @@ enum HomeStrings: LocalizedStrings {
         case .previewBars: return ("%lld bars", "%lld 小節")
         case .previewTracks: return ("%lld tracks", "%lld トラック")
         case .previewClips: return ("%lld clips", "%lld クリップ")
+        case .previewBarOne: return ("%lld bar", "%lld 小節")
+        case .previewTrackOne: return ("%lld track", "%lld トラック")
+        case .previewClipOne: return ("%lld clip", "%lld クリップ")
         case .zoomIn: return ("Zoom in", "拡大")
         case .zoomOut: return ("Zoom out", "縮小")
         case .zoomFit: return ("Fit to window", "ウィンドウに合わせる")
@@ -107,4 +119,12 @@ enum HomeStrings: LocalizedStrings {
         case .playerLoading: return ("Looking for renders…", "レンダーを検索中…")
         }
     }
+}
+
+/// "1 project", "2 projects": English needs a sentence of its own for the singular (9ce4b4b).
+extension HomeStrings {
+    static func projectsShown(_ n: Int) -> String { (n == 1 ? shownProjectOne : shownProjectMany).f(n) }
+    static func bars(_ n: Int) -> String { (n == 1 ? previewBarOne : previewBars).f(n) }
+    static func tracks(_ n: Int) -> String { (n == 1 ? previewTrackOne : previewTracks).f(n) }
+    static func clips(_ n: Int) -> String { (n == 1 ? previewClipOne : previewClips).f(n) }
 }
