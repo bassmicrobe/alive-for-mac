@@ -38,7 +38,7 @@ final class HomeUpstream133Tests: XCTestCase {
         let a = try XCTUnwrap(app.catalog.sets.first { $0.name == "a" }).path
 
         app.selectedSetPath = a
-        app.searchText = "b project"
+        app.searchText = "b.als"          // one word, in B's path only (every word of a query counts)
         app.home.dropHiddenSelection()
         XCTAssertNil(app.selectedSetPath, "⌘O must not open a project the search has hidden")
 
