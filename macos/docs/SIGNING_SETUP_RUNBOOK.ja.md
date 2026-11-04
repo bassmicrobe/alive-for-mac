@@ -144,6 +144,8 @@ gh run view <run-id> -R bassmicrobe/alive-for-mac
 検証モードでは GitHub Release の作成・既存アセットの置換はスキップし、パッケージを
 7日間の Actions artifact として保存する。タグ実行では通常の公開処理を行う。
 古い `main` のワークフローには署名処理も検証モードも無い場合があるため、実行する ref の内容を確認。
+手動実行の `runner` は既定で `macos-26`。長く割り当て待ちになる場合は `-f runner=macos-15`
+を指定して検証できる。ランナーを変えても署名・公証・Gatekeeper の検証条件は同じ。
 
 成功の判断は以下のすべてを満たした場合。
 

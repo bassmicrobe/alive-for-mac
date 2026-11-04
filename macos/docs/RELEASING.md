@@ -245,8 +245,8 @@ Prerequisite: membership in the Apple Developer Program (paid).
      **Developer ID Application**.
    - Or developer.apple.com → Certificates, Identifiers & Profiles → "+" → Developer ID Application
      (upload a CSR made with Keychain Access → Certificate Assistant).
-   - Only the Account Holder (or an administrator who was given the right) can create Developer ID
-     certificates.
+   - Only the Account Holder can create these Developer ID certificates with exportable private keys.
+     Cloud-managed certificate permissions are a separate mechanism.
 2. **Export a .p12.** Keychain Access → login → My Certificates → find
    `Developer ID Application: Name (TEAMID)` and check that it **has a private key** (expand it with
    the arrow) → right-click the certificate → Export… → format **Personal Information Exchange (.p12)** →
