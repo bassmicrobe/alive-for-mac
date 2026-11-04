@@ -223,13 +223,20 @@ public struct Activity: Sendable {
         var ticks: [Int64] = []
         var complete = false
         do {
-            guard try r.int32() == cacheVersion else { return (.empty, false) }
+            let version = try r.int32()
+            guard version == cacheVersion else {
+                Diag.warn("activity.cache has version \(version), not \(cacheVersion): starting with an empty history (the file is kept as activity.cache.bak at the next save)")
+                return (.empty, false)
+            }
             let n = Int(try r.int32())
-            guard n >= 0, n <= 5_000_000 else { return (.empty, false) }
+            guard n >= 0, n <= 5_000_000 else {
+                Diag.warn("activity.cache claims \(n) moments: starting with an empty history (the file is kept as activity.cache.bak at the next save)")
+                return (.empty, false)
+            }
             for _ in 0..<n { ticks.append(try r.int64()) }
             complete = true
         } catch {
-            if ticks.isEmpty { Diag.warn("activity.cache unreadable: \(error)") }
+            Diag.warn("activity.cache is cut short after \(ticks.count) moments: \(error)")
         }
         // The projects are read by the record's place in the file, so a damaged moment (skipped
         // below) does not shift the folders of the ones after it.
@@ -245,20 +252,26 @@ public struct Activity: Sendable {
     /// The tail behind `projectsMark`, if this history has one. A tail cut short gives the
     /// folders it got to; the rest are unnamed.
     private static func readProjects(_ r: inout DotNetReader, count: Int) -> [String] {
-        guard r.remaining >= 4, (try? r.int32()) == projectsMark else { return [] }
+        guard r.remaining >= 4, (try? r.int32()) == projectsMark else {
+            if r.remaining > 0 { Diag.warn("activity.cache: unknown data behind the moments, the project folders are not read") }
+            return []
+        }
         var out: [String] = []
         out.reserveCapacity(min(count, r.remaining))
         var shared: [String: String] = [:]      // one project is named by thousands of saves
         for _ in 0..<count {
-            guard let name = try? r.string() else { break }
+            guard let name = try? r.string() else {
+                Diag.warn("activity.cache: the project folders end after \(out.count) of \(count) saves")
+                break
+            }
             if let known = shared[name] { out.append(known) } else { shared[name] = name; out.append(name) }
         }
         return out
     }
 
-    /// Not an accelerator but the only durable copy of the history, hence the atomic write. The
-    /// folders are written only once at least one save has one: without them the file is the
-    /// old format byte for byte.
+    /// Not an accelerator but the only durable copy of the history, hence the atomic write and the
+    /// previous file kept as `activity.cache.bak`. The folders are written only once at least one
+    /// save has one: without them the file is the old format byte for byte.
     public func saveCache(dir: String = AppHome.path) {
         var w = DotNetWriter()
         w.int32(Activity.cacheVersion)
@@ -268,7 +281,7 @@ public struct Activity: Sendable {
             w.int32(Activity.projectsMark)
             marks.forEach { w.string($0.project) }
         }
-        do { try AppHome.writeAtomicallyIfChanged(w.data, to: Activity.cachePath(dir: dir)) } catch {
+        do { try AppHome.writeKeepingBackup(w.data, to: Activity.cachePath(dir: dir)) } catch {
             Diag.fail("activity.cache write", error)
         }
     }
