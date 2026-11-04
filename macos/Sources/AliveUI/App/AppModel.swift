@@ -340,7 +340,7 @@ final class AppModel {
         case .home: home.enterFromSearch()
         case .sets: sets.focusList()
         case .plugins: plugins.focusList()
-        case .samples: break
+        case .samples: samples.focusList()
         }
     }
 

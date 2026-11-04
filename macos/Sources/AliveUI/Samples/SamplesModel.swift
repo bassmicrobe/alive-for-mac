@@ -42,6 +42,8 @@ final class SamplesModel {
     @ObservationIgnored var expandsRootsOnFirstLoad = false
     var selection: String?
     private(set) var scrollTarget: SampleScrollTarget?
+    /// Bumped by `focusList()`; the list takes the keyboard when it changes.
+    private(set) var listFocusRequest = 0
     /// A folder that `showFolder` was asked for but that is not in the library.
     var outsideFolder: String?
     var info: SampleInfo?
@@ -327,6 +329,14 @@ final class SamplesModel {
             guard let self, !Task.isCancelled, self.selection == path else { return }
             self.info = loaded
         }
+    }
+
+    /// Down from the search field: on into what it found (a6c8dc1 `IntoResults`). The first row
+    /// shown is picked if none of the rows shown is, and a picked one stays; like any arrow key,
+    /// picking a sample auditions it.
+    func focusList() {
+        if !listing.rows.contains(where: { $0.id == selection }) { moveSelection(by: 1) }
+        listFocusRequest += 1
     }
 
     func requestScroll(to id: String) {

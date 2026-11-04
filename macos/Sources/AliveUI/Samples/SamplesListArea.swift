@@ -61,6 +61,7 @@ struct SamplesListArea: View {
         .focusEffectDisabled()
         .onKeyPress(phases: .down) { press in handle(press) }
         .onAppear { focused = true }
+        .onChange(of: model.listFocusRequest) { _, _ in focused = true }
         .accessibilityElement(children: .contain)
     }
 
