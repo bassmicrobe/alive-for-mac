@@ -61,11 +61,11 @@
    ターミナルから登録する場合（`gh` にログイン済み）:
 
    ```sh
-   base64 -i DeveloperID.p12 | gh secret set APPLE_DEVELOPER_ID_P12
-   gh secret set APPLE_DEVELOPER_ID_P12_PASSWORD   # 入力を求められます
-   gh secret set APPLE_NOTARY_APPLE_ID
-   gh secret set APPLE_NOTARY_PASSWORD
-   gh secret set APPLE_TEAM_ID
+   base64 -i DeveloperID.p12 | gh secret set APPLE_DEVELOPER_ID_P12 -R bassmicrobe/alive-for-mac
+   gh secret set APPLE_DEVELOPER_ID_P12_PASSWORD -R bassmicrobe/alive-for-mac   # 入力を求められます
+   gh secret set APPLE_NOTARY_APPLE_ID -R bassmicrobe/alive-for-mac
+   gh secret set APPLE_NOTARY_PASSWORD -R bassmicrobe/alive-for-mac
+   gh secret set APPLE_TEAM_ID -R bassmicrobe/alive-for-mac
    ```
 
 7. 登録できたら、ディスク上の `.p12` を削除します（パスワードマネージャーなどに保管）。
@@ -267,11 +267,11 @@ Prerequisite: membership in the Apple Developer Program (paid).
    From a terminal (logged in with `gh`):
 
    ```sh
-   base64 -i DeveloperID.p12 | gh secret set APPLE_DEVELOPER_ID_P12
-   gh secret set APPLE_DEVELOPER_ID_P12_PASSWORD   # prompts for the value
-   gh secret set APPLE_NOTARY_APPLE_ID
-   gh secret set APPLE_NOTARY_PASSWORD
-   gh secret set APPLE_TEAM_ID
+   base64 -i DeveloperID.p12 | gh secret set APPLE_DEVELOPER_ID_P12 -R bassmicrobe/alive-for-mac
+   gh secret set APPLE_DEVELOPER_ID_P12_PASSWORD -R bassmicrobe/alive-for-mac   # prompts for the value
+   gh secret set APPLE_NOTARY_APPLE_ID -R bassmicrobe/alive-for-mac
+   gh secret set APPLE_NOTARY_PASSWORD -R bassmicrobe/alive-for-mac
+   gh secret set APPLE_TEAM_ID -R bassmicrobe/alive-for-mac
    ```
 
 7. Once registered, delete the `.p12` from disk (keep it in a password manager).
