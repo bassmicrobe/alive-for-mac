@@ -179,6 +179,8 @@ Sets/Samples show an inspector panel on the right (upstream `DetailPanel`).
 | Home / Sets / Plugins / Samples | Ctrl 1…4 | ⌘1…⌘4 |
 | Stat window | toolbar | ⌘5 |
 | Search | Ctrl F | ⌘F |
+| From the search field into the results | Down | ↓ (the active tab's list takes the keyboard and picks its first row) |
+| First / last item of a list | Home / End | Home / End (Home tiles, Sets, Plugins; also the ends of the month in the filter calendar) |
 | Filters | F | ⌥⌘F |
 | Scan folders… | Shift F | ⇧⌘O |
 | Rescan | F5 | ⌘R |
@@ -186,6 +188,10 @@ Sets/Samples show an inspector panel on the right (upstream `DetailPanel`).
 | Show in Finder | Shift Enter | ⇧⌘R |
 | Play / pause render or sample | Space | Space in a focused list (`onKeyPress`), menu ⌥⌘P |
 | Arrangement preview | Ctrl Space | ⌘Y |
+| Preview: tracks / time / zoom / track height / move | Wheel / Shift+wheel / Ctrl+wheel / Alt+wheel / middle drag | Wheel / ⇧ wheel / ⌘ wheel (or pinch) / ⌥ wheel / middle-button drag; a two-finger sideways swipe scrolls the time; `+` `-` `0` zoom in / out / whole song |
+| Samples: play from the start / open folder, close folder | Right / Left | → / ← |
+| Samples: stop the sample | click on empty space | click on empty space |
+| Player: show the render in Finder | Shift Enter | ⇧↩ |
 | Pin set | Q | ⌘D |
 | Tags and notes | Ctrl T | ⌘T |
 | Rescue a set | Ctrl R | ⌥⌘R |
@@ -261,7 +267,7 @@ scan, a working minimal Sets list, end-to-end run against a real library.
   dir. Never commit user data and never hardcode paths from this machine.
 - Real-library smoke tests are gated by env vars and skipped otherwise:
   `ALIVE_TEST_SETS=/path/to/projects` (parse every set, no crash, sane stats),
-  `ALIVE_TEST_SAMPLES=/path/to/samples`. The parser differential (reference XMLParser vs tokenizer) is heavier and has its own gate, `ALIVE_TEST_PARSER_DIFF`. `swift test --filter` does not select tests with this toolchain; run the whole suite with the env var set.
+  `ALIVE_TEST_SAMPLES=/path/to/samples`. The parser differential (reference XMLParser vs tokenizer) is heavier and has its own gate, `ALIVE_TEST_PARSER_DIFF`. `swift test --filter <Class>` does select test classes on the current toolchain (an older one ignored it), so a failing class can be re-run alone; the full run is still the one that counts.
 - Every string table has its completeness test.
 - Before reporting done: `swift build` and `swift test` are green in `macos/`, with no new warnings
   in your files.
