@@ -12,10 +12,20 @@ on:
       - "macos/**"
       - ".github/workflows/macos-ci.yml"
   workflow_dispatch:
+    inputs:
+      verify_only:
+        description: "Verify signing and notarization without creating or overwriting a GitHub Release"
+        type: boolean
+        default: true
+      allow_adhoc_overwrite:
+        description: "Let an ad-hoc signed (not notarized) build replace the files of a release that already exists"
+        type: boolean
+        default: false
 
 concurrency:
   group: macos-ci-${{ github.ref }}
-  cancel-in-progress: true
+  # A release run on a tag is never cancelled by a newer run: it would leave the release half made.
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
 
 jobs:
   build-test:
@@ -37,6 +47,9 @@ jobs:
           xcodebuild -version
           swift --version
 
+      - name: Test signing credential handling
+        run: python3 -m unittest discover -s scripts/tests -v
+
       - name: Build
         run: swift build
 
@@ -48,15 +61,53 @@ jobs:
     needs: build-test
     if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
     runs-on: macos-26
+    # Two notarization waits (each capped at 60 minutes by build-app.sh) plus the universal build.
+    timeout-minutes: 150
     permissions:
       contents: write
     steps:
+      # The whole history: the build number is `git rev-list --count HEAD`, and a shallow clone makes it 1.
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
 
       - name: Select latest Xcode
         uses: maxim-lobanov/setup-xcode@v1
         with:
           xcode-version: latest-stable
+
+      # Developer ID signing and notarization need all five repository secrets (macos/docs/RELEASING.md).
+      # With none of them the release is built exactly as before: ad-hoc signed, and says so. With some
+      # but not all, the job stops: that is a mistake in the secrets, not a choice, and a half-set
+      # configuration must not quietly publish an unnotarized build.
+      - name: Decide signing mode
+        id: signing
+        env:
+          APPLE_DEVELOPER_ID_P12: ${{ secrets.APPLE_DEVELOPER_ID_P12 }}
+          APPLE_DEVELOPER_ID_P12_PASSWORD: ${{ secrets.APPLE_DEVELOPER_ID_P12_PASSWORD }}
+          APPLE_NOTARY_APPLE_ID: ${{ secrets.APPLE_NOTARY_APPLE_ID }}
+          APPLE_NOTARY_PASSWORD: ${{ secrets.APPLE_NOTARY_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          missing=""
+          present=0
+          for name in APPLE_DEVELOPER_ID_P12 APPLE_DEVELOPER_ID_P12_PASSWORD APPLE_NOTARY_APPLE_ID APPLE_NOTARY_PASSWORD APPLE_TEAM_ID; do
+            if [ -z "${!name}" ]; then
+              missing="$missing $name"
+            else
+              present=$((present + 1))
+            fi
+          done
+          if [ -z "$missing" ]; then
+            echo "signed=true" >> "$GITHUB_OUTPUT"
+            echo "All signing secrets are set: the release is Developer ID signed and notarized."
+          elif [ "$present" -eq 0 ]; then
+            echo "signed=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::Release is ad-hoc signed and not notarized (missing secrets:$missing)"
+          else
+            echo "::error::Only some of the five Apple signing secrets are set (missing:$missing). Set all of them to sign and notarize, or none of them for an ad-hoc build."
+            exit 1
+          fi
 
       - name: Check packaging script exists
         env:
@@ -73,11 +124,36 @@ jobs:
             exit 1
           fi
 
-      - name: Build app zip and dmg
+      # The certificate lives in a throw-away keychain that is deleted again at the end of the job.
+      - name: Import Developer ID certificate
+        id: keychain
+        if: steps.signing.outputs.signed == 'true'
+        env:
+          P12_BASE64: ${{ secrets.APPLE_DEVELOPER_ID_P12 }}
+          P12_PASSWORD: ${{ secrets.APPLE_DEVELOPER_ID_P12_PASSWORD }}
+          TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          NOTARY_APPLE_ID: ${{ secrets.APPLE_NOTARY_APPLE_ID }}
+          NOTARY_PASSWORD: ${{ secrets.APPLE_NOTARY_PASSWORD }}
+        run: |
+          python3 macos/scripts/ci-signing.py
+
+      - name: Build app zip and dmg (ad-hoc signed)
+        if: steps.signing.outputs.signed != 'true'
         working-directory: macos
         run: |
           chmod +x scripts/build-app.sh
           scripts/build-app.sh --zip --dmg
+
+      - name: Build, sign and notarize app zip and dmg
+        if: steps.signing.outputs.signed == 'true'
+        working-directory: macos
+        env:
+          ALIVE_SIGN_IDENTITY: ${{ steps.keychain.outputs.identity }}
+          ALIVE_NOTARY_KEYCHAIN_PROFILE: alive-ci-notary
+          ALIVE_NOTARY_KEYCHAIN: ${{ steps.keychain.outputs.keychain }}
+        run: |
+          chmod +x scripts/build-app.sh
+          scripts/build-app.sh --zip --dmg --notarize
 
       - name: Verify universal app and signature
         run: |
@@ -107,13 +183,56 @@ jobs:
           echo "dmg=$dmg" >> "$GITHUB_OUTPUT"
           echo "Built $zip and $dmg"
 
+      # build-app.sh --notarize already checks all of this; this is the independent look at what is
+      # about to be published: Developer ID authority, hardened runtime, and Gatekeeper's verdict.
+      - name: Verify Developer ID signature and notarization
+        if: steps.signing.outputs.signed == 'true'
+        env:
+          DMG_PATH: ${{ steps.pkg.outputs.dmg }}
+        run: |
+          app="macos/build/Alive for Mac.app"
+          info="$(codesign -dvv "$app" 2>&1)"
+          echo "$info" | grep -E '^(Authority|TeamIdentifier|Timestamp)=|^CodeDirectory'
+          if ! echo "$info" | grep -q '^Authority=Developer ID Application'; then
+            echo "::error::The app is not signed by a Developer ID Application certificate."
+            exit 1
+          fi
+          if ! echo "$info" | grep -q 'flags=.*runtime'; then
+            echo "::error::The app is missing the hardened runtime flag."
+            exit 1
+          fi
+          spctl_app="$(spctl -a -vv "$app" 2>&1)" || { echo "$spctl_app"; echo "::error::Gatekeeper rejects the app."; exit 1; }
+          echo "$spctl_app"
+          if ! echo "$spctl_app" | grep -q 'source=Notarized Developer ID'; then
+            echo "::error::The app is not accepted as Notarized Developer ID."
+            exit 1
+          fi
+          xcrun stapler validate "$app"
+          xcrun stapler validate "$DMG_PATH"
+          spctl -a -t open --context context:primary-signature -vv "$DMG_PATH"
+          echo "Notarization: accepted by Apple, ticket stapled to the app and the dmg." | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Save verified packages
+        if: github.event_name == 'workflow_dispatch' && inputs.verify_only
+        uses: actions/upload-artifact@v7
+        with:
+          name: notarized-macos-packages
+          path: |
+            ${{ steps.pkg.outputs.zip }}
+            ${{ steps.pkg.outputs.dmg }}
+          retention-days: 7
+          if-no-files-found: error
+
       - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v') || !inputs.verify_only
         env:
           GH_TOKEN: ${{ github.token }}
           ZIP_PATH: ${{ steps.pkg.outputs.zip }}
           DMG_PATH: ${{ steps.pkg.outputs.dmg }}
           REF_NAME: ${{ github.ref_name }}
           IS_TAG: ${{ startsWith(github.ref, 'refs/tags/v') }}
+          SIGNED: ${{ steps.signing.outputs.signed }}
+          ALLOW_ADHOC_OVERWRITE: ${{ inputs.allow_adhoc_overwrite }}
         run: |
           if [ "$IS_TAG" = "true" ]; then
             tag="$REF_NAME"
@@ -123,10 +242,35 @@ jobs:
             tag="v${version#AliveForMac-}"
           fi
           if gh release view "$tag" >/dev/null 2>&1; then
+            # A re-run without the signing secrets would put ad-hoc files over a notarized release
+            # (and `--clobber` replaces them in place): only on an explicit request.
+            if [ "$SIGNED" != "true" ]; then
+              if [ "$ALLOW_ADHOC_OVERWRITE" != "true" ]; then
+                echo "::error::Release $tag already exists and this build is ad-hoc signed and not notarized, so it would replace the release's files. Set the Apple signing secrets, or run the workflow by hand with allow_adhoc_overwrite."
+                exit 1
+              fi
+              echo "::warning::Replacing the files of release $tag with an ad-hoc signed, not notarized build (allow_adhoc_overwrite)."
+            fi
+            # An existing release keeps its body.
             gh release upload "$tag" "$ZIP_PATH" "$DMG_PATH" --clobber
           else
-            gh release create "$tag" "$ZIP_PATH" "$DMG_PATH" \
-              --target "$GITHUB_SHA" \
-              --title "Alive for Mac $tag" \
-              --generate-notes
+            create_args=(--target "$GITHUB_SHA" --title "Alive for Mac $tag" --generate-notes)
+            if [ "$SIGNED" != "true" ]; then
+              # Prepended to the generated notes.
+              notes_file="$RUNNER_TEMP/release-notes-adhoc.md"
+              cat > "$notes_file" <<'NOTES'
+          > **Not notarized.** This release is ad-hoc signed (the Apple signing credentials were not available to the release workflow), so macOS blocks the first launch. Try to open the app once, then open **System Settings → Privacy & Security** and press **Open Anyway**.
+          >
+          > **公証されていません。** このリリースは ad-hoc 署名のみです（リリース用ワークフローで Apple の署名情報が使えませんでした）。そのため初回起動は macOS にブロックされます。一度アプリを開こうとしてから、**システム設定 → プライバシーとセキュリティ** で **「このまま開く」** を押してください。
+
+          NOTES
+              create_args+=(--notes-file "$notes_file")
+            fi
+            gh release create "$tag" "$ZIP_PATH" "$DMG_PATH" "${create_args[@]}"
           fi
+
+      - name: Delete signing keychain
+        if: always() && steps.signing.outputs.signed == 'true'
+        run: |
+          security delete-keychain "$RUNNER_TEMP/alive-signing.keychain-db" 2>/dev/null || true
+          rm -f "$RUNNER_TEMP/developer-id.p12"

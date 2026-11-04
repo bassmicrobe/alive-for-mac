@@ -132,3 +132,5 @@ Alive が記憶する内容はすべて `%APPDATA%\Alive` にあります (**Set
 ## ライセンス
 
 [MIT](LICENSE)
+
+署名・公証の設定と再検証: [手順書](macos/docs/SIGNING_SETUP_RUNBOOK.ja.md)
