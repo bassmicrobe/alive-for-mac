@@ -72,11 +72,17 @@ public enum AppHome {
     /// one — it is backed up (`<file>.bak`, never over an earlier backup) before that can happen.
     public static func readConfig(_ path: String) -> ConfigRead {
         let name = (path as NSString).lastPathComponent
-        guard FileManager.default.fileExists(atPath: path) else { return .missing }
-        guard let data = FileManager.default.contents(atPath: path) else {
+        // The read itself says why it failed: `fileExists` is false for "no such file" and for "could
+        // not be determined" alike (a data folder that denies traversal for a moment), and a store
+        // that took the second for the first would start empty and later save over the real file.
+        let data: Data
+        do {
+            data = try Data(contentsOf: URL(fileURLWithPath: path))
+        } catch {
+            if isAbsent(error) { return .missing }
             // No copy can be made of bytes the system will not hand over, so there is nothing
             // to announce as "backed up".
-            Diag.warn("\(name) exists but cannot be read")
+            Diag.warn("\(name) exists but cannot be read: \(error.localizedDescription)")
             return .inaccessible
         }
         if data.isEmpty { return .lines([]) }
@@ -92,6 +98,19 @@ public enum AppHome {
         Diag.warn("\(name) is not UTF-8; read as Windows-1252")
         noteBackup(path)
         return .recovered(splitLines(text))
+    }
+
+    /// Whether a read failed because there is no such file (ENOENT) — the only failure that means
+    /// "an ordinary first run". Permission and I/O errors are not absence.
+    static func isAbsent(_ error: Error) -> Bool {
+        let ns = error as NSError
+        if ns.domain == NSPOSIXErrorDomain { return ns.code == Int(ENOENT) }
+        if ns.domain == NSCocoaErrorDomain,
+           ns.code == CocoaError.fileReadNoSuchFile.rawValue || ns.code == CocoaError.fileNoSuchFile.rawValue {
+            return true
+        }
+        if let underlying = ns.userInfo[NSUnderlyingErrorKey] as? NSError { return isAbsent(underlying) }
+        return false
     }
 
     /// Lines of a text file; nil when missing or unreadable (see `readConfig`).
