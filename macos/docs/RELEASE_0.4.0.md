@@ -3,7 +3,7 @@
 2026-11-04 — オリジナル 1.3.1〜1.3.3 の取り込み、公証、全体監査
 
 - **オリジナル（Alive 1.3.1〜1.3.3）の変更をすべて取り込み。** Windows 専用の部分（画面の DPI 対応、独自のスムーズスクロール、Windows 11 のメニューの角）を除き、Mac 版に移植しました。差分は [PARITY.md](../PARITY.md) にあります。
-- **画面の拡大縮小。** 設定 → 外観で 75 / 100 / 125% を選ぶと、その場で文字と部品の大きさが変わります。
+- **画面の拡大縮小。** 設定 → 外観で 75 / 100 / 125% を選ぶと、ツールバー・ホーム・セット一覧・インスペクタ・設定・ヘルプなど主な画面の文字と部品の大きさが、その場で変わります（統計・レスキュー・プレーヤーなど一部は未対応）。
 - **作業カレンダーの日をクリック。** その日に保存したプロジェクトが一覧され、選ぶとタイルへ移動します。作業履歴（`activity.cache`）は保存ごとのプロジェクトも記録します。以前の版でもそのまま読めます。
 - **フィルターのカレンダー。** 空の欄で開くと日付は未選択。矢印で日・週、Page Up / Down で月、Return で決定。
 - **検索をホームとセット一覧で統一。** 名前・フォルダ・プラグイン・レンダー名・タグ・メモを対象に、空白で区切った語をすべて含むものを表示します（全角・半角を区別しません）。
@@ -25,7 +25,7 @@
 Upstream Alive 1.3.1–1.3.3, notarization, and a full audit:
 
 - **Upstream 1.3.1–1.3.3 ported in full**, except the Windows-only parts (screen DPI handling, the custom smooth scrolling, Windows 11 menu corners); see [PARITY.md](../PARITY.md).
-- **Interface scale:** Settings → Appearance, 75 / 100 / 125 %, applied at once.
+- **Interface scale:** Settings → Appearance, 75 / 100 / 125 %, applied at once to the main surfaces (toolbar, Home, Sets, inspector, Settings, Help); Stat, Rescue and the player do not scale yet.
 - **Click a day in the activity calendar** to list the projects saved on it and jump to one. `activity.cache` now records the project of each save; older versions still read it.
 - **Filters calendar:** an empty field opens with no day picked; arrows move by day and week, Page Up / Down by month, Return picks.
 - **One search rule for Home and Sets:** name, folder, plugins, render names, tags and note; every space-separated word must match (width-insensitive).
