@@ -72,6 +72,9 @@ struct SetsTable: View {
             app.openSelectedInLive()
             return .handled
         }
+        // The table's own Home / End only scroll; upstream moves the selection (a6c8dc1).
+        .onKeyPress(.home) { app.sets.selectEdge(first: true); return .handled }
+        .onKeyPress(.end) { app.sets.selectEdge(first: false); return .handled }
         .background(TableScrollBridge(request: app.sets.scrollRequest, rows: pipeline.flattened(expanded: app.sets.expandedDirs)))
     }
 
@@ -108,6 +111,8 @@ struct SetContextMenu: View {
             let hasRenders = app.sets.set(at: path)?.hasRenders ?? false
             Button(CommonStrings.openInLive.s) { app.openInLive(path: path) }
             Button(CommonStrings.showInFinder.s) { app.revealInFinder(path: path) }
+                .keyboardShortcut("r", modifiers: [.command, .shift])
+            Button(SetsStrings.copyPath.s) { SetsClipboard.copy(path) }
             Divider()
             Button(SetsStrings.playRender.s) { app.sets.playRender(of: path) }
                 .disabled(!hasRenders)
@@ -119,7 +124,9 @@ struct SetContextMenu: View {
             }
             Divider()
             Button(CommonStrings.rescue.s) { act(path) { app.presentRescue() } }
+                .keyboardShortcut("r", modifiers: [.command, .option])
             Button(CommonStrings.exportSet.s) { act(path) { app.presentExport() } }
+                .keyboardShortcut("e", modifiers: .command)
         }
     }
 

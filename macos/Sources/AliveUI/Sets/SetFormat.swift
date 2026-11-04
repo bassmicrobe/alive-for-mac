@@ -27,6 +27,36 @@ enum SetFormat {
         return SetFilter.formatDate(date, calendar: calendar)
     }
 
+    /// A version's date in the Versions block, with the time when another version of the folder was
+    /// saved the same day: two equal dates told nothing apart (9ce4b4b).
+    static func versionStamp(_ version: SetEntry, among all: [SetEntry], calendar: Calendar = .current) -> String {
+        let date = day(version.modified, calendar: calendar)
+        guard !date.isEmpty,
+              all.contains(where: { $0.path != version.path && calendar.isDate($0.modified, inSameDayAs: version.modified) })
+        else { return date }
+        let time = calendar.dateComponents([.hour, .minute], from: version.modified)
+        return date + String(format: " %02d:%02d", time.hour ?? 0, time.minute ?? 0)
+    }
+
+    /// "1 set" / "3 sets": English needs the singular form, Japanese carries the same text in both.
+    static func plural(_ n: Int, one: SetsStrings, many: SetsStrings) -> String {
+        (n == 1 ? one : many).f(n)
+    }
+
+    /// The toolbar's "553 projects · 754 sets", with the singular forms ("1 project · 1 set").
+    static func shownSummary(projects: Int, sets: Int) -> String {
+        if sets == 1 { return SetsStrings.shownSummaryOne.s }
+        if projects == 1 { return SetsStrings.shownSummaryOneProject.f(sets) }
+        return SetsStrings.shownSummary.f(projects, sets)
+    }
+
+    /// The Filters window's counter: the number of rows the list shows (search applied, one row per
+    /// project when versions are folded), so the two never disagree (9ce4b4b).
+    static func matches(_ count: Int, perProject: Bool) -> String {
+        perProject ? plural(count, one: .fltMatchesProject1, many: .fltMatchesProjects)
+                   : plural(count, one: .fltMatchesSet1, many: .fltMatchesSets)
+    }
+
     /// Names (and paths) from real libraries often start with a space; shown as they are, that
     /// looks like broken layout. Display only: the exact text goes into help and file operations.
     static func displayName(_ text: String) -> String {

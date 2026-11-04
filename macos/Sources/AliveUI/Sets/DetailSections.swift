@@ -10,15 +10,45 @@ private struct PanelHeading: View {
     let title: String
     var trailing: String?
     var trailingTint: Color = Theme.red
+    /// A text link right after the heading ("copy list").
+    var link: HeadingLink?
+
+    struct HeadingLink {
+        let title: String
+        let help: String
+        let action: () -> Void
+    }
 
     var body: some View {
         HStack {
             Text(title).font(Theme.fLabel).foregroundStyle(Theme.secondaryText)
+            if let link { HeadingLinkButton(link: link) }
             Spacer(minLength: 8)
             if let trailing {
                 Text(trailing).font(Theme.fLabel).foregroundStyle(trailingTint)
             }
         }
+    }
+}
+
+/// Plain text, underlined and lit under the cursor — upstream's "copy list" next to Plugins (9f47c04).
+private struct HeadingLinkButton: View {
+    let link: PanelHeading.HeadingLink
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: link.action) {
+            Text(link.title)
+                .font(Theme.fLabel)
+                .foregroundStyle(hovering ? Theme.text : Theme.secondaryText)
+                .underline(hovering)
+                .lineLimit(1)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+        .animation(Theme.hoverAnimation, value: hovering)
+        .help(link.help)
     }
 }
 
@@ -117,7 +147,10 @@ struct DetailThumbnail: View {
 
     var body: some View {
         Button { app.presentPreview() } label: {
+            // One view per set: the picture of the set shown before must not stand under this
+            // one's name while its own is drawn (9ce4b4b).
             ArrangementThumbnailView(path: path)
+                .id(path)
                 .frame(height: 96)
                 .overlay(
                     RoundedRectangle(cornerRadius: Theme.thumbR, style: .continuous)
@@ -217,7 +250,7 @@ struct DetailVersions: View {
                 PanelHeading(title: SetsStrings.versionsHeading.f(all.count))
                     .padding(.bottom, 2)
                 ForEach(all) { version in
-                    PanelLinkRow(text: version.name, note: SetFormat.day(version.modified),
+                    PanelLinkRow(text: version.name, note: SetFormat.versionStamp(version, among: all),
                                  tint: version.path == set.path ? Theme.text : Theme.secondaryText,
                                  isCurrent: version.path == set.path) {
                         app.sets.select(path: version.path)
@@ -235,7 +268,9 @@ struct DetailFiles: View {
         VStack(alignment: .leading, spacing: 6) {
             PanelHeading(title: SetsStrings.filesHeading.s)
             HStack {
-                Text(SetsStrings.fileCount.f(set.totalRefs)).font(Theme.fLabel).foregroundStyle(Theme.text)
+                // The number alone: the heading above already names it, "78 files" said it twice.
+                Text(set.totalRefs.formatted(.number.locale(Localizer.shared.locale)))
+                    .font(Theme.fLabel).foregroundStyle(Theme.text)
                 Spacer()
                 // Colour only when things are bad: a green zero promised an event that is not there.
                 if set.missingFiles > 0 {
@@ -277,7 +312,9 @@ struct DetailPlugins: View {
         let known = app.sets.pluginsKnown
         VStack(alignment: .leading, spacing: 2) {
             PanelHeading(title: SetsStrings.pluginsHeading.f(set.plugins.count),
-                         trailing: known && set.missingPlugins > 0 ? SetsStrings.notInstalledCount.f(set.missingPlugins) : nil)
+                         trailing: known && set.missingPlugins > 0 ? SetsStrings.notInstalledCount.f(set.missingPlugins) : nil,
+                         link: set.plugins.isEmpty ? nil : .init(title: SetsStrings.copyPluginList.s,
+                                                                 help: SetsStrings.copyPluginListHelp.s, action: copyList))
                 .padding(.bottom, 2)
             if set.plugins.isEmpty {
                 Text(SetsStrings.onlyLiveDevices.s).font(Theme.fLabel).foregroundStyle(Theme.secondaryText)
@@ -300,6 +337,14 @@ struct DetailPlugins: View {
                 }
             }
         }
+    }
+}
+
+extension DetailPlugins {
+    /// The set's plugins as text on the pasteboard (see `PluginListText`).
+    fileprivate func copyList() {
+        SetsClipboard.copy(PluginListText.make(for: set, inventory: app.catalog.index.inventory))
+        app.toast(SetsStrings.pluginListCopied.s)
     }
 }
 
