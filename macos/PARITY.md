@@ -173,6 +173,22 @@ data lives in separate files, see below).
   are backed up to `.bak` before anything is rewritten (UTF-16 and Windows-1252 files from the Windows app
   are read), and `alive.log` writes the home folder as `~`.
 
+## Owner decisions
+
+Decided by the repository owner on 2026-11-04:
+
+- **Notarization: set up.** The release pipeline signs with a Developer ID certificate and notarizes
+  when the Apple credentials are registered as repository secrets (see `docs/RELEASING.md`); without
+  them it falls back to the ad-hoc build and says so in the release.
+- **Shortcuts: the `alive://` URL scheme is the supported route.** App Intents (which would need an
+  Xcode host project) are not planned.
+- **"Ready to open" counts keep both units, labelled.** Home counts projects (each project judged by
+  its newest set, "158 / 554 projects"); the Sets toggle counts sets ("200 sets").
+- **Upstream 1.3.1–1.3.3 is ported in full** (procedure in `docs/UPSTREAM.md`); the Windows-only
+  parts are listed under "Deviations" below.
+- **Root `README.md` stays upstream's file.** The Japanese version of it lives in `README.ja.md`; the
+  Mac README is `.github/README.md` / `README.en.md`.
+
 ## Known gaps / tech debt
 
 - **Rescue for Audio Units has never been run against Live itself.** Treat it as experimental until
