@@ -69,6 +69,31 @@ extension AppHome {
         }
     }
 
+    /// Removes what a write that died between creating its file and the rename left in `dir`:
+    /// `<file>.tmp-<UUID>`, `<file>.bak.part-<UUID>`, and the fixed `.cfg.tmp` / `.bak.part` names
+    /// older builds used. Regular files only, in this folder only, and only ones older than `age`
+    /// (a younger one may belong to a write in progress). Returns how many went. Once per launch.
+    @discardableResult
+    public static func sweepLeftoverTemps(dir: String, olderThan age: TimeInterval = 60, now: Date = Date()) -> Int {
+        let fm = FileManager.default
+        guard let names = try? fm.contentsOfDirectory(atPath: dir) else { return 0 }
+        var removed = 0
+        for name in names where isLeftoverTempName(name) {
+            let path = (dir as NSString).appendingPathComponent(name)
+            guard let stat = FileStat.of(path), !stat.isDirectory, now.timeIntervalSince(stat.modified) > age else { continue }
+            if (try? fm.removeItem(atPath: path)) != nil { removed += 1 }
+        }
+        return removed
+    }
+
+    private static let tempSuffix = try! NSRegularExpression(
+        pattern: "\\.(tmp|part)-[0-9A-Fa-f]{8}(-[0-9A-Fa-f]{4}){3}-[0-9A-Fa-f]{12}$")
+
+    private static func isLeftoverTempName(_ name: String) -> Bool {
+        if name.hasSuffix(".cfg.tmp") || name.hasSuffix(".bak.part") { return true }
+        return tempSuffix.firstMatch(in: name, range: NSRange(name.startIndex..., in: name)) != nil
+    }
+
     /// Writes `data` into a new file next to `path` and returns its path; the caller swaps it in
     /// (`swapIn`) or removes it. The name is unique and the file is created with O_EXCL and
     /// O_NOFOLLOW, so a link someone left at a guessable name (`notes.cfg.tmp`) is never written

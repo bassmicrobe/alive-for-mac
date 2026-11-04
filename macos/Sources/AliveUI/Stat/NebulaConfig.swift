@@ -24,6 +24,9 @@ struct NebulaConfig: Equatable {
     var gradientId = Palette.gradients[0].id
     /// Lines this build does not know, kept in file order and written back.
     var unknownLines: [String] = []
+    /// `nebula.cfg` is there but the system would not hand over its bytes (`AppHome.readStore`): this
+    /// copy holds defaults, and `StatModel` saves nothing over the file until the next start.
+    var isUnread = false
 
     init() {}
 
@@ -105,10 +108,12 @@ struct NebulaConfig: Equatable {
 
     static func path(dir: String) -> String { AppHome.file("nebula.cfg", in: dir) }
 
-    /// Reads `nebula.cfg` from `dir`; defaults when it is missing.
+    /// Reads `nebula.cfg` from `dir`; defaults when it is missing (or cannot be read: `isUnread`).
     static func load(dir: String) -> NebulaConfig {
-        guard let lines = AppHome.readLines(path(dir: dir)) else { return NebulaConfig() }
-        return NebulaConfig(lines: lines)
+        let read = AppHome.readStore(path(dir: dir))
+        var config = NebulaConfig(lines: read.lines)
+        config.isUnread = read.isUnread
+        return config
     }
 
     func save(dir: String) throws {

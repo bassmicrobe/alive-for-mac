@@ -82,6 +82,8 @@ final class AppModel {
         guard !started else { return }
         started = true
         RescueProbe.cleanupStale(dir: dataDir)
+        let swept = AppHome.sweepLeftoverTemps(dir: dataDir)
+        if swept > 0 { Diag.info("removed \(swept) leftover temporary file(s) from the data folder") }
         // The lazily read files are read now, so a damaged one is noticed (and backed up before
         // anything can overwrite it) at launch and the person is told once.
         _ = ProjectMeta.shared.allTags()

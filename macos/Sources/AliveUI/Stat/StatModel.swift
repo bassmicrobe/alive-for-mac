@@ -259,6 +259,10 @@ final class StatModel {
     func saveNow() {
         saveTask?.cancel()
         saveTask = nil
+        guard !config.isUnread else {
+            Diag.warn("nebula.cfg was not read at start; not saving over it")
+            return
+        }
         do {
             try config.save(dir: app.dataDir)
         } catch {
