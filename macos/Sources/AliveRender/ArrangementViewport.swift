@@ -56,6 +56,8 @@ public struct ArrangementViewport: Equatable, Sendable {
     public private(set) var scrollY = 0.0
     /// Pixels per track. Zero until the first `ensure`.
     public private(set) var laneH = 0
+    /// The track height is the fitted one (not set by hand): it follows a resize.
+    public private(set) var lanesFitted = true
     /// The whole song across: kept through a resize until a zoom.
     public private(set) var fitted = true
 
@@ -98,9 +100,6 @@ public struct ArrangementViewport: Equatable, Sendable {
         return fit > 0 ? max(1, maxPx(s) / fit) : 1
     }
 
-    /// Whether the tracks stand above their fitted height (for the "taller tracks" toggle).
-    public func isTaller(in s: ArrangementSpace) -> Bool { laneH > defaultLane(s) }
-
     // MARK: state
 
     /// Fits the song across and the tracks down on first use and after a resize, then keeps the
@@ -108,7 +107,7 @@ public struct ArrangementViewport: Equatable, Sendable {
     public mutating func ensure(in s: ArrangementSpace) {
         guard s.trackCount > 0 else { return }
         if pxPerBeat <= 0 || fitted { pxPerBeat = fitPx(s) }
-        if laneH <= 0 { laneH = defaultLane(s) }
+        if laneH <= 0 || lanesFitted { laneH = defaultLane(s) }
         clamp(in: s)
     }
 
@@ -165,14 +164,8 @@ public struct ArrangementViewport: Equatable, Sendable {
         let inside = Double(max(0, y - s.plot.minY))
         let lanes = (inside + scrollY) / Double(laneH + ArrangementRender.gap(laneH: laneH, options: o))
         laneH = max(minLane(s), min(maxLane(s), laneH + delta))
+        lanesFitted = false
         scrollY = (lanes * Double(laneH + ArrangementRender.gap(laneH: laneH, options: o))).rounded() - inside
-        clamp(in: s)
-    }
-
-    /// Sets the track height outright (the "taller tracks" toggle).
-    public mutating func setLane(_ height: Int, in s: ArrangementSpace) {
-        ensure(in: s)
-        laneH = max(minLane(s), min(maxLane(s), height))
         clamp(in: s)
     }
 

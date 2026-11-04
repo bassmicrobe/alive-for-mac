@@ -13,7 +13,8 @@ import SwiftUI
 final class PreviewCanvasControl {
     /// 1 = the whole song across.
     private(set) var zoom = 1.0
-    private(set) var maxZoom = 1.0
+    /// Unknown until the canvas has a size: until then nothing is held back.
+    private(set) var maxZoom = Double.infinity
     private(set) var isAtFit = true
 
     @ObservationIgnored weak var canvas: ArrangementCanvasView?
@@ -104,6 +105,29 @@ final class ArrangementCanvasView: NSView {
         body = nil
         if let a = arrangement { wantedNameW = ArrangementRender.nameColumnWidth(a.tracks, options) }
         needsDisplay = true
+        publishSoon()
+    }
+
+    /// The header learns the zoom limits when the canvas first gets its size and after every
+    /// resize; asked for after the layout pass, not during it.
+    override func setFrameSize(_ newSize: NSSize) {
+        super.setFrameSize(newSize)
+        body = nil
+        publishSoon()
+    }
+
+    private var publishPending = false
+
+    private func publishSoon() {
+        guard !publishPending else { return }
+        publishPending = true
+        DispatchQueue.main.async { [weak self] in
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                self.publishPending = false
+                if let space = self.makeSpace() { self.publish(space) }
+            }
+        }
     }
 
     private var backingScale: CGFloat { window?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 2 }
@@ -279,5 +303,10 @@ final class ArrangementCanvasView: NSView {
         guard window == nil else { return }
         fadeTimer?.invalidate()
         fadeTimer = nil
+        // Closed in the middle of a drag: the hand goes back with the view.
+        if panFrom != nil {
+            panFrom = nil
+            NSCursor.pop()
+        }
     }
 }
