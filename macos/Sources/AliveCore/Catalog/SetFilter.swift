@@ -217,14 +217,20 @@ public struct SetFilter: Equatable, Sendable {
 extension SetFilter {
     /// The search field's rule — one for both views of the catalog (upstream `MatchesSearch`,
     /// 9ce4b4b): name, project, path, plugins, render names, the project's tags and note.
-    /// `query` is already trimmed and non-empty.
+    /// `query` is already trimmed and non-empty. Mac addition: the query is split on white space
+    /// and every word must hit some field ("song vocals" finds a set whose name has one word and
+    /// whose tag has the other), and case, diacritics and full/half width are ignored ("ｍｉｘ"
+    /// finds "Mix", "cafe" finds "Café").
     public static func matchesSearch(_ s: SetEntry, query q: String,
                                      tagsOf: (String) -> [String], noteOf: (String) -> String) -> Bool {
-        func hit(_ text: String) -> Bool { text.range(of: q, options: [.caseInsensitive, .diacriticInsensitive]) != nil }
-        if hit(s.name) || hit(s.projectName) || hit(s.path) { return true }
-        if s.plugins.contains(where: hit) || s.renderNames.contains(where: hit) { return true }
+        let options: String.CompareOptions = [.caseInsensitive, .diacriticInsensitive, .widthInsensitive]
+        func hit(_ text: String, _ word: String) -> Bool { text.range(of: word, options: options) != nil }
         let dir = s.projectDir
-        return tagsOf(dir).contains(where: hit) || hit(noteOf(dir))
+        return q.components(separatedBy: .whitespacesAndNewlines).filter { !$0.isEmpty }.allSatisfy { word in
+            hit(s.name, word) || hit(s.projectName, word) || hit(s.path, word)
+                || s.plugins.contains { hit($0, word) } || s.renderNames.contains { hit($0, word) }
+                || tagsOf(dir).contains { hit($0, word) } || hit(noteOf(dir), word)
+        }
     }
 }
 

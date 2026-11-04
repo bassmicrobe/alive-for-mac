@@ -142,7 +142,7 @@ final class PluginsModel {
                           query: app.searchText, card: card, filter: filter,
                           sortColumn: sortColumn, sortAscending: sortAscending)
         if let rowsMemo, rowsMemo.key == key { return rowsMemo.rows }
-        let words = SetSearch.words(in: key.query)
+        let words = PluginRow.words(in: key.query)
         var list = snapshot.table.rows.filter { row in
             (card?.passes(row.stat) ?? true) && filter.matches(row.stat) && row.matches(search: words)
         }

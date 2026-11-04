@@ -87,43 +87,6 @@ final class PreferencesMappingTests: XCTestCase {
     }
 }
 
-// MARK: - Search
-
-final class SetSearchTests: XCTestCase {
-    func testEmptyQueryMatchesEverything() {
-        XCTAssertTrue(SetSearch.matches(entry("/a/x.als"), query: "  "))
-    }
-
-    func testCaseAndDiacriticsAreIgnored() {
-        let set = entry("/a/Café Mix.als", project: "Sommer")
-        XCTAssertTrue(SetSearch.matches(set, query: "cafe"))
-        XCTAssertTrue(SetSearch.matches(set, query: "MIX"))
-        XCTAssertTrue(SetSearch.matches(set, query: "sommer"))
-        XCTAssertFalse(SetSearch.matches(set, query: "winter"))
-    }
-
-    func testFullWidthLettersMatchHalfWidth() {
-        XCTAssertTrue(SetSearch.matches(entry("/a/Mix.als"), query: "ｍｉｘ"))
-    }
-
-    func testEveryWordMustMatchNameOrProject() {
-        let set = entry("/a/Song.als", project: "Album")
-        XCTAssertTrue(SetSearch.matches(set, query: "song album"))
-        XCTAssertFalse(SetSearch.matches(set, query: "song single"))
-    }
-
-    func testFilterRunsBeforeFoldingByFolder() {
-        let sets = [entry("/p/v1.als", modified: 1), entry("/p/final.als", modified: 2), entry("/q/other.als")]
-        // "v1" only exists in the older version: folding first would have hidden it.
-        let rows = SetSearch.rows(sets, query: "v1", groupByFolder: true)
-        XCTAssertEqual(rows.map(\.path), ["/p/v1.als"])
-        let all = SetSearch.rows(sets, query: "", groupByFolder: true)
-        XCTAssertEqual(Set(all.map(\.path)), ["/p/final.als", "/q/other.als"])
-        XCTAssertEqual(all.first { $0.path == "/p/final.als" }?.collapsedCount, 1)
-        XCTAssertEqual(SetSearch.rows(sets, query: "", groupByFolder: false).count, 3)
-    }
-}
-
 // MARK: - Open-path resolution
 
 final class OpenPathPlanTests: XCTestCase {

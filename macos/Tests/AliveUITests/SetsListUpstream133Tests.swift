@@ -45,6 +45,10 @@ final class SetsListUpstream133Tests: XCTestCase {
         XCTAssertEqual(found("serum"), ["two"])
         XCTAssertEqual(found("bounce"), ["three"])
         XCTAssertEqual(found("bridge"), ["four"])
+        // Every word must hit some field (not necessarily the same one); full width counts as half.
+        XCTAssertEqual(found("tagged vocals"), ["one"])
+        XCTAssertEqual(found("tagged serum"), [])
+        XCTAssertEqual(found("ｓｅｒｕｍ"), ["two"])
     }
 
     func testFilterCounterIsTheNumberOfRowsTheListShows() {
