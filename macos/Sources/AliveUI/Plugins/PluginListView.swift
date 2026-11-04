@@ -85,6 +85,8 @@ struct PluginListView: View {
                 model.reveal(row)
                 return .handled
             }
+            .onKeyPress(.space) { model.togglePlayerIfLoaded() ? .handled : .ignored }
+            .onChange(of: model.listFocusRequest) { _, _ in focused = true }
             .onChange(of: model.pendingScrollID) { _, id in scroll(proxy, model, to: id) }
             .onAppear { scroll(proxy, model, to: model.pendingScrollID) }
             .accessibilityLabel(PluginsStrings.title.s)
