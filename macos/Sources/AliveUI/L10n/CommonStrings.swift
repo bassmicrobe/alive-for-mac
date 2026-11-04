@@ -91,8 +91,8 @@ enum CommonStrings: LocalizedStrings {
         case .pathMissing: return ("The file no longer exists: %@", "ファイルが見つかりません: %@")
         case .settingsSaveFailed: return ("Could not save settings: %@", "設定を保存できませんでした: %@")
         case .settingsUnread:
-            return ("settings.cfg can't be read right now, so changes are kept only until you quit.",
-                    "settings.cfg を今読み込めないため、変更は終了するまでしか保持されません。")
+            return ("settings.cfg can't be read right now, so changes are not being saved.",
+                    "settings.cfg を今読み込めないため、変更は保存されていません。")
         case .dataFileBackedUp:
             return ("“%1$@” was not a plain UTF-8 text file. The original was kept as “%1$@.bak”.",
                     "「%1$@」は通常の UTF-8 テキストではありませんでした。元のファイルは「%1$@.bak」として残してあります。")
