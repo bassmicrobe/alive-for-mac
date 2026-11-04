@@ -211,11 +211,18 @@ struct NowPlayingStrip: View {
             }
             .buttonStyle(.plain)
             .accessibilityLabel(player.isPlaying ? HomeStrings.pauseRender.s : HomeStrings.playRender.s)
-            VStack(alignment: .leading, spacing: 1) {
-                Text(player.currentFile?.name ?? "").font(Theme.fTitle).foregroundStyle(Theme.text).lineLimit(1)
-                Text(player.setName).font(Theme.fSmall).foregroundStyle(Theme.secondaryText).lineLimit(1)
+            // The name of the set is a link to its tile; a search that hides the tile is cleared (9ce4b4b).
+            Button { if let path = player.setPath { app.home.show(path: path) } } label: {
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(player.currentFile?.name ?? "").font(Theme.fTitle).foregroundStyle(Theme.text).lineLimit(1)
+                    Text(player.setName).font(Theme.fSmall).foregroundStyle(Theme.secondaryText).lineLimit(1)
+                }
+                .frame(width: 180, alignment: .leading)
+                .contentShape(Rectangle())
             }
-            .frame(width: 180, alignment: .leading)
+            .buttonStyle(.plain)
+            .disabled(player.setPath == nil)
+            .help(HomeStrings.showSet.s)
             Text(PlayerFormat.time(player.position)).monospacedDigit()
             ScrubBar(value: player.progress, label: HomeStrings.nowPlayingSeek.s) { player.seek(toFraction: $0) }
             Text(PlayerFormat.time(player.duration)).monospacedDigit()

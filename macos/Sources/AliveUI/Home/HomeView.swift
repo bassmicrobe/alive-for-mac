@@ -54,6 +54,15 @@ private struct HomeContent: View {
                 .onChange(of: app.selectedSetPath) { _, path in
                     if let path { scroller.scrollTo(path) }
                 }
+                // ↓ in the search field: the picked tile (or the first) takes the keyboard.
+                .onChange(of: app.home.gridFocusRequest) { _, _ in
+                    guard let path = app.selectedSetPath else { return }
+                    keyboardActive = true
+                    focusedPath = path
+                    scroller.scrollTo(path)
+                }
+                // A search took the selected tile away: it must not stay the target of ⌘O.
+                .onChange(of: app.home.rows.map(\.path)) { _, _ in app.home.dropHiddenSelection() }
             }
             if app.player.isStripVisible {
                 NowPlayingStrip().transition(.move(edge: .bottom).combined(with: .opacity))
@@ -92,7 +101,10 @@ private struct HomeContent: View {
     private var projectsHeader: some View {
         HStack(spacing: 10) {
             Text(HomeStrings.projects.s).font(Theme.fHead).foregroundStyle(Theme.text)
-            PinnedFirstToggle(isOn: app.home.pinnedFirst) { app.home.togglePinnedFirst() }
+            // Nothing pinned, nothing to put first: the star is not offered (0bb4915).
+            if app.home.hasPinned {
+                PinnedFirstToggle(isOn: app.home.pinnedFirst) { app.home.togglePinnedFirst() }
+            }
             if app.catalog.sets.isEmpty, app.catalog.isReady {
                 Text(HomeStrings.nothingIndexed.s).font(Theme.fLabel).foregroundStyle(Theme.secondaryText)
             }
@@ -139,6 +151,7 @@ private struct HomeContent: View {
             app.tab = .sets
         }
         Button(CommonStrings.rescue.s) { app.sheet = .rescue(path: path) }
+        Button(CommonStrings.exportSet.s) { app.sheet = .export(path: path) }
         Divider()
         Button(CommonStrings.showInFinder.s) { app.revealInFinder(path: path) }
     }
