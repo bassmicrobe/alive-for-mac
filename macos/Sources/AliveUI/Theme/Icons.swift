@@ -15,7 +15,7 @@ enum AppIcon: CaseIterable {
 
     static let mute = AppIcon.volume0
     static let volume = AppIcon.volumeHigh
-    static let dice = AppIcon.dice1
+    static let dice = AppIcon.dice3     // the random-project die starts on three (0bb4915)
 
     var symbol: String {
         switch self {

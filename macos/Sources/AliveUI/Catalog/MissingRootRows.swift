@@ -11,16 +11,16 @@ struct MissingRootRows: View {
             // A disconnected multi-folder library must leave the catalog and recovery buttons
             // reachable. Keep the banner compact and let all missing roots scroll within it.
             ScrollView { rows }
-                .frame(height: Theme.controlH * 3 + 16)
+                .frame(height: Theme.controlH * 3 + Theme.s(16))
         } else {
             rows
         }
     }
 
     private var rows: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: Theme.s(8)) {
             ForEach(roots, id: \.self) { root in
-                HStack(spacing: 10) {
+                HStack(spacing: Theme.s(10)) {
                     Text(CommonStrings.rootMissingLine.f(SetFormat.homeAbbreviated(root)))
                         .font(Theme.fSmall).foregroundStyle(Theme.text)
                         .lineLimit(2).truncationMode(.middle)

@@ -31,8 +31,8 @@ enum HelpStrings: LocalizedStrings {
         case .groupPlayback: return ("Playback", "再生")
         case .groupGeneral: return ("General", "一般")
 
-        case .aboutHome: return ("Pinned sets, recent renders and a year of activity.",
-                                 "ピン留めしたセット、最近のレンダー、1 年分のアクティビティ。")
+        case .aboutHome: return ("Pinned sets, recent renders and a year of activity; click a day to see what was saved that day.",
+                                 "ピン留めしたセット、最近のレンダー、1 年分のアクティビティ。日をクリックすると、その日に保存したプロジェクトを表示します。")
         case .aboutSets: return ("Every Live set in your project folders, with tags, notes and details.",
                                  "プロジェクトフォルダ内のすべての Live セット。タグ、メモ、詳細付き。")
         case .aboutPlugins: return ("The plugins you have installed and which sets use them.",
