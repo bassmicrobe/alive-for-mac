@@ -13,8 +13,7 @@ struct StatWindow: View {
 
     var body: some View {
         // Grows with the interface scale like the main window (9ce4b4b), never past the screen.
-        let size = StatWindowSize.make(uiScale: app.settings.uiScale,
-                                       screen: (NSScreen.main ?? NSScreen.screens.first)?.visibleFrame.size)
+        let size = StatWindowSize.make(uiScale: app.settings.uiScale, screen: ScaledWindowSize.availableRoom)
         return VStack(alignment: .leading, spacing: 14) {
             toolbar
             HStack(alignment: .top, spacing: 16) {

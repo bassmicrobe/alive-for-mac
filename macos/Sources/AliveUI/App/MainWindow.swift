@@ -9,6 +9,8 @@ struct MainWindow: View {
 
     var body: some View {
         @Bindable var app = app
+        // The scaled minimum, but never more than the screen has room for.
+        let size = MainWindowSize.current
         ZStack {
             // A press on the window background or the empty strip of the bar stops a sample.
             background
@@ -28,7 +30,7 @@ struct MainWindow: View {
             }
             ToastOverlay(app: app)
         }
-        .frame(minWidth: Theme.s(1120), minHeight: Theme.s(600))
+        .frame(minWidth: size.minimum.width, minHeight: size.minimum.height)
         .background(WindowTransparency(isTransparent: app.prefs.transparency))
         .sheet(item: $app.sheet) { sheet in SheetHost(sheet: sheet) }
         .preferredColorScheme(.dark)
