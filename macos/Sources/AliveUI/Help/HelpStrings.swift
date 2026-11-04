@@ -14,7 +14,7 @@ enum HelpStrings: LocalizedStrings {
     case launchLive, openSettings, openHelp, fullscreen, minimize, quit
     case listReturn, listSpace, searchIntoResults, listEnds
     case previewWheel, previewShiftWheel, previewCommandWheel, previewOptionWheel, previewMiddleDrag
-    case sampleAudition, samplePlay, sampleCollapse, sampleOpen, sampleReveal, playerReveal
+    case sampleAudition, samplePlay, sampleCollapse, sampleEmptyClick, sampleOpen, sampleReveal, playerReveal
 
     var en: String { text.en }
     var ja: String { text.ja }
@@ -69,7 +69,8 @@ enum HelpStrings: LocalizedStrings {
         case .listReturn: return ("Open the selected set", "選択したセットを開く")
         case .sampleAudition: return ("Play or stop the sample", "サンプルを再生 / 停止")
         case .samplePlay: return ("Play the sample from the start / open the folder", "サンプルを頭から再生 / フォルダを開く")
-        case .sampleCollapse: return ("Collapse the folder", "フォルダを閉じる")
+        case .sampleCollapse: return ("Close the folder / go to the parent", "フォルダを閉じる / 親フォルダへ")
+        case .sampleEmptyClick: return ("Stop the sample (click on empty space)", "サンプルを停止（何もない所をクリック）")
         case .sampleOpen: return ("Open a folder / show a sample in the tree", "フォルダを開く / サンプルをツリーで表示")
         case .sampleReveal: return ("Show the sample in Finder", "サンプルを Finder に表示")
         case .listSpace: return ("Play / pause the render (also on the Plugins tab)", "レンダーを再生 / 一時停止（プラグインタブでも）")

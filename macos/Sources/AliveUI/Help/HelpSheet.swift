@@ -50,6 +50,7 @@ let shortcutGroups: [ShortcutGroup] = [
         ShortcutRow(keys: ["Space"], action: .sampleAudition),
         ShortcutRow(keys: ["→"], action: .samplePlay),
         ShortcutRow(keys: ["←"], action: .sampleCollapse),
+        ShortcutRow(keys: ["Click"], action: .sampleEmptyClick),
         ShortcutRow(keys: ["↩"], action: .sampleOpen),
         ShortcutRow(keys: ["⇧", "↩"], action: .sampleReveal),
     ]),
