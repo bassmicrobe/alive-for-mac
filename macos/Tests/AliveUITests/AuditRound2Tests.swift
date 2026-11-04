@@ -30,7 +30,8 @@ final class AuditRound2Tests: XCTestCase {
     }
 
     // SR1. A data file that cannot be read is announced once at launch, through the stores the app
-    // writes with, and a later change to it does not toast again.
+    // writes with, and a later change to it does not toast again. A file that is not UTF-8 is read by
+    // the same check and its copy is announced after it.
     func testUnreadDataFilesAreAnnouncedOnceThroughTheStoresTheAppUses() throws {
         try XCTSkipIf(geteuid() == 0, "root can read anything")
         let dir = try scratch()
@@ -38,16 +39,19 @@ final class AuditRound2Tests: XCTestCase {
             try "x\n".write(toFile: dir + "/" + name, atomically: true, encoding: .utf8)
             try lock(dir + "/" + name)
         }
+        try Data([UInt8]("/P Project\t/P Project/caf".utf8) + [0xE9, 0x0A]).write(to: URL(fileURLWithPath: dir + "/previews.cfg"))
+        _ = AppHome.takeBackupNotices()
         let app = AppModel(dataDir: dir)
 
-        app.announceUnreadFiles()
-        XCTAssertEqual(app.toasts.count, 1)
-        let text = try XCTUnwrap(app.toasts.first?.text)
-        XCTAssertTrue(text.contains("notes.cfg") && text.contains("home.cfg"), text)
-        XCTAssertFalse(text.contains("previews.cfg") || text.contains("settings.cfg"), text)
+        app.announceDataFileProblems()
+        XCTAssertEqual(app.toasts.count, 2)
+        let unread = try XCTUnwrap(app.toasts.first?.text)
+        XCTAssertTrue(unread.contains("notes.cfg") && unread.contains("home.cfg"), unread)
+        XCTAssertFalse(unread.contains("previews.cfg") || unread.contains("settings.cfg"), unread)
+        XCTAssertEqual(app.toasts.last?.text, CommonStrings.dataFileBackedUp.f("previews.cfg", "previews.cfg.orig"))
 
         app.home.togglePin(path: "/a/One.als")
-        XCTAssertEqual(app.toasts.count, 1, "home.cfg was already announced")
+        XCTAssertEqual(app.toasts.count, 2, "home.cfg was already announced")
     }
 
     // 9. Without a log nothing is revealed and the toast does not point at "alive.log".

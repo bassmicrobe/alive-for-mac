@@ -33,8 +33,9 @@ by `ALIVE_TEST_SETS`, `ALIVE_TEST_SAMPLES`, `ALIVE_TEST_PARSER_DIFF`.
 1. `RescueProbe.cleanupStale(dir:)` removes leftover probe copies listed in `probes.txt`;
    `AppHome.sweepLeftoverTemps` removes `*.tmp-<UUID>` / `*.part-<UUID>` files (and the old fixed
    `.cfg.tmp` / `.bak.part`) that a write which died left in the data folder, when over a minute old.
-   Then `announceBackedUpFiles()` and `announceUnreadFiles()`: one toast each for the files that were
-   copied aside (as `.orig`) and for the data files that exist but cannot be read.
+   Then `announceDataFileProblems()`: `announceUnreadFiles()` first (it is what reads the lazily loaded
+   stores, and a non-UTF-8 file is copied aside by that read), then `announceBackedUpFiles()`: one toast
+   for the data files that exist but cannot be read, one for each file copied aside (as `.orig`).
 2. `CatalogModel.start()`: cache loaded off the main thread and published, then a background scan if
    there is an enabled root; it also starts `app.sets.watcher` (FSEvents, new sets appear by themselves)
    and `VolumeWatcher` (NSWorkspace mount/unmount, debounced 1.5 s -> `volumesChanged()`). That first

@@ -87,10 +87,7 @@ final class AppModel {
         RescueProbe.cleanupStale(dir: dataDir)
         let swept = AppHome.sweepLeftoverTemps(dir: dataDir)
         if swept > 0 { Diag.info("removed \(swept) leftover temporary file(s) from the data folder") }
-        // The lazily read files are read now, so a damaged one is noticed (and backed up before
-        // anything can overwrite it) at launch and the person is told once.
-        announceBackedUpFiles()
-        announceUnreadFiles()
+        announceDataFileProblems()
         catalog.start()
         integration.start()
         samples.expandsRootsOnFirstLoad = true
@@ -188,6 +185,15 @@ final class AppModel {
     var canPresentFilters: Bool { tab == .sets || tab == .plugins }
 
     // MARK: - Toasts
+
+    /// The lazily read files are read now, so a damaged one is noticed (and copied aside before
+    /// anything can overwrite it) at launch and the person is told once. The unread check is what
+    /// reads notes.cfg, home.cfg and previews.cfg, so it comes first: the copies it makes are
+    /// announced right after.
+    func announceDataFileProblems() {
+        announceUnreadFiles()
+        announceBackedUpFiles()
+    }
 
     /// One toast per data file that was unreadable and has been copied to `<file>.orig`.
     func announceBackedUpFiles() {
