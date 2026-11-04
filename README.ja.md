@@ -8,9 +8,9 @@
 
 `.exe` ひとつだけ。インストーラーも外部 DLL もランタイムのダウンロードも不要。
 
-![version](https://img.shields.io/badge/version-1.3-2ea043)
+![version](https://img.shields.io/badge/version-1.3.3-2ea043)
 ![platform](https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-0078d4)
-![framework](https://img.shields.io/badge/.NET%20Framework-4.6%2B-512BD4)
+![framework](https://img.shields.io/badge/.NET%20Framework-4.7%2B-512BD4)
 ![license](https://img.shields.io/badge/license-MIT-blue)
 
 [**ダウンロード**](../../releases) · [Русский](README.ru.md)
@@ -31,7 +31,7 @@
 
 - **ホーム** — プロジェクトごとにアレンジメントのサムネイル付きタイルを表示。スターで先頭に固定、
   再生ボタンでセット横のレンダーを再生。タイルの上には「あなたの 1 年」(作業日数、連続記録、
-  開始時刻の傾向、ライブラリの総容量) を表示。
+  開始時刻の傾向、ライブラリの総容量) を表示。日をクリックすると、その日に保存したプロジェクトが分かります。
 - **Sets** — セットの情報 (テンポ、キー、Live バージョン、トラック数、プラグイン、ファイル、
   フォルダサイズ) を一覧。`v1` / `final` / `final 2` は 1 行に折りたたみ。フィルタ (`F`)、
   検索 (`Ctrl F`)、タグとメモ (`Ctrl T`) に対応。新しいセットは再スキャン不要で自動的に現れます。
@@ -39,14 +39,19 @@
   リストは Live 自身のプラグインデータベース、または VST2/VST3 フォルダから取得。
 - **Samples** (`Ctrl 4`) — 実際に使っているパックと、一度も使っていないパックを集計。
   使用数はプロジェクト単位 (同じ曲の 10 バージョンは 1 とカウント)。未使用・最頻使用・重複の
-  一覧、クリックで試聴、Live へのドラッグに対応。Alive がサンプルを移動・削除することはありません。
+  一覧、クリックで試聴、Live へのドラッグに対応。`→` で選択中のサンプルを頭から再生、
+  空いた場所のクリックで停止、波形の下のスライダーで音量を調整。Alive がサンプルを移動・削除することはありません。
 - **Rescue** (`Ctrl R`) — セットが開かない? Live のログからクラッシュ原因のプラグインを特定。
   ログに手がかりがなければ、セットのコピーでプラグインを順に無効化して自力で犯人を見つけます。
   元のセットには一切触れません。
 - **Export** — セットに必要なもの (サンプル、他プロジェクトのファイル、User Library、パック) を
   1 つのフォルダまたは `.zip` に収集。Live の *Collect All and Save* 相当。
-- **プレビューとプレイヤー** — `Ctrl Space` でアレンジメント全体を Live のクリップ色で 1 枚絵に。
+- **プレビューとプレイヤー** — `Ctrl Space` でアレンジメント全体をトラック名付きで Live のクリップ色の
+  1 枚絵に。操作は Live のアレンジメントと同じ: ホイールでトラックを、`Shift` + ホイールで時間を
+  スクロール、`Ctrl` + ホイールで拡大縮小、`Alt` + ホイールでトラックの高さ、中ボタンでドラッグ。
   `Space` でセット横のレンダーを再生。
+- **設定** — `Ctrl ,`: 画面の拡大縮小 (Windows の倍率の上に 75 / 100 / 125%)、スムーズスクロール、
+  透明効果、更新チェック、プラグイン一覧の取得元。
 - **Stat** — ライブラリ全体を点群として可視化 (1 点 = 1 プロジェクト)。軸・点サイズ・色に
   テンポ、トラック数、年などを割り当て可能。
 
@@ -57,7 +62,7 @@
 
 ## 技術スタック
 
-- **言語 / フレームワーク:** C# (WinForms)、.NET Framework 4.6+ (Windows 10 / 11 に同梱)
+- **言語 / フレームワーク:** C# (WinForms)、.NET Framework 4.7+ (Windows 11、および Windows 10 1703 以降に同梱)
 - **ビルド:** .NET Framework 4.x 付属の C# コンパイラのみ。IDE も追加インストールも不要
 - **macOS 版:** `macos/` に Swift によるネイティブ移植あり (詳細は [macos/PARITY.md](macos/PARITY.md))
 
@@ -67,7 +72,7 @@
 2. `Alive.exe` を実行。
 3. Ableton のプロジェクトフォルダを指定して **Scan**。
 
-必要なのは **.NET Framework 4.6+** のみ (Windows 10 / 11 に同梱)。
+必要なのは **.NET Framework 4.7+** のみ (Windows 11 と、バージョン 1703 以降の Windows 10 に同梱)。
 
 ### ソースからビルド
 
@@ -87,8 +92,9 @@ build.cmd
 | `Shift F` | フォルダをスキャン | `Ctrl Space` | アレンジメントプレビュー |
 | `Ctrl F` | 検索 | `Q` | セットをピン留め |
 | `Ctrl ,` | 設定 | `Ctrl T` | タグとメモ |
-| `F11` / `Ctrl M` | フルスクリーン / 最小化 | `Ctrl R` | セットをレスキュー |
-| `Ctrl Q` | 終了 | `F5` | 再スキャン |
+| `F11` / `Ctrl M` | 最大化 / 最小化 | `Ctrl R` | セットをレスキュー |
+| `Ctrl Q` | 終了 | `Ctrl E` | セットをエクスポート |
+| | | `F5` | 再スキャン |
 | | | `Ctrl N` | Live を起動 |
 
 ### トラブルシューティング
@@ -110,6 +116,7 @@ build.cmd
 Alive が記憶する内容はすべて `%APPDATA%\Alive` にあります (**Settings → Data folder**)。
 レジストリを含め他の場所には何も書きません。フォルダを削除すれば完全リセットです。
 `activity.cache` (作業履歴) と `notes.cfg` (タグとメモ) だけは再構築できないので先に退避を。
+各 `.cfg` は保存のたびに前の版が `*.cfg.bak` として残ります。壊れたときは `.bak` の名前を戻してください。
 ポータブル運用などで場所を変えたい場合は、起動前に環境変数 `ALIVE_HOME` にフォルダを設定します。
 
 ## 構成
@@ -127,7 +134,7 @@ Alive が記憶する内容はすべて `%APPDATA%\Alive` にあります (**Set
 - [FORMAT.md](FORMAT.md) — `.als` フォーマットの解析結果 (実セット 427 個に基づく)。Live を
   開かずにセットを読める理由がここにあります。
 - [macos/PARITY.md](macos/PARITY.md) — macOS 版と Windows 版の機能パリティ。
-- [docs/maintenance.md](docs/maintenance.md) — CI ランタイムなどのメンテナンス履歴。
+- [macos/docs/CI_MAINTENANCE.md](macos/docs/CI_MAINTENANCE.md) — CI ランタイムなどのメンテナンス履歴。
 
 ## ライセンス
 

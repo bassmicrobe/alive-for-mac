@@ -87,7 +87,7 @@ Paste this into Claude Code at the repo root:
 Take in the latest upstream (rueblose/alive) changes for Alive for Mac. Follow macos/docs/UPSTREAM.md
 and macos/docs/PORTING.md exactly.
 
-1. Work on a fresh branch from macos-port with a clean tree. Run
+1. Work on a fresh branch from main with a clean tree. Run
    `macos/scripts/upstream-sync.sh` (fetch + merge upstream/main + report). If it says
    "Up to date", stop.
 2. For every upstream commit in the report, read the diff (`git show <sha>`), and port it to the
@@ -177,7 +177,7 @@ git commit -m "feat(mac): port upstream <old>..<new>"
 Alive for Mac に、上流 (rueblose/alive) の最新の変更を取り込んでください。
 macos/docs/UPSTREAM.md と macos/docs/PORTING.md に厳密に従うこと。
 
-1. クリーンな作業ツリーで macos-port から新しいブランチを切り、
+1. クリーンな作業ツリーで main から新しいブランチを切り、
    `macos/scripts/upstream-sync.sh`（fetch + upstream/main のマージ + レポート）を実行。
    "Up to date" と出たら終了。
 2. レポートの各上流コミットについて差分 (`git show <sha>`) を読み、レポートに出た Swift ファイル
