@@ -27,13 +27,24 @@ enum SetFormat {
         return SetFilter.formatDate(date, calendar: calendar)
     }
 
+    /// How many of `versions` were saved on each calendar day (the key is the start of the day).
+    static func dayCounts(of versions: [SetEntry], calendar: Calendar = .current) -> [Date: Int] {
+        var counts: [Date: Int] = [:]
+        for v in versions { counts[calendar.startOfDay(for: v.modified), default: 0] += 1 }
+        return counts
+    }
+
     /// A version's date in the Versions block, with the time when another version of the folder was
-    /// saved the same day: two equal dates told nothing apart (9ce4b4b).
+    /// saved the same day: two equal dates told nothing apart (9ce4b4b). `version` is one of the
+    /// `all` that `dayCounts` counted.
     static func versionStamp(_ version: SetEntry, among all: [SetEntry], calendar: Calendar = .current) -> String {
+        versionStamp(version, dayCounts: dayCounts(of: all, calendar: calendar), calendar: calendar)
+    }
+
+    /// The same with the per-day counts made once for the whole block, not once per row.
+    static func versionStamp(_ version: SetEntry, dayCounts: [Date: Int], calendar: Calendar = .current) -> String {
         let date = day(version.modified, calendar: calendar)
-        guard !date.isEmpty,
-              all.contains(where: { $0.path != version.path && calendar.isDate($0.modified, inSameDayAs: version.modified) })
-        else { return date }
+        guard !date.isEmpty, dayCounts[calendar.startOfDay(for: version.modified), default: 0] > 1 else { return date }
         let time = calendar.dateComponents([.hour, .minute], from: version.modified)
         return date + String(format: " %02d:%02d", time.hour ?? 0, time.minute ?? 0)
     }

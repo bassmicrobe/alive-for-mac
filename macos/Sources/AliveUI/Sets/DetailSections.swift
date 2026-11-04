@@ -246,11 +246,12 @@ struct DetailVersions: View {
     var body: some View {
         let all = app.catalog.index.inSameFolder(set)
         if all.count > 1 {
+            let dayCounts = SetFormat.dayCounts(of: all)
             VStack(alignment: .leading, spacing: 2) {
                 PanelHeading(title: SetsStrings.versionsHeading.f(all.count))
                     .padding(.bottom, 2)
                 ForEach(all) { version in
-                    PanelLinkRow(text: version.name, note: SetFormat.versionStamp(version, among: all),
+                    PanelLinkRow(text: version.name, note: SetFormat.versionStamp(version, dayCounts: dayCounts),
                                  tint: version.path == set.path ? Theme.text : Theme.secondaryText,
                                  isCurrent: version.path == set.path) {
                         app.sets.select(path: version.path)
