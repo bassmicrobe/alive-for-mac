@@ -232,8 +232,18 @@ final class ExportModel {
             app.toast(ExportStrings.toastDone.f(name))
             return
         }
-        app.toast(ExportStrings.toastDoneWithFailures.f(name, ExportStrings.files(r.failed.count)), kind: .error)
-        app.revealInFinder(path: Diag.currentLogPath ?? Diag.defaultLogPath(dir: app.dataDir))
+        let outcome = Self.failureOutcome(name: name, failed: r.failed.count, logPath: Diag.currentLogPath)
+        app.toast(outcome.text, kind: .error)
+        if let log = outcome.reveal { app.revealInFinder(path: log) }
+    }
+
+    /// The toast after copies failed, and the log to show in Finder. Without a log (`Diag` writes
+    /// none when the data folder cannot be written) there is nothing to reveal and the toast does
+    /// not send the person to a file that is not there.
+    static func failureOutcome(name: String, failed: Int, logPath: String?) -> (text: String, reveal: String?) {
+        let count = ExportStrings.files(failed)
+        guard let logPath else { return (ExportStrings.toastDoneWithFailuresNoLog.f(name, count), nil) }
+        return (ExportStrings.toastDoneWithFailures.f(name, count), logPath)
     }
 
     private func report(_ p: CollectProgress, generation g: Int) {

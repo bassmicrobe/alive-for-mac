@@ -19,7 +19,7 @@ enum ExportStrings: LocalizedStrings {
     // Where the files from elsewhere come from
     case elsewhereFrom, andMore
     // Outcome
-    case done, doneWithFailures, toastDone, toastDoneWithFailures
+    case done, doneWithFailures, toastDone, toastDoneWithFailures, toastDoneWithFailuresNoLog
     // Errors (one inline message, never one per file)
     case errDestinationExists, errNotEnoughSpace, errPack, errSetNotWritten, errIO, errCancelled
 
@@ -84,6 +84,9 @@ enum ExportStrings: LocalizedStrings {
         case .toastDoneWithFailures:
             return ("Exported “%1$@” — %2$@ could not be copied, their names are in alive.log",
                     "「%1$@」をエクスポートしました。%2$@をコピーできませんでした。名前は alive.log にあります")
+        case .toastDoneWithFailuresNoLog:
+            return ("Exported “%1$@” — %2$@ could not be copied (there is no log to name them)",
+                    "「%1$@」をエクスポートしました。%2$@をコピーできませんでした（名前を記録するログがありません）")
         case .errDestinationExists:
             return ("“%@” already exists. Choose another name — nothing is ever replaced.",
                     "「%@」は既に存在します。別の名前を選んでください。既存のものは置き換えません。")

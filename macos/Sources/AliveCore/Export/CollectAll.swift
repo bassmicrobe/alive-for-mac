@@ -229,7 +229,7 @@ public enum CollectAll {
                     // that is not in the copy, and the loss goes into the result.
                     result.failed.append(CollectFailure(name: d.name, path: d.path,
                                                         reason: error.localizedDescription))
-                    Diag.info("collect: cannot copy \(d.path): \(error.localizedDescription)")
+                    Diag.warn("collect: cannot copy \(d.path): \(error.localizedDescription)")
                     for i in d.refIndexes { rewrites[i] = nil }
                     // A half-copied bundle is worse than a missing one.
                     try? fm.removeItem(atPath: (root as NSString).appendingPathComponent(rel))
