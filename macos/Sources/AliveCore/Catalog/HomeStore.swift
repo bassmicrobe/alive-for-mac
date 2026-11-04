@@ -11,6 +11,8 @@ public final class HomeStore: @unchecked Sendable {
     private let dir: String
     private let lock = NSLock()
     private var loadedPins: [String]?
+    /// home.cfg is there but could not be read: nothing is saved over it (see `AppHome.readStore`).
+    private var unread = false
 
     public init(dir: String) { self.dir = dir }
 
@@ -19,7 +21,9 @@ public final class HomeStore: @unchecked Sendable {
     private func pinsLocked() -> [String] {
         if let p = loadedPins { return p }
         var pins: [String] = []
-        for raw in AppHome.readLines(filePath) ?? [] {
+        let read = AppHome.readStore(filePath)
+        unread = read.isUnread
+        for raw in read.lines {
             let line = raw.trimmingCharacters(in: .whitespaces)
             if line.isEmpty || line.hasPrefix("#") { continue }
             guard let eq = line.firstIndex(of: "=") else { continue }
@@ -32,6 +36,13 @@ public final class HomeStore: @unchecked Sendable {
 
     private static func contains(_ list: [String], _ v: String) -> Bool {
         list.contains { $0.caseInsensitiveCompare(v) == .orderedSame }
+    }
+
+    /// The file could not be read at start, so pins changed since are kept in memory only.
+    public var isUnread: Bool {
+        lock.lock(); defer { lock.unlock() }
+        _ = pinsLocked()
+        return unread
     }
 
     /// Pin order is kept: pinned first, shown first.
@@ -59,7 +70,11 @@ public final class HomeStore: @unchecked Sendable {
         }
         loadedPins = pins
         let text = (["# Alive - home page: pinned projects"] + pins.map { "pin=\($0)" }).joined(separator: "\n") + "\n"
-        do { try AppHome.writeAtomically(text, to: filePath) } catch { Diag.fail("home.cfg write", error) }
+        if unread {
+            Diag.warn("home.cfg was not read at start; not saving over it")
+        } else {
+            do { try AppHome.writeKeepingBackup(text, to: filePath) } catch { Diag.fail("home.cfg write", error) }
+        }
         return nowPinned
     }
 }

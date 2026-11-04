@@ -77,6 +77,12 @@ public struct Settings: Equatable, Sendable {
     /// Lines with keys this build does not know, in file order — round-tripped verbatim.
     public var unknownLines: [String] = []
 
+    /// settings.cfg is there but could not be read at all (another program held it, no
+    /// permission). What this copy holds is then defaults, and saving them would put them in
+    /// place of everything on disk — so `save` does nothing until the next start reads the file
+    /// (upstream `_unread`, 9ce4b4b).
+    public private(set) var isUnread = false
+
     public static let systemLang = "system"
     static let header = "# Alive - folders to scan for projects"
     public static let allowedLangs = ["system", "en", "ja"]
@@ -93,8 +99,9 @@ public struct Settings: Equatable, Sendable {
 
     public static func load(dir: String = AppHome.path) -> Settings {
         var s = Settings()
-        guard let lines = AppHome.readLines(filePath(dir: dir)) else { return s }
-        for raw in lines {
+        let read = AppHome.readStore(filePath(dir: dir))
+        s.isUnread = read.isUnread
+        for raw in read.lines {
             let line = raw.trimmingCharacters(in: .whitespaces)
             if line.isEmpty { continue }
             if line.hasPrefix("#") {
@@ -232,14 +239,21 @@ public struct Settings: Equatable, Sendable {
         return out.joined(separator: "\n") + "\n"
     }
 
-    /// Atomic write (temp file + rename). Throws on I/O failure; callers log via `Diag`.
+    /// Atomic write (temp file + rename), the previous version kept as `settings.cfg.bak`.
+    /// Throws on I/O failure; callers log via `Diag`. A file that could not be read at load is
+    /// left alone (`isUnread`).
     public func save(dir: String = AppHome.path) throws {
-        try AppHome.writeAtomically(serialized(), to: Settings.filePath(dir: dir))
+        guard !isUnread else {
+            Diag.warn("settings.cfg was not read at start; not saving over it")
+            return
+        }
+        try AppHome.writeKeepingBackup(serialized(), to: Settings.filePath(dir: dir))
     }
 
     /// Re-reads only the root lists from disk (upstream `ReloadRoots`).
     public mutating func reloadRoots(dir: String = AppHome.path) {
         let s = Settings.load(dir: dir)
+        if s.isUnread { return }        // keep the roots we have rather than none
         roots = s.roots
         disabledRoots = s.disabledRoots
     }

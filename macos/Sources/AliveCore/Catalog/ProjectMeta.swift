@@ -23,6 +23,10 @@ public final class ProjectMeta: @unchecked Sendable {
     private let dir: String
     private let lock = NSLock()
     private var byDir: [String: Entry]?    // keyed lowercased
+    /// notes.cfg is there but could not be read (another program held it). Saving then would put
+    /// the few entries made since in place of every tag and note on disk, so nothing is saved
+    /// until the next start reads the file (upstream `_unread`, 9ce4b4b).
+    private var unread = false
 
     /// The tag set may have grown — time for the window to rebuild its list. Called on the
     /// calling thread of `set`, outside the lock.
@@ -37,7 +41,9 @@ public final class ProjectMeta: @unchecked Sendable {
     private func loaded() -> [String: Entry] {
         if let m = byDir { return m }
         var m: [String: Entry] = [:]
-        for raw in AppHome.readLines(filePath) ?? [] {
+        let read = AppHome.readStore(filePath)
+        unread = read.isUnread
+        for raw in read.lines {
             let line = raw.trimmingCharacters(in: .whitespaces)
             if line.isEmpty || line.hasPrefix("#") { continue }
             guard let eq = line.firstIndex(of: "=") else { continue }
@@ -59,6 +65,13 @@ public final class ProjectMeta: @unchecked Sendable {
     }
 
     // MARK: access
+
+    /// The file could not be read at start, so edits made since are kept in memory only.
+    public var isUnread: Bool {
+        lock.lock(); defer { lock.unlock() }
+        _ = loaded()
+        return unread
+    }
 
     public func tagsOf(_ dir: String) -> [String] {
         guard !dir.isEmpty else { return [] }
@@ -144,12 +157,16 @@ public final class ProjectMeta: @unchecked Sendable {
     }
 
     private func save(_ m: [String: Entry]) {
+        guard !unread else {
+            Diag.warn("notes.cfg was not read at start; not saving over it")
+            return
+        }
         var lines = ["# Alive - tags and notes, one project folder per key"]
         for e in m.values.sorted(by: { $0.dir < $1.dir }) where !e.isEmpty {
             if !e.tags.isEmpty { lines.append("tags=\(e.dir)\t\(Self.joinTags(e.tags))") }
             if !e.note.isEmpty { lines.append("note=\(e.dir)\t\(Self.escape(e.note))") }
         }
-        do { try AppHome.writeAtomically(lines.joined(separator: "\n") + "\n", to: filePath) }
+        do { try AppHome.writeKeepingBackup(lines.joined(separator: "\n") + "\n", to: filePath) }
         catch { Diag.fail("notes.cfg write", error) }
     }
 }

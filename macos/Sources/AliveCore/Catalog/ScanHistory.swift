@@ -101,7 +101,7 @@ public enum ScanHistory {
              String(DotNetTicks.utc($0.fullWalkAt)), $0.catalogStamp].joined(separator: "\t")
         }
         let text = lines.isEmpty ? "" : lines.joined(separator: "\n") + "\n"
-        do { try AppHome.writeAtomicallyIfChanged(Data(text.utf8), to: path(dir: dir)) } catch {
+        do { try AppHome.writeKeepingBackup(text, to: path(dir: dir)) } catch {
             Diag.fail("scan-history.cfg write", error)
         }
     }
