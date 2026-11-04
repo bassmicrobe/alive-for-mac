@@ -231,7 +231,7 @@ jobs:
           if-no-files-found: error
 
       - name: Publish GitHub Release
-        if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && !inputs.verify_only)
+        if: (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) || (github.event_name == 'workflow_dispatch' && !inputs.verify_only)
         env:
           GH_TOKEN: ${{ github.token }}
           ZIP_PATH: ${{ steps.pkg.outputs.zip }}

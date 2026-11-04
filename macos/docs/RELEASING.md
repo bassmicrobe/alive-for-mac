@@ -129,17 +129,13 @@ Developer ID Application 証明書が自分の Mac のキーチェーンにあ�
 ```sh
 security find-identity -v -p codesigning     # identity 名を確認
 
-# 方法 A: 資格情報をキーチェーンに保存して使う（パスワードをシェル履歴に残さない）
+# 資格情報をキーチェーンに保存して使う（パスワードを引数やシェル履歴に残さない）
 xcrun notarytool store-credentials "alive-notary" \
     --apple-id "you@example.com" --team-id "TEAMID"     # App 用パスワードを聞かれる
 ALIVE_SIGN_IDENTITY="Developer ID Application: Name (TEAMID)" \
 ALIVE_NOTARY_KEYCHAIN_PROFILE=alive-notary \
     scripts/build-app.sh --zip --dmg --notarize
 
-# 方法 B: 環境変数で渡す
-ALIVE_SIGN_IDENTITY="Developer ID Application: Name (TEAMID)" \
-APPLE_ID="you@example.com" APPLE_APP_PASSWORD="xxxx-xxxx-xxxx-xxxx" APPLE_TEAM_ID="TEAMID" \
-    scripts/build-app.sh --zip --dmg --notarize
 ```
 
 - `--notarize` には `ALIVE_SIGN_IDENTITY` が必要です。資格情報が足りないと、ビルドを始める前に終了します。
@@ -338,17 +334,13 @@ With the Developer ID Application certificate in your Mac's keychain, from `maco
 ```sh
 security find-identity -v -p codesigning     # shows the identity name
 
-# Option A: store the credentials in the keychain (keeps the password out of shell history)
+# Store credentials in the keychain (keeps the password out of process arguments and shell history)
 xcrun notarytool store-credentials "alive-notary" \
     --apple-id "you@example.com" --team-id "TEAMID"     # asks for the app-specific password
 ALIVE_SIGN_IDENTITY="Developer ID Application: Name (TEAMID)" \
 ALIVE_NOTARY_KEYCHAIN_PROFILE=alive-notary \
     scripts/build-app.sh --zip --dmg --notarize
 
-# Option B: environment variables
-ALIVE_SIGN_IDENTITY="Developer ID Application: Name (TEAMID)" \
-APPLE_ID="you@example.com" APPLE_APP_PASSWORD="xxxx-xxxx-xxxx-xxxx" APPLE_TEAM_ID="TEAMID" \
-    scripts/build-app.sh --zip --dmg --notarize
 ```
 
 - `--notarize` requires `ALIVE_SIGN_IDENTITY`; missing credentials stop the script before the build starts.

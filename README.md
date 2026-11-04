@@ -128,9 +128,9 @@ Alive が記憶する内容はすべて `%APPDATA%\Alive` にあります (**Set
   開かずにセットを読める理由がここにあります。
 - [macos/PARITY.md](macos/PARITY.md) — macOS 版と Windows 版の機能パリティ。
 - [docs/maintenance.md](docs/maintenance.md) — CI ランタイムなどのメンテナンス履歴。
+- [署名・公証の設定手順](macos/docs/SIGNING_SETUP_RUNBOOK.ja.md) — 初期設定、エラー対処、次回の検証方法。
+- [署名・公証の検証記録](docs/SIGNING_VERIFICATION_2026-11-05.md) — 2026-11-05 の実行結果。
 
 ## ライセンス
 
 [MIT](LICENSE)
-
-署名・公証の設定と再検証: [手順書](macos/docs/SIGNING_SETUP_RUNBOOK.ja.md)

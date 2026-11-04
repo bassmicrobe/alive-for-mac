@@ -160,7 +160,7 @@ gh run view <run-id> -R bassmicrobe/alive-for-mac
 既存のブランチ実行とは別の concurrency group で検証できる。公開用の `v*` タグと区別する。
 
 検証モードでは GitHub Release の作成・既存アセットの置換はスキップし、パッケージを
-7日間の Actions artifact として保存する。タグ実行では通常の公開処理を行う。
+7日間の Actions artifact として保存する。公開用の `v*` タグへの push では通常の公開処理を行う。
 古い `main` のワークフローには署名処理も検証モードも無い場合があるため、実行する ref の内容を確認。
 手動実行の `runner` は既定で `macos-26`。長く割り当て待ちになる場合は `-f runner=macos-15`
 を指定して検証できる。ランナーを変えても署名・公証・Gatekeeper の検証条件は同じ。
@@ -186,4 +186,5 @@ App 用パスワードは echo を無効にした端末の `notarytool` プロ�
 - [App 用パスワード](https://support.apple.com/HT204397)
 - [CSR の作成](https://developer.apple.com/help/account/create-certificates/create-a-certificate-signing-request)
 
-実際の Actions の実行URL・結果は検証記録に追記する。実行前の段階で「公証済み」と記録しない。
+実際の Actions の実行URL・結果は[検証記録](../../docs/SIGNING_VERIFICATION_2026-11-05.md)を参照。
+実行前の段階で「公証済み」と記録しない。

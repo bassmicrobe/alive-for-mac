@@ -18,8 +18,7 @@
 #   --notarize credentials  ALIVE_NOTARY_KEYCHAIN_PROFILE (a `notarytool store-credentials` profile;
 #                           ALIVE_NOTARY_KEYCHAIN = the keychain file that holds it, when it is not in
 #                           the default search list: what CI does, so the password never sits on the
-#                           command line of a long-running process), or APPLE_ID + APPLE_APP_PASSWORD +
-#                           APPLE_TEAM_ID. ALIVE_NOTARY_TIMEOUT (default 60m) limits each wait for Apple.
+#                           command line). ALIVE_NOTARY_TIMEOUT (default 60m) limits each wait for Apple.
 #
 # --zip, --dmg and --notarize make a release artifact: they need the universal build and stop if it
 # fails, instead of falling back to the host architecture.
@@ -60,10 +59,8 @@ if [[ $NOTARIZE -eq 1 ]]; then
     if [[ -n "${ALIVE_NOTARY_KEYCHAIN_PROFILE:-}" ]]; then
         NOTARY_AUTH=(--keychain-profile "$ALIVE_NOTARY_KEYCHAIN_PROFILE")
         if [[ -n "${ALIVE_NOTARY_KEYCHAIN:-}" ]]; then NOTARY_AUTH+=(--keychain "$ALIVE_NOTARY_KEYCHAIN"); fi
-    elif [[ -n "${APPLE_ID:-}" && -n "${APPLE_APP_PASSWORD:-}" && -n "${APPLE_TEAM_ID:-}" ]]; then
-        NOTARY_AUTH=(--apple-id "$APPLE_ID" --password "$APPLE_APP_PASSWORD" --team-id "$APPLE_TEAM_ID")
     else
-        echo "error: --notarize needs ALIVE_NOTARY_KEYCHAIN_PROFILE, or APPLE_ID + APPLE_APP_PASSWORD + APPLE_TEAM_ID" >&2
+        echo "error: --notarize needs ALIVE_NOTARY_KEYCHAIN_PROFILE (store credentials with notarytool first)" >&2
         exit 2
     fi
     if ! xcrun --find notarytool >/dev/null 2>&1 || ! xcrun --find stapler >/dev/null 2>&1; then
