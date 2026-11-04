@@ -155,7 +155,7 @@ gh run list -R bassmicrobe/alive-for-mac --workflow macos-ci.yml --limit 5
 gh run view <run-id> -R bassmicrobe/alive-for-mac
 ```
 
-`verify-signing-*` タグへの push でも同じ署名・公証の検証を実行する。
+`signing-verify-*` タグへの push でも同じ署名・公証の検証を実行する。
 この検証用タグでは公開処理を実行しない。手動実行が滞留する場合も、固有のタグなら
 既存のブランチ実行とは別の concurrency group で検証できる。公開用の `v*` タグと区別する。
 
