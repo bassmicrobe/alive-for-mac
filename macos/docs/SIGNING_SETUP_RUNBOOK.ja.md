@@ -10,6 +10,7 @@
 - 証明書: `Developer ID Application: Cybereye Technology Co., Ltd. (8XUK86NH38)`
 - App 用パスワードの用途名: `alive-for-mac notarytool`
 - 登録先: このリポジトリの Actions repository secrets。
+- Actions 実機検証は p12 の MAC 検証で停止。署名・公証は未確認（詳細は検証記録）。
 - p12 と Base64 の値、各パスワード、Apple Account の認証コードは記録しない。
 - 一時 p12・CSR・秘密鍵ファイルを削除し、クリップボードを消去済み。
 - このMacへの p12 取り込みは認証エラーの後にキャンセル。ローカルキーチェーンに
@@ -101,6 +102,28 @@ OpenSSL で書き出す場合の互換オプションは
 CI の `ci-signing.py` は元の p12 を OpenSSL で検証した後、runner 内の一時コピーを
 この形式に変換する。GitHub Secret 自体は変更しない。一時的に復号した PEM と
 互換 p12 も、成功・失敗の両方で削除する。復号した標準出力をエラーログに出さない。
+
+### MAC 検証で失敗した場合
+
+`Mac verify error: invalid password?` が OpenSSL の MAC 検証で出た場合、
+`SecKeychainItemImport` の形式互換性エラーとは別に扱う。MAC 検証を無効にして先へ進まない。
+今回の Actions 実行はこの段階で停止し、互換形式への変換・署名・公証には到達していない。
+別のダミー p12 は OpenSSL 4 と標準 LibreSSL の両方で MAC 検証に成功しているため、
+今回の失敗を OpenSSL 4 の既定形式だけが原因と断定しない。
+
+1. 秘密鍵付き証明書またはパスワードが分かる p12 バックアップの有無を所有者と確認する。
+2. p12 を書き出し直す場合は、新しい書き出し用パスワードを生成し、**同じ組**として用意する。
+3. クリップボードの値を表示せず、登録前にローカルで一致を確認する。
+
+   ```sh
+   pbpaste | openssl pkcs12 -in ~/Desktop/DeveloperID.p12 -noout -passin stdin
+   ```
+
+4. 検証成功後、手順3の2コマンドで p12 とパスワードの両 Secret を登録し、後片付け・Actions 再検証。
+
+秘密鍵が無い場合、公開証明書 `.cer` だけでは p12 を復元できない。
+既存証明書を勝手に失効させず、所有者と対応を決める。
+App 用パスワードはこの失敗だけを理由に作り直さない。
 
 ## 4. Apple ID、Team ID、App 用パスワード
 
