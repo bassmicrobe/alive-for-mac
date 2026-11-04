@@ -152,25 +152,34 @@ public final class PreviewPins: @unchecked Sendable {
         return Self.parse(read.lines)
     }
 
+    /// The file could not be read (yet), so pins changed since are kept in memory only.
+    public var isUnread: Bool {
+        lock.lock(); defer { lock.unlock() }
+        _ = loaded()
+        return unread
+    }
+
     public func get(_ projectRoot: String) -> String {
         lock.lock(); defer { lock.unlock() }
         return loaded()[Self.key(projectRoot)]?.file ?? ""
     }
 
-    public func set(_ projectRoot: String, file: String) {
+    @discardableResult
+    public func set(_ projectRoot: String, file: String) -> StoreSave {
         lock.lock(); defer { lock.unlock() }
         var m = loadedForEdit()
         m[Self.key(projectRoot)] = Pin(root: projectRoot, file: file)
         map = m
-        save(m)
+        return save(m)
     }
 
-    public func clear(_ projectRoot: String) {
+    @discardableResult
+    public func clear(_ projectRoot: String) -> StoreSave {
         lock.lock(); defer { lock.unlock() }
         var m = loadedForEdit()
         m[Self.key(projectRoot)] = nil
         map = m
-        save(m)
+        return save(m)
     }
 
     /// Lookup is case-insensitive like upstream's dictionary; trailing separators are ignored.
@@ -180,14 +189,15 @@ public final class PreviewPins: @unchecked Sendable {
         return r.lowercased()
     }
 
-    private func save(_ m: [String: Pin]) {
+    private func save(_ m: [String: Pin]) -> StoreSave {
         guard !unread else {
             Diag.warn("previews.cfg was not read at start; not saving over it")
-            return
+            return .unread
         }
         let lines = m.values.filter { !$0.file.isEmpty }.sorted { $0.root < $1.root }
             .map { "\($0.root)\t\($0.file)" }
         do { try AppHome.writeKeepingBackup(lines.joined(separator: "\n") + (lines.isEmpty ? "" : "\n"), to: filePath) }
-        catch { Diag.fail("previews.cfg write", error) }
+        catch { Diag.fail("previews.cfg write", error); return .failed }
+        return .saved
     }
 }

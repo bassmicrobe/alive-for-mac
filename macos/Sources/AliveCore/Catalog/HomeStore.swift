@@ -75,7 +75,13 @@ public final class HomeStore: @unchecked Sendable {
     /// Returns the new state (true = now pinned).
     @discardableResult
     public func togglePin(_ path: String) -> Bool {
-        guard !path.isEmpty else { return false }
+        togglePinReportingSave(path).isPinned
+    }
+
+    /// `togglePin`, and how the save ended: while the file cannot be read the pin is kept in memory
+    /// only (`.unread`), which the caller tells the person.
+    public func togglePinReportingSave(_ path: String) -> (isPinned: Bool, save: StoreSave) {
+        guard !path.isEmpty else { return (false, .saved) }
         lock.lock(); defer { lock.unlock() }
         var pins = pinsForEditLocked()
         let nowPinned: Bool
@@ -88,9 +94,12 @@ public final class HomeStore: @unchecked Sendable {
         let text = (["# Alive - home page: pinned projects"] + pins.map { "pin=\($0)" }).joined(separator: "\n") + "\n"
         if unread {
             Diag.warn("home.cfg was not read at start; not saving over it")
-        } else {
-            do { try AppHome.writeKeepingBackup(text, to: filePath) } catch { Diag.fail("home.cfg write", error) }
+            return (nowPinned, .unread)
         }
-        return nowPinned
+        do { try AppHome.writeKeepingBackup(text, to: filePath) } catch {
+            Diag.fail("home.cfg write", error)
+            return (nowPinned, .failed)
+        }
+        return (nowPinned, .saved)
     }
 }

@@ -46,7 +46,8 @@ final class AppModel {
     /// sounds never overlap. Its errors surface as toasts.
     @ObservationIgnored let audio = AudioPlayback()
     @ObservationIgnored private var started = false
-    @ObservationIgnored private var toldSettingsUnread = false
+    /// Files already announced as unreadable this session, so each is announced once.
+    @ObservationIgnored private var toldUnread: Set<String> = []
     @ObservationIgnored private let widgetPublisher = WidgetSnapshotPublisher()
 
     @ObservationIgnored lazy var prefs = AppPreferences(app: self)
@@ -86,9 +87,8 @@ final class AppModel {
         if swept > 0 { Diag.info("removed \(swept) leftover temporary file(s) from the data folder") }
         // The lazily read files are read now, so a damaged one is noticed (and backed up before
         // anything can overwrite it) at launch and the person is told once.
-        _ = ProjectMeta.shared.allTags()
-        _ = HomeStore.shared.pins
         announceBackedUpFiles()
+        announceUnreadFiles()
         catalog.start()
         integration.start()
         samples.expandsRootsOnFirstLoad = true
@@ -133,9 +133,20 @@ final class AppModel {
             toast(CommonStrings.settingsSaveFailed.f(error.localizedDescription), kind: .error)
         }
         // `save` leaves an unread file alone (and logs it); the person is told once.
-        if settings.isUnread, !toldSettingsUnread {
-            toldSettingsUnread = true
+        if settings.isUnread, toldUnread.insert("settings.cfg").inserted {
             toast(CommonStrings.settingsUnread.s, kind: .error)
+        }
+    }
+
+    /// How a store's save ended, for the ones that have no screen of their own to say it (the pins).
+    /// An unread file is announced once per session; a failed write each time.
+    func reportStoreSave(_ save: StoreSave, file: String) {
+        switch save {
+        case .saved: break
+        case .unread:
+            if toldUnread.insert(file).inserted { toast(CommonStrings.fileUnread.f(file), kind: .error) }
+        case .failed:
+            toast(CommonStrings.fileSaveFailed.f(file), kind: .error)
         }
     }
 
@@ -181,6 +192,21 @@ final class AppModel {
         for notice in AppHome.takeBackupNotices() {
             toast(CommonStrings.dataFileBackedUp.f(notice.file, notice.copy), kind: .error)
         }
+    }
+
+    /// One toast at launch when a data file exists but could not be read: nothing is saved over it, so
+    /// the person learns now that changes to it are not kept. Reads through the stores the app writes
+    /// with (`sets.meta`, `home`, `player.pins`), not through the `.shared` ones, which may point
+    /// elsewhere.
+    func announceUnreadFiles() {
+        var unread: [String] = []
+        if settings.isUnread { unread.append("settings.cfg") }
+        if sets.meta.isUnread { unread.append("notes.cfg") }
+        if home.isStoreUnread { unread.append("home.cfg") }
+        if player.pins.isUnread { unread.append("previews.cfg") }
+        guard !unread.isEmpty else { return }
+        toldUnread.formUnion(unread)
+        toast(CommonStrings.dataFilesUnread.f(unread.joined(separator: ", ")), kind: .error)
     }
 
     /// How long a toast stays: errors wait much longer (and can be dismissed), so they are not missed.

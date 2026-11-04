@@ -21,10 +21,10 @@ enum CommonStrings: LocalizedStrings {
     case comingSoonTitle, comingSoonBody
     // Toasts
     case liveNotFound, liveOpenFailed, liveLaunchFailed, audioFailed, folderOpenFailed
-    case pathMissing, settingsSaveFailed, settingsUnread, dataFileBackedUp, rootAdded, rootsAdded, alreadyWatching, notAFolder
+    case pathMissing, settingsSaveFailed, settingsUnread, fileUnread, fileSaveFailed, dataFilesUnread, dataFileBackedUp, rootAdded, rootsAdded, alreadyWatching, notAFolder
     // Scan status and first run
     case scanning, scanProgress
-    case emptyRootsTitle, emptyRootsBody, addProjectsFolder, chooseFolderPrompt, chooseFolderMessage
+    case emptyRootsTitle, emptyRootsBody, emptyRootsSettingsUnread, addProjectsFolder, chooseFolderPrompt, chooseFolderMessage
     case suggestionsTitle, addSuggestion, noSetsTitle, noSetsBody
     case catalogReadFailedTitle, catalogReadFailedBody, catalogUnreadableFolders
     case catalogRetainedNotice, catalogPartialNotice
@@ -93,6 +93,15 @@ enum CommonStrings: LocalizedStrings {
         case .settingsUnread:
             return ("settings.cfg can't be read right now, so changes are not being saved.",
                     "settings.cfg を今読み込めないため、変更は保存されていません。")
+        case .fileUnread:
+            return ("“%@” can't be read right now, so changes to it are not being saved.",
+                    "「%@」を今読み込めないため、変更は保存されていません。")
+        case .fileSaveFailed:
+            return ("Could not save “%@”. See alive.log for details.",
+                    "「%@」を保存できませんでした。詳細は alive.log を確認してください。")
+        case .dataFilesUnread:
+            return ("These files exist but can't be read, so changes to them will not be saved: %@",
+                    "次のファイルは存在しますが読み込めないため、変更は保存されません: %@")
         case .dataFileBackedUp:
             return ("“%1$@” was not a plain UTF-8 text file. The original was kept as “%2$@”.",
                     "「%1$@」は通常の UTF-8 テキストではありませんでした。元のファイルは「%2$@」として残してあります。")
@@ -106,6 +115,9 @@ enum CommonStrings: LocalizedStrings {
         case .emptyRootsTitle: return ("Nothing to show yet", "まだ表示するものがありません")
         case .emptyRootsBody: return ("Alive reads your Live sets from the folders you point it at. It only reads; it never changes a set.",
                                       "Alive は指定したフォルダの Live セットを読み込みます。読み取り専用で、セットは変更しません。")
+        case .emptyRootsSettingsUnread:
+            return ("settings.cfg exists but can't be read, so your folders are not shown. They come back once it can be read; changes made now are not saved.",
+                    "settings.cfg は存在しますが読み込めないため、フォルダを表示できません。読み込めるようになると元に戻ります。今行った変更は保存されません。")
         case .addProjectsFolder: return ("Add the folder with your Live projects", "Live プロジェクトのフォルダを追加")
         case .chooseFolderPrompt: return ("Add", "追加")
         case .chooseFolderMessage: return ("Choose the folders that contain your Live projects", "Live プロジェクトが入っているフォルダを選択")

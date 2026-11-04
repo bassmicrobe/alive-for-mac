@@ -265,7 +265,7 @@ final class PlayerModel {
         guard let path = setPath else { return }
         let root = RenderScan.projectRoot(entryForCurrentSet(path))
         guard !root.isEmpty else { return }
-        if file.pinned { pins.clear(root) } else { pins.set(root, file: file.path) }
+        app.reportStoreSave(file.pinned ? pins.clear(root) : pins.set(root, file: file.path), file: "previews.cfg")
         let playing = currentFile?.path
         let entry = entryForCurrentSet(path)
         let pins = pins

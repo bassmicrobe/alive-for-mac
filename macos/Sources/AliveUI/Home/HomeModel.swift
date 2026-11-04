@@ -172,10 +172,14 @@ final class HomeModel {
     func isPinned(_ path: String) -> Bool { pinned.contains(path) }
 
     func togglePin(path: String) {
-        _ = store.togglePin(path)
+        let result = store.togglePinReportingSave(path)
         pinOrder = store.pins
         pinned = Set(pinOrder)
+        app.reportStoreSave(result.save, file: "home.cfg")
     }
+
+    /// home.cfg is there but could not be read (`AppModel.announceUnreadFiles`).
+    var isStoreUnread: Bool { store.isUnread }
 
     // MARK: - Overview
 

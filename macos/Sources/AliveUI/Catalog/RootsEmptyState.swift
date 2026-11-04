@@ -20,6 +20,13 @@ struct RootsEmptyState: View {
                     .foregroundStyle(Theme.textDim)
                     .multilineTextAlignment(.center)
                     .frame(maxWidth: Theme.s(380))
+                if app.settings.isUnread {
+                    Text(CommonStrings.emptyRootsSettingsUnread.s)
+                        .font(Theme.fBody)
+                        .foregroundStyle(Theme.errorText)
+                        .multilineTextAlignment(.center)
+                        .frame(maxWidth: Theme.s(380))
+                }
             }
             PillButton(title: CommonStrings.addProjectsFolder.s, icon: .plus, kind: .primary) {
                 chooseFolders()
