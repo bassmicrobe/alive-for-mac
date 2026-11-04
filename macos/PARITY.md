@@ -113,7 +113,7 @@ Legend: **Done** = same behaviour · **Simplified** = works, but less than upstr
 | Upstream feature | Status | Note |
 |---|---|---|
 | Settings window | Simplified | Standard macOS Settings scene: language, interface scale, transparency, plugin source, data folder, updates, About. |
-| Interface scale (75 / 100 / 125 %) | Done | Applies at once (upstream: after a restart). Every `Theme` size and font follows it, and the sheets, tabs, pills, cards, toasts, top bar, Help and Settings with them; about 300 literal `.frame` / `.padding` numbers in views are not scaled yet (see Deviations). The preview canvas draws at the display's scale only. |
+| Interface scale (75 / 100 / 125 %) | Done | Applies at once (upstream: after a restart). Every `Theme` size and font follows it, and the sheets, tabs, pills, cards, toasts, top bar, Help, Settings and the whole Home tab with them; about 260 literal `.frame` / `.padding` numbers in views are not scaled yet (see Deviations). The preview canvas draws at the display's scale only. |
 | Smooth scrolling | N/A | Native scrolling. The setting is kept in `settings.cfg` for compatibility only. |
 | Transparency ("glass") | Done | `NSVisualEffectView` behind the content, off by default. |
 | Update check (manual and daily, dot on the gear) | Done | Against `bassmicrobe/alive-for-mac` releases, never upstream's (those are Windows builds). A failed manual check does not stamp `lastupdatecheck`. Opt-in; the only network use. |
@@ -197,7 +197,7 @@ Different on purpose:
 - **The detail panel's footer menu shows no key hints** (inside a window SwiftUI would register them as live key equivalents next to the same ones in the menu bar); the row's context menu does.
 - **The plugin Filters counter still counts only the plugins that pass the filter** (upstream did not change it either).
 - **A broken `settings.cfg` shows no banner** (upstream is silent, too): edits are kept in memory, nothing is written over the file, and `alive.log` has one line.
-- **Interface scale: about 300 literal `.frame` / `.padding` numbers in views are not scaled**, mostly in the player window, tiles, Stat controls, cells, Rescue and the Samples views. Everything that reads a `Theme` metric or font is.
+- **Interface scale: about 260 literal `.frame` / `.padding` numbers in views are not scaled** (about 300 before the Home tab and the Sets strip were done), mostly in the player window, Stat controls, Sets cells and inspector, Plugins columns, Rescue, the Samples views and the calendar's day popover. Everything that reads a `Theme` metric or font is, and so are the Home tab (Overview cards, ready bar, calendar, tiles, now-playing strip) and the Sets strip. The Sets table's own column widths (`sets-columns.json`) are saved in points as they were laid out and reused as they are after a change of scale or window size: a table saved at 125 % is wider than the window at 100 % (horizontal scroller) until "Reset columns".
 
 ## Owner decisions
 
@@ -209,7 +209,11 @@ Decided by the repository owner on 2026-11-04:
 - **Shortcuts: the `alive://` URL scheme is the supported route.** App Intents (which would need an
   Xcode host project) are not planned.
 - **"Ready to open" counts keep both units, labelled.** Home counts projects (each project judged by
-  its newest set, "158 / 554 projects"); the Sets toggle counts sets ("200 sets").
+  its newest set, "158 / 554 projects"); the Sets toggle counts sets ("200 sets"). The noun agrees with
+  the total on Home ("1 / 1 project") and with the count on Sets ("1 set"); Japanese has no plural
+  ("24 / 24 プロジェクト", "24 セット"). On Home the bar's label is "Ready to open" / "今すぐ開ける" (it
+  was "今すぐ開けるセット", which contradicted the unit) and the unit lives in the figure. Spotlight, the
+  menu bar and the widget show no readiness count.
 - **Upstream 1.3.1–1.3.3 is ported in full** (procedure in `docs/UPSTREAM.md`); the Windows-only
   parts are listed under "Deviations" below.
 - **Root `README.md` stays upstream's file.** The Japanese version of it lives in `README.ja.md`; the

@@ -213,8 +213,13 @@ Cross-feature calls go through these entry points, not through views: `app.sets.
   (from the main track's time signature, 4 when absent), never a literal 4.
 - **Never store a `Theme` size in a `static let` or a `let` set once.** `Theme.pad`, `rowH`, `cardR` and
   the fonts are computed over the interface scale; a stored copy only updates after a relaunch. Use
-  `static var x: CGFloat { Theme.… }`. About 300 literal `.frame` / `.padding` numbers are still not
-  scaled (see `PARITY.md`).
+  `static var x: CGFloat { Theme.… }` (`HomeContentColumns`, `HeatmapMetrics` and `OverviewPanel.minContent`
+  are). A custom `Layout` is not observed, so one that measures with `Theme` sizes (`HeatmapFit`,
+  `OverviewColumn`) carries the scale as a stored `scale:` value; a new value makes SwiftUI lay it out
+  again. SF Symbols and captions that were `.system(size:)` use `Theme.fGlyph(size)` (the base value,
+  scaled) and the large Overview figure `Theme.fFigure`. The Home tab (Overview cards, the ready bar,
+  the calendar, project and "New Live Set" tiles, the now-playing strip) and the Sets strip follow the
+  scale. About 260 literal `.frame` / `.padding` numbers are still not scaled (see `PARITY.md`).
 - **`HomeModel.dropHiddenSelection()` is called by the grid** (`.onChange` of the tile paths), not from
   the `rows` getter: a state write during `body` loops the structural-region pass.
 - **Config files keep a `.bak`.** Every text `.cfg` goes through `AppHome.writeKeepingBackup` (a temp file
