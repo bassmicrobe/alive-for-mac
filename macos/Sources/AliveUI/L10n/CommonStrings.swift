@@ -66,7 +66,7 @@ enum CommonStrings: LocalizedStrings {
         case .showInFinder: return ("Show in Finder", "Finder に表示")
         case .pin: return ("Pin / Unpin", "ピン留め / 解除")
         case .tagsAndNotes: return ("Tags and Notes…", "タグとメモ…")
-        case .rescue: return ("Rescue…", "レスキュー…")
+        case .rescue: return ("Rescue Project…", "プロジェクトをレスキュー…")
         case .exportSet: return ("Export…", "エクスポート…")
         case .arrangementPreview: return ("Arrangement Preview", "アレンジメントのプレビュー")
         case .playPause: return ("Play / Pause", "再生 / 一時停止")

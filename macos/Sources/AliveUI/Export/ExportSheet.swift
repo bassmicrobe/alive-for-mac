@@ -12,7 +12,7 @@ struct ExportSheet: View {
         let model = app.export
         SheetFrame(title: model.set.name.isEmpty ? ExportStrings.title.s : ExportStrings.titleFor.f(model.set.name),
                    width: 640) {
-            VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: Theme.s(14)) {
                 switch model.phase {
                 case .idle, .counting: counting
                 case .ready: choosing(model)
@@ -30,21 +30,21 @@ struct ExportSheet: View {
     // MARK: states
 
     private var counting: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: Theme.s(10)) {
             ProgressView().controlSize(.small)
             Text(ExportStrings.counting.s).font(Theme.fBody).foregroundStyle(Theme.secondaryText)
         }
-        .frame(maxWidth: .infinity, minHeight: 150)
+        .frame(maxWidth: .infinity, minHeight: Theme.s(150))
     }
 
     @ViewBuilder
     private func choosing(_ model: ExportModel) -> some View {
         if let error = model.readError {
             Text(ReadErrorLog.note(error, of: path)).font(Theme.fBody).foregroundStyle(Theme.errorText)
-                .frame(maxWidth: .infinity, minHeight: 80, alignment: .topLeading)
+                .frame(maxWidth: .infinity, minHeight: Theme.s(80), alignment: .topLeading)
             HStack { Spacer(); PillButton(title: ExportStrings.close.s) { app.sheet = nil } }
         } else {
-            VStack(spacing: 2) {
+            VStack(spacing: Theme.s(2)) {
                 ForEach(model.groups.filter { $0.origin != .inProject }) { g in
                     OriginRow(group: g, isEnabled: model.canEditOptions) { model.setIncluded(g.origin, $0) }
                 }
@@ -55,7 +55,7 @@ struct ExportSheet: View {
             if model.options.fromElsewhere, let line = ExportText.elsewhereFolders(model.elsewhereFolders) {
                 Text(line).font(Theme.fSmall).foregroundStyle(Theme.secondaryText)
                     .lineLimit(2).truncationMode(.middle)
-                    .padding(.horizontal, 4)
+                    .padding(.horizontal, Theme.s(4))
                     .help(model.elsewhereFolders.joined(separator: "\n"))
             }
             if let line = ExportText.notFoundSummary(model.notFound.count) {
@@ -71,7 +71,7 @@ struct ExportSheet: View {
     }
 
     private func destinationRow(_ model: ExportModel) -> some View {
-        HStack(spacing: 10) {
+        HStack(spacing: Theme.s(10)) {
             Text(ExportStrings.destination.s).font(Theme.fLabel).foregroundStyle(Theme.secondaryText)
             Text(model.outputPath)
                 .font(Theme.fLabel)
@@ -80,7 +80,7 @@ struct ExportSheet: View {
                 .truncationMode(.middle)
                 .textSelection(.enabled)
                 .help(model.outputPath)
-            Spacer(minLength: 8)
+            Spacer(minLength: Theme.s(8))
             QuietTextButton(title: ExportStrings.chooseDestination.s) { chooseDestination(model) }
         }
     }
@@ -88,14 +88,14 @@ struct ExportSheet: View {
     private func shelf(_ model: ExportModel) -> some View {
         let s = ExportText.summary(plan: model.plan, failure: model.failure, destinationExists: model.destinationExists,
                                    targetDir: model.targetDir, outputPath: model.outputPath)
-        return HStack(spacing: 14) {
+        return HStack(spacing: Theme.s(14)) {
             Text(s.text)
                 .font(Theme.fLabel)
                 .foregroundStyle(s.isError ? Theme.errorText : Theme.text)
                 .lineLimit(2)
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity, alignment: .leading)
-            HStack(spacing: 10) {
+            HStack(spacing: Theme.s(10)) {
                 PillSwitch(label: ExportStrings.addToZip.s,
                            isOn: Binding(get: { model.options.toZip }, set: { model.setZip($0) }),
                            isEnabled: model.canEditOptions)
@@ -111,13 +111,13 @@ struct ExportSheet: View {
     }
 
     private func running(_ model: ExportModel) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: Theme.s(12)) {
             Text(ExportText.progress(model.progress)).font(Theme.fBody).foregroundStyle(Theme.text)
             ProgressBar(fraction: fraction(model.progress))
             Text(model.progress?.current ?? "")
                 .font(Theme.fLabel).foregroundStyle(Theme.secondaryText)
                 .lineLimit(1).truncationMode(.middle)
-                .frame(minHeight: 18, alignment: .leading)
+                .frame(minHeight: Theme.s(18), alignment: .leading)
             Divider().overlay(Theme.hairline)
             HStack {
                 Spacer()
@@ -126,7 +126,7 @@ struct ExportSheet: View {
                     .keyboardShortcut(.cancelAction)
             }
         }
-        .frame(minHeight: 150, alignment: .top)
+        .frame(minHeight: Theme.s(150), alignment: .top)
     }
 
     private func fraction(_ p: CollectProgress?) -> Double? {
@@ -147,7 +147,7 @@ struct ExportSheet: View {
                 DisclosureLine(summary: line, items: r.failed.map { ExportStrings.listItem.f($0.name, $0.reason) })
             }
             Divider().overlay(Theme.hairline)
-            HStack(spacing: 10) {
+            HStack(spacing: Theme.s(10)) {
                 Spacer()
                 PillButton(title: ExportStrings.showInFinder.s, icon: .folder) { model.revealResult() }
                 PillButton(title: ExportStrings.close.s, kind: .primary) { app.sheet = nil }
@@ -182,20 +182,20 @@ private struct OriginRow: View {
     @State private var hovering = false
 
     var body: some View {
-        HStack(spacing: 14) {
+        HStack(spacing: Theme.s(14)) {
             PillSwitch(label: ExportText.label(group.origin),
                        isOn: Binding(get: { group.included }, set: onChange), isEnabled: isEnabled)
             Text(ExportText.label(group.origin)).font(Theme.fBody).foregroundStyle(Theme.text)
                 .accessibilityHidden(true) // Avoid repeating the switch's label in the combined row.
-            Spacer(minLength: 8)
+            Spacer(minLength: Theme.s(8))
             Text(ExportText.groupNumbers(group))
                 .font(Theme.fLabel)
                 .monospacedDigit()
                 .foregroundStyle(group.included ? Theme.text : Theme.secondaryText)
         }
-        .padding(.horizontal, 4)
-        .frame(height: 34)
-        .rowHover(cornerRadius: 10)
+        .padding(.horizontal, Theme.s(4))
+        .frame(height: Theme.s(34))
+        .rowHover(cornerRadius: Theme.s(10))
         .contentShape(Rectangle())
         .onTapGesture { if isEnabled { onChange(!group.included) } }
         .accessibilityElement(children: .combine)
@@ -212,8 +212,8 @@ private struct ExtraLine: View {
             Spacer()
             Text(value).font(Theme.fLabel).monospacedDigit().foregroundStyle(Theme.secondaryText)
         }
-        .padding(.horizontal, 4)
-        .frame(height: 24)
+        .padding(.horizontal, Theme.s(4))
+        .frame(height: Theme.s(24))
     }
 }
 
@@ -225,11 +225,11 @@ private struct DisclosureLine: View {
     @State private var hovering = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: Theme.s(6)) {
             Button {
                 withAnimation(Theme.hoverAnimation) { expanded.toggle() }
             } label: {
-                HStack(spacing: 8) {
+                HStack(spacing: Theme.s(8)) {
                     IconView(icon: .warning, size: 11).foregroundStyle(Theme.secondaryText)
                     Text(summary).font(Theme.fLabel)
                     Text(expanded ? ExportStrings.hideList.s : ExportStrings.showList.s)
@@ -245,7 +245,7 @@ private struct DisclosureLine: View {
 
             if expanded {
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 2) {
+                    VStack(alignment: .leading, spacing: Theme.s(2)) {
                         ForEach(Array(items.enumerated()), id: \.offset) { _, item in
                             Text(item).font(Theme.fSmall).foregroundStyle(Theme.secondaryText)
                                 .lineLimit(1).truncationMode(.middle)
@@ -253,11 +253,11 @@ private struct DisclosureLine: View {
                         }
                     }
                 }
-                .frame(maxHeight: 110)
-                .padding(.leading, 19)
+                .frame(maxHeight: Theme.s(110))
+                .padding(.leading, Theme.s(19))
             }
         }
-        .padding(.horizontal, 4)
+        .padding(.horizontal, Theme.s(4))
     }
 }
 
@@ -280,10 +280,10 @@ struct PillSwitch: View {
                 Circle()
                     .fill(LinearGradient(colors: isOn ? [Theme.lightTop, Theme.light] : [Theme.textDim, Theme.textDim],
                                          startPoint: .top, endPoint: .bottom))
-                    .padding(3)
-                    .frame(width: 24, height: 24)
+                    .padding(Theme.s(3))
+                    .frame(width: Theme.s(24), height: Theme.s(24))
             }
-            .frame(width: 42, height: 24)
+            .frame(width: Theme.s(42), height: Theme.s(24))
             .contentShape(Capsule())
         }
         .buttonStyle(.plain)
@@ -291,7 +291,7 @@ struct PillSwitch: View {
         .brightness(hovering && isEnabled ? 0.08 : 0)
         .opacity(isEnabled ? 1 : 0.4)
         .animation(Theme.selectAnimation, value: isOn)
-        .focusRing(focused && isEnabled, cornerRadius: 12)
+        .focusRing(focused && isEnabled, cornerRadius: Theme.s(12))
         .onHover { hovering = $0 }
         .focused($focused)
         .focusEffectDisabled()
@@ -310,10 +310,10 @@ private struct ProgressBar: View {
             ZStack(alignment: .leading) {
                 Capsule().fill(Color.white.opacity(0.19))
                 Capsule().fill(Theme.text)
-                    .frame(width: max(6, geo.size.width * CGFloat(fraction ?? 0.05)))
+                    .frame(width: max(Theme.s(6), geo.size.width * CGFloat(fraction ?? 0.05)))
                     .animation(.linear(duration: 0.15), value: fraction)
             }
         }
-        .frame(height: 6)
+        .frame(height: Theme.s(6))
     }
 }
