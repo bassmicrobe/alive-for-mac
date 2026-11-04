@@ -53,15 +53,12 @@ final class AuditRound1Tests: XCTestCase {
         XCTAssertLessThan(reps.count, 60)
     }
 
-    // 7. At 125 % the window may not ask for more than the screen has.
-    func testTheMainWindowMinimumIsCappedToTheScreen() {
+    // 7. The main window is scaled from its own base size. (That no window asks for more than the
+    // screen has: StatCatalogUpstream133Tests, the same `ScaledWindowSize` rule.)
+    func testTheMainWindowIsScaledFromItsOwnBaseSize() {
         let roomy = MainWindowSize.make(uiScale: 125, screen: CGSize(width: 2560, height: 1400))
         XCTAssertEqual(roomy.minimum, CGSize(width: 1400, height: 750))
         XCTAssertEqual(roomy.ideal, CGSize(width: 1550, height: 975))
-
-        let small = MainWindowSize.make(uiScale: 125, screen: CGSize(width: 1280, height: 695))
-        XCTAssertEqual(small.minimum, CGSize(width: 1280, height: 695))
-        XCTAssertEqual(small.ideal, CGSize(width: 1280, height: 695))
     }
 
     // 8. Down in the search field on the Samples tab picks the first row and asks the list for focus.

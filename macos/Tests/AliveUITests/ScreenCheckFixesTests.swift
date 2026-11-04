@@ -1,7 +1,8 @@
 import XCTest
 @testable import AliveUI
 
-/// The 2026-11-04 screen check: counts name their unit, and the Home tab follows the interface scale.
+/// The 2026-11-04 screen check: counts name their unit and agree with their number (Home, Sets, Plugins,
+/// Stat), and the Home tab follows the interface scale.
 @MainActor
 final class ScreenCheckFixesTests: XCTestCase {
     private var saved: LanguagePreference = .system
@@ -17,13 +18,23 @@ final class ScreenCheckFixesTests: XCTestCase {
         super.tearDown()
     }
 
-    /// Home counts projects, Sets counts sets; the noun agrees with the total, and Japanese has no plural.
-    func testReadyCountsNameTheirUnit() {
+    /// Home counts projects, Sets counts sets; the noun agrees with the number (every surface picks the
+    /// singular text for 1), and Japanese has no plural.
+    func testCountsNameTheirUnitAndAgreeWithTheirNumber() {
         Localizer.shared.preference = .en
         XCTAssertEqual(HomeStrings.readyProjects(ready: 24, total: 24), "24 / 24 projects")
         XCTAssertEqual(HomeStrings.readyProjects(ready: 0, total: 1), "0 / 1 project")
+        XCTAssertEqual(HomeStrings.projectsShown(12), "12 projects shown")
+        XCTAssertEqual(HomeStrings.projectsShown(1), "1 project shown")
         XCTAssertEqual(SetFormat.readyCount(24), "24 sets")
         XCTAssertEqual(SetFormat.readyCount(1), "1 set")
+        XCTAssertEqual(SetFormat.shownSummary(projects: 1, sets: 3), "1 project · 3 sets")
+        XCTAssertEqual(SetFormat.shownSummary(projects: 1, sets: 1), "1 project · 1 set")
+        XCTAssertEqual(SetFormat.matches(1, perProject: false), "1 set matches")
+        XCTAssertEqual(PluginsFormat.matches(12), "12 plugins match")
+        XCTAssertEqual(PluginsFormat.matches(1), "1 plugin matches")
+        XCTAssertEqual(StatStrings.projects(12), "12 projects")
+        XCTAssertEqual(StatStrings.projects(1), "1 project")
 
         Localizer.shared.preference = .ja
         XCTAssertEqual(HomeStrings.readyProjects(ready: 24, total: 24), "24 / 24 プロジェクト")

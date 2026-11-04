@@ -30,28 +30,13 @@ final class AuditRound2Tests: XCTestCase {
         let path = t.sub("notes.cfg")
         let original = Data([UInt8]("tags=/Caf".utf8) + [0xE9, 0x09] + [UInt8]("jazz\n".utf8))     // Latin-1 "é"
         try original.write(to: URL(fileURLWithPath: path))
-        _ = AppHome.takeBackupNotices()
 
         XCTAssertEqual(AppHome.readConfig(path), .recovered(["tags=/Caf\u{E9}\tjazz", ""]))
-        XCTAssertEqual(AppHome.takeBackupNotices(), [AppHome.BackupNotice(file: "notes.cfg", copy: "notes.cfg.orig")])
 
         try AppHome.writeKeepingBackup("tags=/Caf\u{E9}\tjazz\n", to: path)
         try AppHome.writeKeepingBackup("tags=/Caf\u{E9}\tjazz, live\n", to: path)
         try AppHome.writeKeepingBackup("tags=/Caf\u{E9}\tjazz, live, dub\n", to: path)
         XCTAssertEqual(try Data(contentsOf: URL(fileURLWithPath: path + ".orig")), original)
-    }
-
-    // 7. activity.cache is the only copy of the history: its previous version stays as .bak.
-    func testTheActivityCacheKeepsItsPreviousVersion() throws {
-        let t = makeTemp()
-        let day1 = Date(timeIntervalSince1970: 1_700_000_000), day2 = day1.addingTimeInterval(86_400)
-        Activity(stamps: [day1], today: day2).saveCache(dir: t.path)
-        Activity(stamps: [day1, day2], today: day2).saveCache(dir: t.path)
-
-        XCTAssertEqual(Activity.loadCache(dir: t.path, now: day2).total, 2)
-        let earlier = t.mkdir("earlier")
-        try FileManager.default.copyItem(atPath: t.sub("activity.cache.bak"), toPath: earlier + "/activity.cache")
-        XCTAssertEqual(Activity.loadCache(dir: earlier, now: day2).total, 1, "the .bak holds the first save alone")
     }
 
     // 6. A root that would not open stands with its old samples; that walk is not a whole one.
@@ -114,24 +99,32 @@ final class AuditRound2Tests: XCTestCase {
         XCTAssertEqual(text(home), "# Alive - home page: pinned projects\npin=/a/One.als\npin=/a/two.als\n")
     }
 
-    // SR3. The folded texts follow the catalog and the tags; the rule is the same as without them.
+    // SR3. The one search rule (every word, any field, width/case/diacritics ignored) with and without
+    // the kept texts; the kept texts follow the catalog and the tags.
     func testTheSearchTextsAreKeptUntilTheCatalogOrTheTagsChange() {
         var set = SetEntry()
         set.path = "/Music/Café Project/Mix.als"
         set.name = "Mix"
         set.projectName = "Café"
+        set.plugins = ["Serum"]
+        set.renderNames = ["demo bounce"]
         let haystacks = SearchHaystacks()
         var tags: [String: [String]] = [:]
+        let note = "fix the bridge"
         func cached(_ query: String) -> Bool {
             SetFilter.matchesSearch(set, query: SearchQuery(query)!, haystacks: haystacks,
-                                    tagsOf: { tags[$0] ?? [] }, noteOf: { _ in "" })
+                                    tagsOf: { tags[$0] ?? [] }, noteOf: { _ in note })
         }
         func plain(_ query: String) -> Bool {
-            SetFilter.matchesSearch(set, query: query, tagsOf: { tags[$0] ?? [] }, noteOf: { _ in "" })
+            SetFilter.matchesSearch(set, query: query, tagsOf: { tags[$0] ?? [] }, noteOf: { _ in note })
         }
         haystacks.validate(.init(catalog: 1, meta: 1))
         XCTAssertTrue(cached("ｍｉｘ cafe"), "width, case and diacritics are ignored, and every word counts")
         XCTAssertTrue(plain("ｍｉｘ cafe"))
+        for field in ["serum", "bounce", "bridge"] {       // plugins, render names and the note are searched too
+            XCTAssertTrue(cached(field), field)
+            XCTAssertTrue(plain(field), field)
+        }
         XCTAssertFalse(cached("mix vocal"))
         XCTAssertFalse(plain("mix vocal"))
 

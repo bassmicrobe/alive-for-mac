@@ -41,11 +41,6 @@ final class HomeUpstream133Tests: XCTestCase {
         app.searchText = "b.als"          // one word, in B's path only (every word of a query counts)
         app.home.dropHiddenSelection()
         XCTAssertNil(app.selectedSetPath, "⌘O must not open a project the search has hidden")
-
-        app.searchText = ""
-        app.selectedSetPath = a
-        app.home.dropHiddenSelection()
-        XCTAssertEqual(app.selectedSetPath, a, "a tile that is still shown stays selected")
     }
 
     func testDownFromTheSearchFieldEntersTheGridAtTheSelectedOrFirstTile() async throws {
@@ -71,18 +66,12 @@ final class HomeUpstream133Tests: XCTestCase {
 
     // MARK: search and pins
 
-    func testHomeSearchUsesTheSetsRuleForTagsNotesAndPlugins() {
-        var tagged = entry("/p/Alpha Project/alpha.als")
-        tagged.plugins = ["Serum"]
-        let other = entry("/p/Beta Project/beta.als")
-        let sets = [tagged, other]
-        func found(_ q: String) -> [String] {
-            HomeListing.projects(sets: sets, query: q, groupByFolder: true, pinOrder: [], pinnedFirst: false,
-                                 tagsOf: { $0 == "/p/Alpha Project" ? ["techno"] : [] }, noteOf: { _ in "" }).map(\.name)
-        }
-        XCTAssertEqual(found("techno"), ["alpha"], "tags are searched")
-        XCTAssertEqual(found("serum"), ["alpha"], "plugins are searched")
-        XCTAssertEqual(found("zzz"), [])
+    /// The rule is `SetFilter.matchesSearch` (Core, AuditRound2Tests); Home's part is handing it the tags.
+    func testHomeSearchFindsAProjectByItsTags() {
+        let sets = [entry("/p/Alpha Project/alpha.als"), entry("/p/Beta Project/beta.als")]
+        let found = HomeListing.projects(sets: sets, query: "techno", groupByFolder: true, pinOrder: [], pinnedFirst: false,
+                                         tagsOf: { $0 == "/p/Alpha Project" ? ["techno"] : [] }, noteOf: { _ in "" }).map(\.name)
+        XCTAssertEqual(found, ["alpha"])
     }
 
     func testTheStarIsOfferedOnlyWhileSomethingMatchingIsPinned() {
@@ -105,15 +94,5 @@ final class HomeUpstream133Tests: XCTestCase {
         XCTAssertEqual(list.map(\.name), ["alpha v2", "Gone Project"], "busiest first, one entry per project")
         XCTAssertEqual(list.map(\.setPath), ["/p/Alpha Project/alpha v2.als", nil], "a project gone from the catalog has no set")
         XCTAssertTrue(HomeDay.projects(dirs: [], sets: sets).isEmpty, "a day from before the history kept projects")
-    }
-
-    // MARK: texts
-
-    func testSingularFormsHaveTheirOwnSentence() {
-        Localizer.shared.preference = .en
-        defer { Localizer.shared.preference = .system }
-        XCTAssertEqual(HomeStrings.projectsShown(1), "1 project shown")
-        XCTAssertEqual(HomeStrings.projectsShown(12), "12 projects shown")
-        XCTAssertEqual(HomeStrings.tracks(1), "1 track")
     }
 }

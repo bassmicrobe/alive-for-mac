@@ -26,8 +26,9 @@ final class DataSafetyUpstream133Tests: XCTestCase {
         XCTAssertEqual(left, ["settings.cfg", "settings.cfg.bak"], "no temp files left behind")
     }
 
-    /// The stores each go through the same writer; this is only their wiring.
-    func testTheOtherCfgStoresKeepABakToo() throws {
+    /// The stores each go through the same writer; this is only their wiring. The activity cache is
+    /// the only copy of the history, so its previous version has to stay as well.
+    func testTheOtherStoresKeepABakToo() throws {
         let t = makeTemp()
         let meta = ProjectMeta(dir: t.path)
         meta.set("/P/A Project", tags: ["x"], note: "")
@@ -38,11 +39,19 @@ final class DataSafetyUpstream133Tests: XCTestCase {
         let pins = PreviewPins(dir: t.path)
         pins.set("/P/A Project", file: "/P/A Project/one.wav")
         pins.set("/P/A Project", file: "/P/A Project/two.wav")
+        let day1 = Date(timeIntervalSince1970: 1_700_000_000), day2 = day1.addingTimeInterval(86_400)
+        Activity(stamps: [day1], today: day2).saveCache(dir: t.path)
+        Activity(stamps: [day1, day2], today: day2).saveCache(dir: t.path)
 
         let files = Set(try FileManager.default.contentsOfDirectory(atPath: t.path))
-        XCTAssertTrue(files.isSuperset(of: ["notes.cfg.bak", "home.cfg.bak", "previews.cfg.bak"]), "\(files)")
+        XCTAssertTrue(files.isSuperset(of: ["notes.cfg.bak", "home.cfg.bak", "previews.cfg.bak", "activity.cache.bak"]), "\(files)")
         XCTAssertTrue(try XCTUnwrap(text(t.sub("home.cfg.bak"))).contains("pin=/P/A Project/a.als"))
         XCTAssertFalse(try XCTUnwrap(text(t.sub("home.cfg.bak"))).contains("b.als"))
+
+        let earlier = t.mkdir("earlier")
+        try FileManager.default.copyItem(atPath: t.sub("activity.cache.bak"), toPath: earlier + "/activity.cache")
+        XCTAssertEqual(Activity.loadCache(dir: t.path, now: day2).total, 2)
+        XCTAssertEqual(Activity.loadCache(dir: earlier, now: day2).total, 1, "the .bak holds the first save alone")
     }
 
     /// A file there but unreadable (another program holds it, no permission) says nothing about

@@ -58,9 +58,4 @@ final class StatCatalogUpstream133Tests: XCTestCase {
         XCTAssertEqual(small.ideal, CGSize(width: 1366, height: 720))
         XCTAssertEqual(small.minimum, CGSize(width: 1300, height: 720))
     }
-
-    func testTheStatusLineSaysOneProjectInTheSingular() {
-        XCTAssertEqual(StatStrings.projects(1), StatStrings.projectsCountOne.s)
-        XCTAssertEqual(StatStrings.projects(12), StatStrings.projectsCount.f(12))
-    }
 }

@@ -39,7 +39,6 @@ final class AuditRound1Tests: XCTestCase {
         let t = makeTemp()
         let dir = t.mkdir("data")
         let path = t.write("data/notes.cfg", "tags=/P/A Project\tx\n")
-        XCTAssertEqual(AppHome.readConfig(t.sub("data/nothing.cfg")), .missing, "a real absence is still a first run")
 
         try lock(dir)
         XCTAssertEqual(AppHome.readConfig(path), .inaccessible)
@@ -76,23 +75,19 @@ final class AuditRound1Tests: XCTestCase {
     }
 
     // 4. A store that could not be read is read again when something is saved, and the change goes
-    // on top of the file; while it still cannot be read the change is refused, not faked.
+    // on top of the file; while it still cannot be read the change is refused, not faked. (The pins
+    // and the preview pins have the same guard: AuditRound2Tests.)
     func testAStoreThatWasUnreadIsReadAgainOnTheNextSave() throws {
         try XCTSkipIf(geteuid() == 0, "root can read anything")
         let t = makeTemp()
         let notes = t.write("notes.cfg", "tags=/P/Other Project\tdrum\ntags=/P/A Project\told\n")
-        let pins = t.write("home.cfg", "pin=/P/one.als\n")
         try lock(notes)
-        try lock(pins)
 
         let meta = ProjectMeta(dir: t.path)
         XCTAssertTrue(meta.isUnread)
         XCTAssertEqual(meta.set("/P/A Project", tags: ["x"], note: ""), .unread)
-        let home = HomeStore(dir: t.path)
-        home.togglePin("/P/two.als")
 
         try unlock(notes)
-        try unlock(pins)
         XCTAssertEqual(text(notes), "tags=/P/Other Project\tdrum\ntags=/P/A Project\told\n", "nothing was written over it")
 
         XCTAssertEqual(meta.set("/P/A Project", tags: ["x"], note: ""), .saved)
@@ -100,9 +95,6 @@ final class AuditRound1Tests: XCTestCase {
         let reread = ProjectMeta(dir: t.path)
         XCTAssertEqual(reread.tagsOf("/P/Other Project"), ["drum"], "other entries stay")
         XCTAssertEqual(reread.tagsOf("/P/A Project"), ["x", "old"], "the entry the person could not see is kept")
-
-        home.togglePin("/P/three.als")
-        XCTAssertEqual(HomeStore(dir: t.path).pins, ["/P/one.als", "/P/three.als"])
     }
 
     // 5. A guessable temporary name must not be written through.

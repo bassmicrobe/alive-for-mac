@@ -24,31 +24,20 @@ final class SetsListUpstream133Tests: XCTestCase {
         return SetsPipeline.make(input)
     }
 
-    func testSearchIsTheSharedRuleSoTagsNotesPluginsAndRendersFindASet() {
-        var tagged = entry("one", dir: "/lib/Tagged Project")
-        tagged.projectName = "Tagged"
-        var plugged = entry("two", dir: "/lib/Plugged Project")
-        plugged.plugins = ["Serum"]
-        var rendered = entry("three", dir: "/lib/Rendered Project")
-        rendered.renderNames = ["demo bounce"]
-        let noted = entry("four", dir: "/lib/Noted Project")
-        let all = [tagged, plugged, rendered, noted]
-
+    /// The rule is `SetFilter.matchesSearch` (Core, AuditRound2Tests); the list's part is handing it
+    /// the project's tags and note, and a query with spaces around it.
+    func testSearchFindsASetByItsProjectsTagsAndNote() {
+        let tagged = entry("one", dir: "/lib/Tagged Project")
+        let noted = entry("two", dir: "/lib/Noted Project")
         func found(_ query: String) -> [String] {
-            pipeline(all) {
+            pipeline([tagged, noted]) {
                 $0.query = " \(query) "
                 $0.tagsOf = { $0 == tagged.projectDir ? ["Vocals"] : [] }
                 $0.noteOf = { $0 == noted.projectDir ? "fix the bridge" : "" }
             }.heads.map(\.name)
         }
         XCTAssertEqual(found("vocals"), ["one"])
-        XCTAssertEqual(found("serum"), ["two"])
-        XCTAssertEqual(found("bounce"), ["three"])
-        XCTAssertEqual(found("bridge"), ["four"])
-        // Every word must hit some field (not necessarily the same one); full width counts as half.
-        XCTAssertEqual(found("tagged vocals"), ["one"])
-        XCTAssertEqual(found("tagged serum"), [])
-        XCTAssertEqual(found("ｓｅｒｕｍ"), ["two"])
+        XCTAssertEqual(found("bridge"), ["two"])
     }
 
     func testFilterCounterIsTheNumberOfRowsTheListShows() {
@@ -60,7 +49,6 @@ final class SetsListUpstream133Tests: XCTestCase {
 
         let flat = pipeline(sets) { $0.query = "song"; $0.groupByFolder = false }
         XCTAssertEqual(SetFormat.matches(flat.heads.count, perProject: false), "2 sets match")
-        XCTAssertEqual(SetFormat.matches(1, perProject: false), "1 set matches")
     }
 
     func testAVersionShowsItsTimeOnlyWhenAnotherVersionWasSavedTheSameDay() {
@@ -88,11 +76,5 @@ final class SetsListUpstream133Tests: XCTestCase {
         XCTAssertFalse(p.hasPinnedRows(pins: []))
         XCTAssertFalse(p.hasPinnedRows(pins: ["/lib/Elsewhere/x.als"]))
         XCTAssertTrue(p.hasPinnedRows(pins: ["/LIB/b project/b.als"]))
-    }
-
-    func testTheShownSummaryUsesSingularForms() {
-        XCTAssertEqual(SetFormat.shownSummary(projects: 553, sets: 754), "553 projects · 754 sets")
-        XCTAssertEqual(SetFormat.shownSummary(projects: 1, sets: 3), "1 project · 3 sets")
-        XCTAssertEqual(SetFormat.shownSummary(projects: 1, sets: 1), "1 project · 1 set")
     }
 }

@@ -3,23 +3,10 @@ import XCTest
 @testable import AliveCore
 @testable import AliveUI
 
-/// Upstream a6c8dc1 / 9ce4b4b in the full-screen preview: the caption in the set's own bars with
-/// singular forms, and a canvas that tells the header its limits and never keeps the last set's view.
+/// Upstream a6c8dc1 / 9ce4b4b in the full-screen preview: a canvas that tells the header its limits and
+/// never keeps the last set's view. (The caption in the set's own bars: ArrangementPreviewTests.)
 @MainActor
 final class PlayerPreviewUpstream133Tests: XCTestCase {
-    func testCaptionCountsBarsInTheSetsTimeSignatureAndUsesSingularForms() {
-        Localizer.shared.preference = .en
-        defer { Localizer.shared.preference = .system }
-        var a = SyntheticArrangement.make()
-        a.tempo = 0
-        a.barBeats = 3                                   // 3/4: 32 beats are 11 bars, not 8
-        a.tracks = [a.tracks[0]]
-        a.clipCount = 1
-        XCTAssertEqual(PreviewSizing.metrics(path: "/p/a.als", key: "", arrangement: a), "11 bars   ·   1 track   ·   1 clip")
-        a.end = 3
-        XCTAssertTrue(PreviewSizing.metrics(path: "/p/a.als", key: "", arrangement: a).hasPrefix("1 bar   ·"))
-    }
-
     /// The main run loop gets a turn: the canvas reports after the layout pass, not during it.
     private func letTheCanvasReport() async throws {
         try await Task.sleep(nanoseconds: 60_000_000)

@@ -32,12 +32,12 @@ final class PlayerUpstream133Tests: XCTestCase {
         XCTAssertGreaterThan(wave.max.suffix(8).max() ?? 0, 0.3, "…across the whole picture")
     }
 
-    func testAFileThatCannotBeReadLeavesALineInTheLogAndNoWave() throws {
+    func testAFileThatCannotBeReadLeavesALineInTheLog() throws {
         let scratch = makeHomeScratch()
         Diag.start(dir: scratch.sub("data"))
         defer { Diag.stop() }
         let path = scratch.write("junk/broken.wav", "this is not audio")
-        XCTAssertFalse(WaveformReader.read(path: path, buckets: 64).ok)
+        _ = WaveformReader.read(path: path, buckets: 64)       // that it gives no wave: PlayerWaveformTests
         let log = try String(contentsOfFile: Diag.defaultLogPath(dir: scratch.sub("data")), encoding: .utf8)
         XCTAssertTrue(log.contains("wave: " + path), "the failure is logged with the file")
     }
