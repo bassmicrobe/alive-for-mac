@@ -9,13 +9,26 @@ import Foundation
 /// Answers "is there a file at this path" for a whole load: the scanner log is cumulative and one
 /// plugin occurs in it dozens of times, so each path is asked about once. The cache lives for one
 /// load — otherwise a plugin installed while the program ran would not show up on "rescan".
-final class PathExistsCache {
+///
+/// One per load, never shared between loads (upstream a6c8dc1 asked the disk through a cache of
+/// load paths; 9ce4b4b then made it per thread, because two loads at once wrote the same set and
+/// a hash set written from two threads can spin forever). The lock keeps even a cache that is
+/// handed to several threads of one load from doing that.
+final class PathExistsCache: @unchecked Sendable {
+    private let lock = NSLock()
     private var known: [String: Bool] = [:]
+    private let probe: (String) -> Bool
+
+    /// `probe` answers for a path nobody asked about yet; tests count its calls.
+    init(probe: @escaping (String) -> Bool = { FileManager.default.fileExists(atPath: $0) }) {
+        self.probe = probe
+    }
 
     func exists(_ path: String) -> Bool {
         if path.isEmpty { return false }
+        lock.lock(); defer { lock.unlock() }
         if let hit = known[path] { return hit }
-        let now = FileManager.default.fileExists(atPath: path)
+        let now = probe(path)      // under the lock: every path is asked once, whoever asks first
         known[path] = now
         return now
     }
