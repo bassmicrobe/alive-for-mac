@@ -202,14 +202,30 @@ public struct Activity: Sendable {
     /// Read up to the last intact record: a truncated tail is a lost tail, not a reason to throw
     /// away years (returning empty would overwrite the remainder with a blank at the next scan).
     public static func loadCache(dir: String = AppHome.path, now: Date = Date()) -> Activity {
-        guard let data = FileManager.default.contents(atPath: cachePath(dir: dir)) else { return .empty }
+        readCache(dir: dir, now: now).activity
+    }
+
+    /// `loadCache`, and whether the cache exists but could not be read (permissions, an I/O error).
+    /// An absent cache is an ordinary first run and starts empty. An unread one is the only
+    /// durable copy of the history, so it must not be replaced by what a scan finds in Backup:
+    /// the caller leaves the file alone (`ProjectIndex` skips `saveCache`) until a read works.
+    public static func readCache(dir: String = AppHome.path, now: Date = Date()) -> (activity: Activity, isUnread: Bool) {
+        let path = cachePath(dir: dir)
+        let data: Data
+        do {
+            data = try Data(contentsOf: URL(fileURLWithPath: path))
+        } catch {
+            if AppHome.isAbsent(error) { return (.empty, false) }
+            Diag.warn("activity.cache exists but cannot be read, so it will not be replaced: \(error.localizedDescription)")
+            return (.empty, true)
+        }
         var r = DotNetReader(data)
         var ticks: [Int64] = []
         var complete = false
         do {
-            guard try r.int32() == cacheVersion else { return .empty }
+            guard try r.int32() == cacheVersion else { return (.empty, false) }
             let n = Int(try r.int32())
-            guard n >= 0, n <= 5_000_000 else { return .empty }
+            guard n >= 0, n <= 5_000_000 else { return (.empty, false) }
             for _ in 0..<n { ticks.append(try r.int64()) }
             complete = true
         } catch {
@@ -223,7 +239,7 @@ public struct Activity: Sendable {
         for (i, t) in ticks.enumerated() where DotNetTicks.isValid(ticks: t) {
             marks.append(Mark(when: DotNetTicks.date(local: t), project: i < projects.count ? projects[i] : ""))
         }
-        return marks.isEmpty ? .empty : Activity(marks: marks, today: now)
+        return (marks.isEmpty ? .empty : Activity(marks: marks, today: now), false)
     }
 
     /// The tail behind `projectsMark`, if this history has one. A tail cut short gives the
