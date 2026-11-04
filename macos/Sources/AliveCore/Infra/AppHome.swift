@@ -74,8 +74,9 @@ public enum AppHome {
         let name = (path as NSString).lastPathComponent
         guard FileManager.default.fileExists(atPath: path) else { return .missing }
         guard let data = FileManager.default.contents(atPath: path) else {
+            // No copy can be made of bytes the system will not hand over, so there is nothing
+            // to announce as "backed up".
             Diag.warn("\(name) exists but cannot be read")
-            noteBackup(path)
             return .inaccessible
         }
         if data.isEmpty { return .lines([]) }

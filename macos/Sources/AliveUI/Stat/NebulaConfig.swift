@@ -112,6 +112,6 @@ struct NebulaConfig: Equatable {
     }
 
     func save(dir: String) throws {
-        try AppHome.writeAtomically(serialized(), to: NebulaConfig.path(dir: dir))
+        try AppHome.writeKeepingBackup(serialized(), to: NebulaConfig.path(dir: dir))
     }
 }
