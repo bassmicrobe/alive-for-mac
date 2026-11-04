@@ -223,14 +223,15 @@ extension SetFilter {
     /// finds "Mix", "cafe" finds "Café").
     public static func matchesSearch(_ s: SetEntry, query q: String,
                                      tagsOf: (String) -> [String], noteOf: (String) -> String) -> Bool {
-        let options: String.CompareOptions = [.caseInsensitive, .diacriticInsensitive, .widthInsensitive]
-        func hit(_ text: String, _ word: String) -> Bool { text.range(of: word, options: options) != nil }
-        let dir = s.projectDir
-        return q.components(separatedBy: .whitespacesAndNewlines).filter { !$0.isEmpty }.allSatisfy { word in
-            hit(s.name, word) || hit(s.projectName, word) || hit(s.path, word)
-                || s.plugins.contains { hit($0, word) } || s.renderNames.contains { hit($0, word) }
-                || tagsOf(dir).contains { hit($0, word) } || hit(noteOf(dir), word)
-        }
+        guard let query = SearchQuery(q) else { return true }
+        return query.matches(SearchHaystacks.build(s, tagsOf: tagsOf, noteOf: noteOf))
+    }
+
+    /// The same rule with the folded texts kept in `haystacks` (validated by the caller against the
+    /// catalog and tags revisions): what a keystroke over thousands of sets runs.
+    public static func matchesSearch(_ s: SetEntry, query: SearchQuery, haystacks: SearchHaystacks,
+                                     tagsOf: (String) -> [String], noteOf: (String) -> String) -> Bool {
+        query.matches(haystacks.text(for: s, tagsOf: tagsOf, noteOf: noteOf))
     }
 }
 

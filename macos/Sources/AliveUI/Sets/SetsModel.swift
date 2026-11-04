@@ -85,10 +85,12 @@ final class SetsModel {
                           metaRevision: metaRevision, pluginsKnown: pluginsKnown)
         if let memo, memo.key == key { return memo.value }
         let meta = meta
+        app.searchHaystacks.validate(.init(catalog: key.revision, meta: key.metaRevision))
         let value = SetsPipeline.make(.init(
             sets: app.catalog.sets, query: key.query, filter: key.filter, groupByFolder: key.group,
             sort: key.sort, pinnedFirst: key.pinnedFirst, pins: key.pins,
-            tagsOf: { meta.tagsOf($0) }, noteOf: { meta.noteOf($0) }, pluginsKnown: key.pluginsKnown,
+            tagsOf: { meta.tagsOf($0) }, noteOf: { meta.noteOf($0) }, haystacks: app.searchHaystacks,
+            pluginsKnown: key.pluginsKnown,
             statusOf: { [weak self] in self?.status(of: $0) ?? SetFilter.basicStatus($0) }))
         memo = (key, value)
         return value

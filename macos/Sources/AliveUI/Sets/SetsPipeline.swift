@@ -21,6 +21,8 @@ struct SetsPipeline {
         var pins: Set<String> = []
         var tagsOf: (String) -> [String] = { _ in [] }
         var noteOf: (String) -> String = { _ in "" }
+        /// The folded search texts kept between keystrokes (validated by the caller); nil: folded on the spot.
+        var haystacks: SearchHaystacks?
         /// Whether the installed-plugin list could be read. When it could not, "missing" is not a
         /// fact but an unknown, so the missing/installed conditions are left out.
         var pluginsKnown = true
@@ -46,9 +48,15 @@ struct SetsPipeline {
         // finds it). The search is the catalog's one rule, `SetFilter.matchesSearch`: Home asks the
         // same, so a search shows the same projects on both tabs (9ce4b4b).
         let filter = effectiveFilter(input.filter, pluginsKnown: input.pluginsKnown)
+        let search = SearchQuery(query)
         var matched = input.sets.filter { set in
-            filter.matches(set, tagsOf: input.tagsOf, statusOf: input.statusOf)
-                && (query.isEmpty || SetFilter.matchesSearch(set, query: query, tagsOf: input.tagsOf, noteOf: input.noteOf))
+            guard filter.matches(set, tagsOf: input.tagsOf, statusOf: input.statusOf) else { return false }
+            guard let search else { return true }
+            guard let haystacks = input.haystacks else {
+                return SetFilter.matchesSearch(set, query: query, tagsOf: input.tagsOf, noteOf: input.noteOf)
+            }
+            return SetFilter.matchesSearch(set, query: search, haystacks: haystacks,
+                                           tagsOf: input.tagsOf, noteOf: input.noteOf)
         }
         var out = SetsPipeline()
         if input.groupByFolder {

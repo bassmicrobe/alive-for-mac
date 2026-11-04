@@ -46,6 +46,8 @@ final class AppModel {
     /// sounds never overlap. Its errors surface as toasts.
     @ObservationIgnored let audio = AudioPlayback()
     @ObservationIgnored private var started = false
+    /// The folded search texts of the catalog's sets, shared by Home and Sets (kept per catalog revision and tags revision).
+    @ObservationIgnored let searchHaystacks = SearchHaystacks()
     /// Files already announced as unreadable this session, so each is announced once.
     @ObservationIgnored private var toldUnread: Set<String> = []
     @ObservationIgnored private let widgetPublisher = WidgetSnapshotPublisher()

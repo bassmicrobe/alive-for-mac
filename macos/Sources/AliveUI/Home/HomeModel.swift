@@ -23,14 +23,24 @@ enum HomeListing {
                 pinnedFirst: pinnedFirst, tagsOf: tagsOf, noteOf: noteOf).rows
     }
 
+    /// `haystacks`: the folded search texts kept between keystrokes (validated by the caller).
     static func listing(sets: [SetEntry], query: String, groupByFolder: Bool,
                         pinOrder: [String], pinnedFirst: Bool,
-                        tagsOf: (String) -> [String], noteOf: (String) -> String) -> Result {
+                        tagsOf: (String) -> [String], noteOf: (String) -> String,
+                        haystacks: SearchHaystacks? = nil) -> Result {
         // The one rule of the search box, shared with the Sets table (9ce4b4b): name, folder,
         // plugins, renders, tags and note.
         let q = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        let matched = q.isEmpty ? sets : sets.filter {
-            SetFilter.matchesSearch($0, query: q, tagsOf: tagsOf, noteOf: noteOf)
+        let matched: [SetEntry]
+        if let search = SearchQuery(q) {
+            matched = sets.filter {
+                if let haystacks {
+                    return SetFilter.matchesSearch($0, query: search, haystacks: haystacks, tagsOf: tagsOf, noteOf: noteOf)
+                }
+                return SetFilter.matchesSearch($0, query: q, tagsOf: tagsOf, noteOf: noteOf)
+            }
+        } else {
+            matched = sets
         }
         var all = matched.filter { !$0.isBackup }
         if groupByFolder { all = ProjectIndex.collapseByFolder(all) }
@@ -146,9 +156,11 @@ final class HomeModel {
                           metaRevision: app.sets.metaRevision)
         if let cache = rowsCache, cache.key == key { return cache.listing }
         let meta = app.sets.meta
+        app.searchHaystacks.validate(.init(catalog: key.revision, meta: key.metaRevision))
         let listing = HomeListing.listing(sets: app.catalog.sets, query: key.query, groupByFolder: key.grouped,
                                           pinOrder: key.pins, pinnedFirst: key.pinnedFirst,
-                                          tagsOf: { meta.tagsOf($0) }, noteOf: { meta.noteOf($0) })
+                                          tagsOf: { meta.tagsOf($0) }, noteOf: { meta.noteOf($0) },
+                                          haystacks: app.searchHaystacks)
         rowsCache = (key, listing)
         return listing
     }
