@@ -54,6 +54,9 @@ enum SetFormat {
         (n == 1 ? one : many).f(n)
     }
 
+    /// The "Ready to open" toggle's count: "1 set", "24 sets".
+    static func readyCount(_ n: Int) -> String { plural(n, one: .readyNowCountOne, many: .readyNowCount) }
+
     /// The toolbar's "553 projects · 754 sets", with the singular forms ("1 project · 1 set").
     static func shownSummary(projects: Int, sets: Int) -> String {
         if sets == 1 { return SetsStrings.shownSummaryOne.s }

@@ -6,7 +6,7 @@ enum HomeStrings: LocalizedStrings {
     // Tab / sheet titles
     case title, previewTitle
     // Overview
-    case readySets, readySetsHelp
+    case readySets, readySetsHelp, readyProjectsOne, readyProjects
     case overview, activeDays, streak, noStreak, record, peakHour, onDisk
     case nothingSaved, saveOne, saveMany, daysShort, overviewCollapse, overviewExpand
     // A day of the calendar, clicked
@@ -37,7 +37,10 @@ enum HomeStrings: LocalizedStrings {
         case .title: return ("Home", "ホーム")
         case .previewTitle: return ("Arrangement Preview", "アレンジメントのプレビュー")
 
-        case .readySets: return ("Ready to open", "今すぐ開けるセット")
+        case .readySets: return ("Ready to open", "今すぐ開ける")
+        // The bar counts projects (each judged by its newest set): the unit follows the total.
+        case .readyProjectsOne: return ("%1$lld / %2$lld project", "%1$lld / %2$lld プロジェクト")
+        case .readyProjects: return ("%1$lld / %2$lld projects", "%1$lld / %2$lld プロジェクト")
         case .readySetsHelp: return ("Show the sets that open right now on the Sets tab", "今すぐ開けるセットをセットタブで表示")
         case .overview: return ("Overview", "概要")
         case .activeDays: return ("Active days", "作業した日")
@@ -124,6 +127,10 @@ enum HomeStrings: LocalizedStrings {
 
 /// "1 project", "2 projects": English needs a sentence of its own for the singular (9ce4b4b).
 extension HomeStrings {
+    /// The Overview's bar: "24 / 24 projects", "0 / 1 project" (the noun agrees with the total).
+    static func readyProjects(ready: Int, total: Int) -> String {
+        (total == 1 ? readyProjectsOne : readyProjects).f(ready, total)
+    }
     static func projectsShown(_ n: Int) -> String { (n == 1 ? shownProjectOne : shownProjectMany).f(n) }
     static func bars(_ n: Int) -> String { (n == 1 ? previewBarOne : previewBars).f(n) }
     static func tracks(_ n: Int) -> String { (n == 1 ? previewTrackOne : previewTracks).f(n) }

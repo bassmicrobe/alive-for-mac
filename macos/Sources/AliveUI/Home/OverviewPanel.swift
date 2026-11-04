@@ -187,7 +187,7 @@ private struct ReadySetsCard: View {
                 Image(systemName: "checkmark.circle").font(.system(size: 12, weight: .medium)).foregroundStyle(Theme.green)
                 Text(HomeStrings.readySets.s).font(Theme.fLabel).foregroundStyle(Theme.secondaryText)
                 Spacer(minLength: 8)
-                Text("\(summary.ready) / \(summary.total)")
+                Text(HomeStrings.readyProjects(ready: summary.ready, total: summary.total))
                     .font(.system(size: 15, weight: .semibold)).foregroundStyle(Theme.text).monospacedDigit()
                 IconView(icon: .chevronDown, size: 9, weight: .semibold)
                     .rotationEffect(.degrees(-90))
@@ -204,6 +204,6 @@ private struct ReadySetsCard: View {
         .onHover { hovering = $0 }
         .animation(Theme.hoverAnimation, value: hovering)
         .help(HomeStrings.readySetsHelp.s)
-        .accessibilityValue("\(summary.ready) / \(summary.total)")
+        .accessibilityValue(HomeStrings.readyProjects(ready: summary.ready, total: summary.total))
     }
 }

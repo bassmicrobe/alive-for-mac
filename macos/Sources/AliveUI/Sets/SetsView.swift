@@ -116,7 +116,7 @@ private struct ReadyNowToggle: View {
                 Image(systemName: "checkmark.circle").font(.system(size: 11, weight: .medium))
                 Text(SetsStrings.readyNow.s)
                 if let count {
-                    Text(count.formatted()).monospacedDigit().opacity(0.7)
+                    Text(SetFormat.readyCount(count)).monospacedDigit().opacity(0.7)
                 }
             }
             .font(Theme.fSmall)

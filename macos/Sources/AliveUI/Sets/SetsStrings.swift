@@ -16,7 +16,7 @@ enum SetsStrings: LocalizedStrings {
     case pluginListInstalled, pluginListMissing
     case rendersHeading, moreItems
     // Readiness (Mac-only)
-    case readyNow, readyNowHelp, statusHeading, statusReady, statusOffline, statusMissingFiles
+    case readyNow, readyNowCountOne, readyNowCount, readyNowHelp, statusHeading, statusReady, statusOffline, statusMissingFiles
     case statusMissingPlugins, statusUnknown, statusUnreadable, statusUnreadableHelp, statusOfflineLine, statusStaleLine, staleRender, staleRenderHelp
     case fltReadiness, fltStaleRender, fltReadinessNone
     // Filters
@@ -105,6 +105,9 @@ enum SetsStrings: LocalizedStrings {
         case .moreItems: return ("… %lld more", "… ほか %lld 件")
 
         case .readyNow: return ("Ready to open", "今すぐ開ける")
+        // The toggle's count is a number of sets (Home's bar counts projects).
+        case .readyNowCountOne: return ("%lld set", "%lld セット")
+        case .readyNowCount: return ("%lld sets", "%lld セット")
         case .readyNowHelp: return ("Only sets that open as saved right now: every file found, every plugin installed, no drive missing",
                                     "保存したとおりに今すぐ開けるセットだけを表示（ファイルがすべてあり、プラグインがすべてインストール済みで、未接続のドライブがない）")
         case .statusHeading: return ("Status:", "状態:")
