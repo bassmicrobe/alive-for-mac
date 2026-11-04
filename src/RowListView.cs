@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -179,6 +179,7 @@ namespace AbletonManager
         public event Action<int> RowCountClicked;      // a click on the "+3" / "−3" tail
         public event Action<int> RowTagsClicked;       // a click on a row's tags (or on the "+" in an empty cell)
         public event Action<int> SelectedRowClicked;   // a left click on the row already selected — SelectionChanged stays silent
+        public event Action EmptyClicked;              // a left press past the rows, on nothing
 
         public int SortColumn = -1;
         public bool SortDescending;
@@ -455,11 +456,20 @@ namespace AbletonManager
             return new Rectangle(PadX + CheckW + (PinW - s) / 2, top + (rowH - s) / 2, s, s);
         }
 
+        public bool HasPinnedRows()
+        {
+            for (int i = 0; i < _rows.Count; i++)
+            {
+                if (_rows[i].Pinned) return true;
+            }
+            return false;
+        }
+
         /// <summary>Is the cursor on the header star? It occupies the same gutter as the row
         /// stars.</summary>
         bool OnHeaderPin(Point p)
         {
-            return ShowPinIndicator && ShowHeaderPin && p.Y < HeaderHeight && PinRect(0, HeaderHeight).Contains(p);
+            return ShowPinIndicator && ShowHeaderPin && HasPinnedRows() && p.Y < HeaderHeight && PinRect(0, HeaderHeight).Contains(p);
         }
 
         /// <summary>A row's play button — the gutter between the star and the first
@@ -989,7 +999,7 @@ namespace AbletonManager
 
         void DoResize(int mouseX)
         {
-            float scale = DeviceDpi / 96f;
+            float scale = Theme.Dpi;
             int[] before = ComputeWidths();
             int rightBefore = ColX(before, _resizeCol) + before[_resizeCol];
 
@@ -1157,6 +1167,8 @@ namespace AbletonManager
                 return;
             }
 
+            if (idx < 0 && e.Button == MouseButtons.Left && EmptyClicked != null) EmptyClicked();
+
             // The "+3" tail is an independent "show the other versions" button, like play and
             // the star: it does not touch the row selection, or the details panel would jump on
             // every expansion.
@@ -1318,7 +1330,8 @@ namespace AbletonManager
 
         protected override bool IsInputKey(Keys k)
         {
-            return k == Keys.Up || k == Keys.Down || k == Keys.PageUp || k == Keys.PageDown || base.IsInputKey(k);
+            return k == Keys.Up || k == Keys.Down || k == Keys.PageUp || k == Keys.PageDown
+                || k == Keys.Home || k == Keys.End || base.IsInputKey(k);
         }
 
         protected override void OnKeyDown(KeyEventArgs e)
@@ -1328,6 +1341,8 @@ namespace AbletonManager
             else if (e.KeyCode == Keys.Up) step = -1;
             else if (e.KeyCode == Keys.PageDown) step = PageStep;
             else if (e.KeyCode == Keys.PageUp) step = -PageStep;
+            else if (e.KeyCode == Keys.End) step = _rows.Count;
+            else if (e.KeyCode == Keys.Home) step = -_rows.Count;
 
             if (step != 0 && MoveSelection(step)) e.Handled = true;
             base.OnKeyDown(e);
@@ -1364,7 +1379,9 @@ namespace AbletonManager
         public bool MoveSelection(int step)
         {
             if (_rows.Count == 0) return false;
-            int want = Math.Max(0, Math.Min(_rows.Count - 1, (_selected < 0 ? 0 : _selected) + step));
+            // With nothing selected the walk starts just above the first row: Down lands on it
+            // rather than on the second, and End on the last.
+            int want = Math.Max(0, Math.Min(_rows.Count - 1, (_selected < 0 ? -1 : _selected) + step));
             if (want != _selected)
             {
                 _selected = want;
@@ -1534,7 +1551,7 @@ namespace AbletonManager
                             {
                                 int mx = ColX(widths, m.Column);
                                 if (mx < scrollLeft || mx >= Width - PadRight) continue;
-                                PaintMark(g, widths, topAnim, rowH, m);
+                                PaintMark(g, widths, topAnim, rowH, entrance, m);
                             }
                         }
                     }
@@ -1574,7 +1591,7 @@ namespace AbletonManager
 
                         foreach (CellMark m in row.Marks)
                         {
-                            if (m.Column == 0) PaintMark(g, widths, topAnim, rowH, m);
+                            if (m.Column == 0) PaintMark(g, widths, topAnim, rowH, entrance, m);
                         }
                     }
                 }
@@ -1635,7 +1652,9 @@ namespace AbletonManager
             if (col.Id == IndentColumn && row.NameFont != null) f = row.NameFont;
             Color color = dim ? Theme.TextDim
                               : (col.Color ?? (c == 0 || bright ? Theme.Text : Theme.TextDim));
-            if (entrance < 1.0f) color = Color.FromArgb((int)Math.Round(color.A * entrance), color);
+            // TextRenderer ignores alpha: a row still rising in gets its text moved toward the
+            // background instead, or the words stood at full strength from the first frame.
+            if (entrance < 1.0f) color = Theme.Interpolate(Theme.Bg, color, entrance);
 
             // A version under an expanded row, a folder or a sample inside its folder: the name
             // is indented, and the indent alone says the level. Guide rails were tried, short
@@ -1680,7 +1699,7 @@ namespace AbletonManager
                     // Under the cursor the tail lightens — otherwise nobody would guess it can
                     // be clicked to expand the versions.
                     Color countColor = countHot ? Theme.Text : Theme.TextDim;
-                    if (entrance < 1.0f) countColor = Color.FromArgb((int)Math.Round(countColor.A * entrance), countColor);
+                    if (entrance < 1.0f) countColor = Theme.Interpolate(Theme.Bg, countColor, entrance);
 
                     int countW = TextW(countText, f);
                     int mainW = TextW(mainText, f);
@@ -1988,7 +2007,7 @@ namespace AbletonManager
                 RememberTags(rowIndex, new Rectangle(cell.X, cell.Y, right - cell.X, cell.Height), clipLeft);
         }
 
-        void PaintMark(Graphics g, int[] widths, int top, int rowH, CellMark m)
+        void PaintMark(Graphics g, int[] widths, int top, int rowH, float entrance, CellMark m)
         {
             if (m.Column < 0 || m.Column >= _columns.Count || string.IsNullOrEmpty(m.Text)) return;
 
@@ -2004,7 +2023,7 @@ namespace AbletonManager
             // The coloured strip at the right edge is gone: the text itself is already
             // coloured, and the strip only doubled the same message in the rightmost column.
             Chrome.DrawText(g, m.Text, Theme.FBody, new Rectangle(slot.Left, top + yOffset, slot.Width, rowH),
-                            m.Color, Chrome.CellRight);
+                            entrance < 1.0f ? Theme.Interpolate(Theme.Bg, m.Color, entrance) : m.Color, Chrome.CellRight);
         }
 
         void PaintHeader(Graphics g, int[] widths)
@@ -2036,7 +2055,7 @@ namespace AbletonManager
                 int head0W = Math.Min(scrollLeft, Width - PadRight);
                 g.SetClip(new Rectangle(0, 0, head0W, HeaderHeight));
 
-                if (ShowPinIndicator && ShowHeaderPin)
+                if (ShowPinIndicator && ShowHeaderPin && HasPinnedRows())
                 {
                     RectangleF hp = PinRect(0, HeaderHeight);
                     Color ink = PinnedFirst ? Theme.Light
