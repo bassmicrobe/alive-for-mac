@@ -238,7 +238,7 @@ final class HomeModel {
     /// still open a project nobody can see (9ce4b4b). Called by the grid when its tiles change.
     func dropHiddenSelection() {
         guard app.tab == .home else { return }
-        let kept = HomeSelection.kept(app.selectedSetPath, in: rows)
+        let kept = HomeSelection.keptIncludingFolded(app.selectedSetPath, in: rows, sets: app.catalog.sets)
         if kept != app.selectedSetPath { app.selectedSetPath = kept }
     }
 

@@ -12,6 +12,17 @@ enum HomeSelection {
         return path
     }
 
+    /// `kept`, and also a set that is folded under a newer version of its folder when that version's
+    /// tile is shown: picked in the Sets list while its folder was open, it is still the selection
+    /// after a switch to Home, where the tile stands for the whole folder.
+    static func keptIncludingFolded(_ path: String?, in rows: [SetEntry], sets: [SetEntry]) -> String? {
+        guard let path else { return nil }
+        if rows.contains(where: { $0.path == path }) { return path }
+        guard let set = sets.first(where: { $0.path == path }) else { return nil }
+        let folder = set.directory.lowercased()
+        return rows.contains { $0.directory.lowercased() == folder } ? path : nil
+    }
+
     /// ↓ from the search field goes on into the tiles: the picked one stays, otherwise the first.
     static func entry(selected: String?, in rows: [SetEntry]) -> String? {
         kept(selected, in: rows) ?? rows.first?.path
