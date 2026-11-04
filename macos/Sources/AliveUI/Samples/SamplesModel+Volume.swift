@@ -34,9 +34,10 @@ extension SamplesModel {
         app.mutateSettings { $0.previewVolume = v }
     }
 
-    /// Puts the level on the sample this tab started, if it is still the one playing. It goes to the
-    /// underlying player and not to `audio.volume`: that is the render player's level, and the next
-    /// render builds its player from it.
+    /// Puts the slider's level on the sample this tab started, if it is still the one playing (a new
+    /// sample starts at that level through `play(url:volume:)`). It goes to the underlying player and
+    /// not to `audio.volume`: that is the render player's level, and the next render builds its
+    /// player from it.
     func applyPreviewVolume() {
         guard let path = startedPath, app.audio.url?.path == path else { return }
         app.audio.player?.volume = Float(previewVolume)

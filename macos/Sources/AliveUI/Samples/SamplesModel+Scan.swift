@@ -50,8 +50,11 @@ extension SamplesModel {
         started = true
         let dir = app.dataDir
         loadTask = Task { [weak self] in
-            let cached = await Task.detached(priority: .userInitiated) { SampleCache.load(dir: dir) }.value
+            let (cached, walked) = await Task.detached(priority: .userInitiated) {
+                (SampleCache.load(dir: dir), SampleCache.walkedAt(dir: dir))
+            }.value
             guard let self else { return }
+            self.cachedWalkDate = walked
             let s = self.app.settings
             self.adopt(cached.only(s.sampleRoots, disabled: s.disabledSampleRoots))
             self.isLoaded = true
@@ -65,12 +68,21 @@ extension SamplesModel {
     }
 
     /// The quiet walk of a session. Upstream walks only when the last whole walk is over a day old or
-    /// a switched-on root is missing from the cache (SampleIndex.WalkDue), so a start does not fight
-    /// Live for the disk. That decision belongs to Core; until its entry is merged this walks every
-    /// time (notes/E1.md has the exact replacement). F5, a new folder and a returning volume still
-    /// go straight to `startScan`.
+    /// a switched-on root is missing from the cache (`SampleIndex.walkDue`), so a start does not fight
+    /// Live for the disk. F5, a new folder and a returning volume still go straight to `startScan`.
     func walkAtStartup() {
-        startScan(manual: false)
+        let s = app.settings
+        if SampleIndex.walkDue(cached: index, roots: s.sampleRoots, disabled: s.disabledSampleRoots,
+                               walkedAt: cachedWalkDate) {
+            startScan(manual: false)
+            return
+        }
+        Diag.info("samples: last walked \(cachedWalkDate.map { String(describing: $0) } ?? "never"), not walked again")
+        // No walk will finish and reveal it, so do it now.
+        if let path = pendingReveal {
+            pendingReveal = nil
+            reveal(path)
+        }
     }
 
     /// The list of folders changed (added, removed, switched on or off in the roots sheet): the tree

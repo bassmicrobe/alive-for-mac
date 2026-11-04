@@ -31,8 +31,8 @@ extension SamplesModel {
             return
         }
         // A failure is reported by AppModel's `audio.onError`.
-        startedPath = app.audio.play(url: URL(fileURLWithPath: path)) ? path : nil
-        applyPreviewVolume()
+        // The sound starts at the audition level; the render player's own level is left alone.
+        startedPath = app.audio.play(url: URL(fileURLWithPath: path), volume: Float(previewVolume)) ? path : nil
         auditioned = path
         lastStart = Date()
     }

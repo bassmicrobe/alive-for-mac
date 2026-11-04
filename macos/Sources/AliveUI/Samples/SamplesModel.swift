@@ -59,6 +59,8 @@ final class SamplesModel {
     // MARK: scanning
     @ObservationIgnored var started = false
     @ObservationIgnored var scannedKey: String?
+    /// When the cache on disk was last walked (read with it at start; nil without a cache).
+    @ObservationIgnored var cachedWalkDate: Date?
     @ObservationIgnored var restartRequested = false
     @ObservationIgnored var scanFlag: SampleCancelFlag?
     @ObservationIgnored var scanTask: Task<Void, Never>?

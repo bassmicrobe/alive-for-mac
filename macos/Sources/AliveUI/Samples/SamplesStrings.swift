@@ -97,7 +97,7 @@ enum SamplesStrings: LocalizedStrings {
         case .playing: return ("Playing", "再生中")
         case .notPlayable: return ("Only Live plays this file", "この形式は Live でのみ再生できます")
         case .dragHelp: return ("Drag into Live", "Live にドラッグ")
-        case .panelNoSelection: return ("No folder selected", "フォルダが選択されていません")
+        case .panelNoSelection: return ("No sample selected", "サンプルが選択されていません")
         case .panelNoSelectionHint: return ("Pick a folder or a sample", "フォルダかサンプルを選んでください")
         case .panelSamples: return ("Samples:", "サンプル数:")
         case .panelUsed: return ("Used:", "使用:")
