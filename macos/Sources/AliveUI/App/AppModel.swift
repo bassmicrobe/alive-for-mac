@@ -174,10 +174,10 @@ final class AppModel {
 
     // MARK: - Toasts
 
-    /// One toast per data file that was unreadable and has been copied to `<file>.bak`.
+    /// One toast per data file that was unreadable and has been copied to `<file>.orig`.
     func announceBackedUpFiles() {
-        for name in AppHome.takeBackupNotices() {
-            toast(CommonStrings.dataFileBackedUp.f(name), kind: .error)
+        for notice in AppHome.takeBackupNotices() {
+            toast(CommonStrings.dataFileBackedUp.f(notice.file, notice.copy), kind: .error)
         }
     }
 

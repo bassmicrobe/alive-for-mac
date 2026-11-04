@@ -94,8 +94,8 @@ enum CommonStrings: LocalizedStrings {
             return ("settings.cfg can't be read right now, so changes are not being saved.",
                     "settings.cfg を今読み込めないため、変更は保存されていません。")
         case .dataFileBackedUp:
-            return ("“%1$@” was not a plain UTF-8 text file. The original was kept as “%1$@.bak”.",
-                    "「%1$@」は通常の UTF-8 テキストではありませんでした。元のファイルは「%1$@.bak」として残してあります。")
+            return ("“%1$@” was not a plain UTF-8 text file. The original was kept as “%2$@”.",
+                    "「%1$@」は通常の UTF-8 テキストではありませんでした。元のファイルは「%2$@」として残してあります。")
         case .rootAdded: return ("Added %@", "%@を追加しました")
         case .rootsAdded: return ("Added %lld folders", "%lld 個のフォルダを追加しました")
         case .alreadyWatching: return ("Already watching that folder", "そのフォルダはすでに監視しています")
