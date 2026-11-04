@@ -12,10 +12,17 @@
 - **Apple の資格情報（下の 5 つのシークレット）が登録されている場合:** Developer ID Application
   証明書で署名し、Apple に公証（notarize）を依頼し、チケットをアプリと DMG に staple します。
   ダウンロードした利用者の Mac では、Gatekeeper の操作なしで開けます。
-- **1 つでも欠けている場合:** これまでどおり ad-hoc 署名のビルドを作ります。ワークフローは
+- **5 つとも無い場合:** これまでどおり ad-hoc 署名のビルドを作ります。ワークフローは
   `::warning::Release is ad-hoc signed and not notarized (missing secrets: …)` を出し、リリースを
   新規作成するときだけ本文の先頭に「公証されていない・「このまま開く」が必要」という注意書き
   （日本語と英語）を付けます。既存のリリースへの上書きアップロードでは本文は変えません。
+- **一部だけ欠けている場合（1〜4 個が登録済み）:** シークレットの登録ミスとみなし、
+  `Decide signing mode` が `::error::` を出してジョブを失敗させます。ad-hoc のビルドは作りません。
+- **ad-hoc のビルドを既存のリリースに上書きすることはしません。** シークレットが無いまま同じタグで
+  再実行すると、公証済みのファイルを ad-hoc 署名のものに置き換えてしまうためです。既存のリリースが
+  あり、かつ署名されていないビルドのときは `Publish GitHub Release` が失敗します。本当に上書きしたい
+  ときだけ、Actions から手動実行（`workflow_dispatch`）して boolean の入力 `allow_adhoc_overwrite`
+  を true にします（既定は false。タグの push では常に false）。
 
 ### 1. 一度だけ行う準備
 
@@ -66,15 +73,29 @@
 
 ### 2. CI で起きること
 
-1. `Decide signing mode`: 5 つのシークレットがそろっているかを調べる（欠けていれば警告）。
+1. `Decide signing mode`: 5 つのシークレットがそろっているかを調べる（全部無ければ警告で ad-hoc、
+   一部だけ無ければエラーで失敗）。
 2. `Import Developer ID certificate`: 使い捨てキーチェーンを作って .p12 を取り込み、署名用の
-   identity 名（`Developer ID Application: 名前 (TEAMID)`）を証明書から取り出す。
-3. `scripts/build-app.sh --zip --dmg --notarize`（下の「build-app.sh の手順」）。
+   identity 名（`Developer ID Application: 名前 (TEAMID)`）を証明書から取り出す。続けて
+   `xcrun notarytool store-credentials alive-ci-notary … --keychain <使い捨てキーチェーン>` で
+   公証の資格情報を同じキーチェーンに保存する（Apple に資格情報を確認してもらうので、間違いはビルド
+   の前に分かる）。App 用パスワードがコマンドラインに出るのはこの短いコマンドだけで、長く動く
+   `build-app.sh` には `ALIVE_NOTARY_KEYCHAIN_PROFILE=alive-ci-notary` と
+   `ALIVE_NOTARY_KEYCHAIN=<キーチェーンのパス>` だけを渡します。
+3. `scripts/build-app.sh --zip --dmg --notarize`（下の「build-app.sh の手順」）。`--zip`、`--dmg`、
+   `--notarize` を付けたときは、ユニバーサルビルドに失敗しても実行環境のアーキテクチャだけの
+   ビルドにはフォールバックせず、失敗終了します。
 4. `Verify universal app and signature`: arm64 と x86_64 の両方が入っていること、署名が壊れていないこと。
 5. `Verify Developer ID signature and notarization`: `codesign -dvv` の Authority が Developer ID、
    ハードランタイム、`spctl`（`source=Notarized Developer ID`）、`stapler validate`（アプリと DMG）。
-6. `Publish GitHub Release`。
-7. `Delete signing keychain`: 成功しても失敗してもキーチェーンを消す（`if: always()`）。
+6. `Publish GitHub Release`（既存のリリースへ署名なしで上書きするのは、上の `allow_adhoc_overwrite`
+   を付けたときだけ）。
+7. `Delete signing keychain`: 成功しても失敗してもキーチェーンを消す（`if: always()`）。公証の資格情報
+   のプロファイルもこのキーチェーンごと消えます。
+
+`release` ジョブのチェックアウトは `fetch-depth: 0`（全履歴）です。ビルド番号（`CFBundleVersion`）は
+`git rev-list --count HEAD` で、浅いクローンだと 1 になってしまうためです。タグの push で動いた
+実行は、あとから同じタグの実行が来ても中断されません（`cancel-in-progress` はタグでは false）。
 
 ### 3. build-app.sh の手順
 
@@ -119,6 +140,8 @@ APPLE_ID="you@example.com" APPLE_APP_PASSWORD="xxxx-xxxx-xxxx-xxxx" APPLE_TEAM_I
 ```
 
 - `--notarize` には `ALIVE_SIGN_IDENTITY` が必要です。資格情報が足りないと、ビルドを始める前に終了します。
+- プロファイルが既定の検索リストに無いキーチェーンにあるときは、そのパスを `ALIVE_NOTARY_KEYCHAIN`
+  で渡します（CI がこの形）。
 - 署名だけ試すなら `ALIVE_SIGN_IDENTITY=… scripts/build-app.sh`（`--notarize` なし）。
 - 1 回の待ちの上限は `ALIVE_NOTARY_TIMEOUT`（既定 `60m`）。公証は通常数分で終わります。
 - 署名には Apple のタイムスタンプサーバーへの接続が必要です。
@@ -198,10 +221,17 @@ GitHub Release.
 - **With the Apple credentials (the five secrets below) registered:** the build is signed with a
   Developer ID Application certificate, submitted to Apple for notarization, and the tickets are
   stapled to the app and the DMG. Users open it without any Gatekeeper steps.
-- **With any of them missing:** the build is ad-hoc signed as before. The workflow prints
+- **With none of them:** the build is ad-hoc signed as before. The workflow prints
   `::warning::Release is ad-hoc signed and not notarized (missing secrets: …)`, and only when it
   creates the release it puts a "not notarized, use Open Anyway" note (Japanese and English) at the top
   of the release body. Uploading into an existing release leaves its body alone.
+- **With some but not all of them (one to four registered):** this is taken for a mistake in the
+  secrets. `Decide signing mode` prints an `::error::` and the job fails; no ad-hoc build is made.
+- **An ad-hoc build never replaces the files of an existing release by itself.** Re-running a tag
+  without the secrets would otherwise put ad-hoc files over notarized ones. When the release exists
+  and the build is not signed, `Publish GitHub Release` fails. Only when that is really wanted, run the
+  workflow by hand (`workflow_dispatch`) and set the boolean input `allow_adhoc_overwrite` to true
+  (default false; always false on a tag push).
 
 ### 1. One-time setup
 
@@ -253,15 +283,28 @@ and so produce a notarized release; a GitHub Environment with required reviewers
 
 ### 2. What CI does
 
-1. `Decide signing mode`: checks that all five secrets are set (warns about the missing ones).
+1. `Decide signing mode`: checks that all five secrets are set (none: a warning and an ad-hoc build;
+   some but not all: an error and the job fails).
 2. `Import Developer ID certificate`: creates a throw-away keychain, imports the .p12 and reads the
-   signing identity name (`Developer ID Application: Name (TEAMID)`) from the certificate.
-3. `scripts/build-app.sh --zip --dmg --notarize` (next section).
+   signing identity name (`Developer ID Application: Name (TEAMID)`) from the certificate. Then
+   `xcrun notarytool store-credentials alive-ci-notary … --keychain <throw-away keychain>` saves the
+   notarization credentials in the same keychain (Apple checks them at once, so a wrong password shows
+   before the build). The app-specific password is an argument of that short command only; the
+   long-running `build-app.sh` gets `ALIVE_NOTARY_KEYCHAIN_PROFILE=alive-ci-notary` and
+   `ALIVE_NOTARY_KEYCHAIN=<keychain path>`, never the password.
+3. `scripts/build-app.sh --zip --dmg --notarize` (next section). With `--zip`, `--dmg` or `--notarize`
+   a failed universal build stops the script; it does not fall back to a host-architecture build.
 4. `Verify universal app and signature`: both arm64 and x86_64 present, signature intact.
 5. `Verify Developer ID signature and notarization`: `codesign -dvv` authority is Developer ID, hardened
    runtime, `spctl` (`source=Notarized Developer ID`), `stapler validate` for the app and the DMG.
-6. `Publish GitHub Release`.
+6. `Publish GitHub Release` (replacing the files of an existing release with an unsigned build only
+   with `allow_adhoc_overwrite`, above).
 7. `Delete signing keychain`: removes the keychain whether the job succeeded or not (`if: always()`).
+   The notarization profile goes with it.
+
+The `release` job checks out with `fetch-depth: 0` (the whole history): the build number
+(`CFBundleVersion`) is `git rev-list --count HEAD`, which a shallow clone turns into 1. A run started by
+a tag push is not cancelled by a later run of the same tag (`cancel-in-progress` is false on tags).
 
 ### 3. What build-app.sh does
 
@@ -306,6 +349,8 @@ APPLE_ID="you@example.com" APPLE_APP_PASSWORD="xxxx-xxxx-xxxx-xxxx" APPLE_TEAM_I
 ```
 
 - `--notarize` requires `ALIVE_SIGN_IDENTITY`; missing credentials stop the script before the build starts.
+- When the profile lives in a keychain that is not on the default search list, pass its path as
+  `ALIVE_NOTARY_KEYCHAIN` (this is what CI does).
 - To try signing only: `ALIVE_SIGN_IDENTITY=… scripts/build-app.sh` (no `--notarize`).
 - `ALIVE_NOTARY_TIMEOUT` (default `60m`) caps each wait. Notarization usually takes a few minutes.
 - Signing needs a connection to Apple's timestamp server.
