@@ -8,7 +8,7 @@ enum CommonStrings: LocalizedStrings {
     case tabHome, tabSets, tabPlugins, tabSamples, tabStat
     case windowStat, windowPlayer
     // Toolbar
-    case filters, searchIn, shownCount, shownProjects, scanFolders, foldersLabel, clearSearch, settings, help
+    case filters, searchIn, shownCount, scanFolders, foldersLabel, clearSearch, settings, help
     // Accessibility state values (VoiceOver)
     case setReadFailed
     case stateExpanded, stateCollapsed, stateOn, stateOff, dismiss
@@ -47,7 +47,6 @@ enum CommonStrings: LocalizedStrings {
         case .filters: return ("Filters", "フィルター")
         case .searchIn: return ("Search in %@…", "%@を検索…")
         case .shownCount: return ("%lld shown", "%lld 件を表示")
-        case .shownProjects: return ("%lld projects shown", "%lld 件のプロジェクトを表示")
         case .foldersLabel: return ("Folders", "フォルダ")
         case .clearSearch: return ("Clear search", "検索をクリア")
         case .setReadFailed: return ("This set could not be read. See alive.log for details.",

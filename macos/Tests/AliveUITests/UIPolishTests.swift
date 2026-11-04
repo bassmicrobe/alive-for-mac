@@ -13,10 +13,8 @@ final class UIPolishTests: XCTestCase {
 
     func testCountsNameTheirUnits() {
         Localizer.shared.preference = .en
-        XCTAssertEqual(CommonStrings.shownProjects.f(553), "553 projects shown")
         XCTAssertEqual(SetsStrings.shownSummary.f(553, 754), "553 projects · 754 sets")
         Localizer.shared.preference = .ja
-        XCTAssertEqual(CommonStrings.shownProjects.f(553), "553 件のプロジェクトを表示")
         XCTAssertEqual(SetsStrings.shownSummary.f(553, 754), "553 プロジェクト・754 セット")
     }
 

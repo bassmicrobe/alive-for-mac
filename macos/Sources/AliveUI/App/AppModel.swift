@@ -136,7 +136,7 @@ final class AppModel {
     /// projects · sets; Samples: "12,923 samples · 23.7 GB"); nil: the plain count.
     var shownLabel: String? {
         switch tab {
-        case .home: return CommonStrings.shownProjects.f(home.shownCount)
+        case .home: return home.shownLabel
         case .sets: return sets.shownLabel
         case .samples: return samples.shownLabel
         case .plugins: return nil
@@ -276,6 +276,8 @@ final class AppModel {
     }
 
     func rescan() {
+        // The Stat window shows the catalog, whatever tab is behind it (upstream's F5 there).
+        if stat.isKeyWindow { catalog.rescan(); return }
         if tab == .samples {
             samples.rescan()
         } else {
@@ -316,7 +318,15 @@ final class AppModel {
     /// ↓ in the search field: on into what it found, as from a browser's address bar (a6c8dc1
     /// `IntoResults`). The list of the active tab takes the keyboard and picks its first row when
     /// nothing is selected; a list that wants this watches `resultsFocusRequest`.
-    func focusResults() { resultsFocusRequest += 1 }
+    func focusResults() {
+        resultsFocusRequest += 1
+        switch tab {
+        case .home: home.enterFromSearch()
+        case .sets: sets.focusList()
+        case .plugins: plugins.focusList()
+        case .samples: break
+        }
+    }
 
     // MARK: - Internals
 

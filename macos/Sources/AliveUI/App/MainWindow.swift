@@ -10,7 +10,10 @@ struct MainWindow: View {
     var body: some View {
         @Bindable var app = app
         ZStack {
+            // A press on the window background or the empty strip of the bar stops a sample.
             background
+                .contentShape(Rectangle())
+                .onTapGesture { app.samples.emptyClicked() }
             VStack(spacing: 0) {
                 TopBar()
                 if (app.tab == .home || app.tab == .sets), !app.catalog.sets.isEmpty,
