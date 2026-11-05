@@ -32,8 +32,15 @@ def main():
                 text = text.replace(value, "[REDACTED]")
         return text
 
-    def run(args, data=None):
+    def run(args, data=None, legacy_p12=False):
         result = subprocess.run(args, input=data, capture_output=True)
+        if legacy_p12 and result.returncode and b"unsupported" in result.stderr.lower():
+            # Keychain Access can export RC2-encrypted certificate bags. OpenSSL
+            # 3/4 needs its legacy provider to read them; MAC checks remain on.
+            result = subprocess.run(args[:2] + ["-legacy"] + args[2:],
+                                    input=data, capture_output=True)
+            if not result.returncode:
+                print("Legacy PKCS#12 decoding enabled.", flush=True)
         if result.returncode:
             # stdout may contain decrypted private-key material from OpenSSL.
             raise RuntimeError(sanitized(result.stderr))
@@ -53,13 +60,14 @@ def main():
             os.chmod(p12, 0o600)
             handle.write(base64.b64decode("".join(os.environ["P12_BASE64"].split()), validate=True))
         password_input = os.environ["P12_PASSWORD"].encode() + b"\n"
-        run(["openssl", "pkcs12", "-in", str(p12), "-noout", "-passin", "stdin"], password_input)
+        run(["openssl", "pkcs12", "-in", str(p12), "-noout", "-passin", "stdin"],
+            password_input, legacy_p12=True)
         print("p12 password verified by OpenSSL.", flush=True)
         # OpenSSL 3/4's default PBES2 PKCS#12 can be rejected by macOS Security
         # with a misleading passphrase error. Re-encode only the runner's copy
         # with the PBE/MAC algorithms supported by SecKeychainItemImport.
         private_data = run(["openssl", "pkcs12", "-in", str(p12), "-nodes",
-                            "-passin", "stdin"], password_input)
+                            "-passin", "stdin"], password_input, legacy_p12=True)
         with pem.open("xb") as handle:
             os.chmod(pem, 0o600)
             handle.write(private_data)

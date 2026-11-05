@@ -10,7 +10,7 @@ SCRIPT = Path(__file__).resolve().parents[1] / "ci-signing.py"
 
 
 class SigningCredentialsTests(unittest.TestCase):
-    def run_helper(self, fail=False, bad_p12=False):
+    def run_helper(self, fail=False, bad_p12=False, legacy_p12=False):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             shim = root / "bin"
@@ -46,9 +46,17 @@ import os, pathlib, sys
 assert os.environ['P12_PASSWORD'] not in sys.argv
 assert sys.stdin.buffer.readline().strip().decode() == os.environ['P12_PASSWORD']
 if os.environ.get('SIMULATE_BAD_P12'):
+    assert '-legacy' not in sys.argv
     print('PRIVATE_PAYLOAD_SHOULD_NOT_LOG')
     print('Invalid p12 password: ' + os.environ['P12_PASSWORD'], file=sys.stderr)
     sys.exit(1)
+if os.environ.get('SIMULATE_LEGACY_P12') and '-export' not in sys.argv:
+    if '-legacy' not in sys.argv:
+        print('PRIVATE_PAYLOAD_SHOULD_NOT_LOG')
+        print('Error: unsupported RC2-40-CBC', file=sys.stderr)
+        sys.exit(1)
+    with pathlib.Path(os.environ['RUNNER_TEMP'], 'legacy-reads').open('a') as handle:
+        handle.write('read\\n')
 if '-export' in sys.argv:
     pathlib.Path(sys.argv[sys.argv.index('-out') + 1]).write_bytes(b'test compatible p12')
 elif '-noout' not in sys.argv:
@@ -66,6 +74,8 @@ elif '-noout' not in sys.argv:
                 env['SIMULATE_FAILURE'] = '1'
             if bad_p12:
                 env['SIMULATE_BAD_P12'] = '1'
+            if legacy_p12:
+                env['SIMULATE_LEGACY_P12'] = '1'
             result = subprocess.run(['python3', str(SCRIPT)], env=env,
                                     capture_output=True, text=True, timeout=15)
             output = result.stdout + result.stderr
@@ -75,6 +85,8 @@ elif '-noout' not in sys.argv:
             self.assertFalse((root / "developer-id.p12").exists())
             self.assertFalse((root / "developer-id-compatible.p12").exists())
             self.assertFalse((root / "developer-id-private.pem").exists())
+            if legacy_p12:
+                self.assertEqual((root / 'legacy-reads').read_text(), 'read\nread\n')
             return result, (root / "output").read_text() if (root / "output").exists() else ''
 
     def test_passwords_use_stdin_and_tty_and_outputs_are_written(self):
@@ -94,6 +106,13 @@ elif '-noout' not in sys.argv:
         self.assertNotEqual(result.returncode, 0)
         self.assertIn('Invalid p12 password: [REDACTED]', result.stdout)
         self.assertEqual(output, '')
+
+    def test_keychain_legacy_p12_is_read_without_disabling_mac_verification(self):
+        result, output = self.run_helper(legacy_p12=True)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn('p12 password verified by OpenSSL.', result.stdout)
+        self.assertIn('Legacy PKCS#12 decoding enabled.', result.stdout)
+        self.assertIn('identity=', output)
 
 
 if __name__ == '__main__':
