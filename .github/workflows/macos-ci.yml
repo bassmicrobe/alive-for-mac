@@ -24,13 +24,17 @@ on:
         description: "Verify signing and notarization without creating or overwriting a GitHub Release"
         type: boolean
         default: true
+      notary_status_only:
+        description: "Only query Alive for Mac notarization submissions; do not build, submit, or publish"
+        type: boolean
+        default: false
       allow_adhoc_overwrite:
         description: "Let an ad-hoc signed (not notarized) build replace the files of a release that already exists"
         type: boolean
         default: false
 
 concurrency:
-  group: macos-ci-${{ github.ref }}-${{ github.event_name }}
+  group: macos-ci-${{ github.ref }}-${{ github.event_name }}-${{ inputs.notary_status_only && 'status' || 'build' }}
   # A release run on a tag is never cancelled by a newer run: it would leave the release half made.
   cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
 
@@ -66,7 +70,7 @@ jobs:
 
   release:
     name: Package and release
-    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/signing-verify-')
+    if: ${{ !inputs.notary_status_only && (startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/signing-verify-')) }}
     runs-on: ${{ inputs.runner || 'macos-26' }}
     # Two notarization waits (each capped at 60 minutes by build-app.sh) plus the universal build.
     timeout-minutes: 150
@@ -295,6 +299,59 @@ jobs:
 
       - name: Delete signing keychain
         if: always() && steps.signing.outputs.signed == 'true'
+        run: |
+          security delete-keychain "$RUNNER_TEMP/alive-signing.keychain-db" 2>/dev/null || true
+          rm -f "$RUNNER_TEMP/developer-id.p12" "$RUNNER_TEMP/developer-id-compatible.p12" "$RUNNER_TEMP/developer-id-private.pem"
+
+  notary-status:
+    name: Check notarization status
+    if: github.event_name == 'workflow_dispatch' && inputs.notary_status_only
+    runs-on: ${{ inputs.runner || 'macos-26' }}
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Prepare temporary notarization credentials
+        id: keychain
+        env:
+          P12_BASE64: ${{ secrets.APPLE_DEVELOPER_ID_P12 }}
+          P12_PASSWORD: ${{ secrets.APPLE_DEVELOPER_ID_P12_PASSWORD }}
+          TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          NOTARY_APPLE_ID: ${{ secrets.APPLE_NOTARY_APPLE_ID }}
+          NOTARY_PASSWORD: ${{ secrets.APPLE_NOTARY_PASSWORD }}
+        run: python3 macos/scripts/ci-signing.py
+
+      - name: Query Alive for Mac submissions without resubmitting
+        env:
+          PROFILE_KEYCHAIN: ${{ steps.keychain.outputs.keychain }}
+        run: |
+          python3 - <<'PY'
+          import json, os, subprocess
+          result = subprocess.run([
+              "xcrun", "notarytool", "history", "--keychain-profile", "alive-ci-notary",
+              "--keychain", os.environ["PROFILE_KEYCHAIN"], "--output-format", "json"
+          ], capture_output=True, text=True, timeout=180)
+          if result.returncode:
+              raise SystemExit("Unable to query notarization status; credential output suppressed.")
+          history = json.loads(result.stdout).get("history", [])
+          matches = [item for item in history if item.get("name") == "Alive for Mac.zip"
+                     or (item.get("name", "").startswith("AliveForMac-")
+                         and item.get("name", "").endswith(".dmg"))]
+          summary = "\n".join(json.dumps({key: item.get(key) for key in
+                              ("id", "name", "status", "createdDate")})
+                              for item in matches[:5]) or "No Alive for Mac submissions found."
+          print(summary)
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as handle:
+              handle.write(summary + "\n")
+          PY
+
+      - name: Delete temporary signing credentials
+        if: always()
         run: |
           security delete-keychain "$RUNNER_TEMP/alive-signing.keychain-db" 2>/dev/null || true
           rm -f "$RUNNER_TEMP/developer-id.p12" "$RUNNER_TEMP/developer-id-compatible.p12" "$RUNNER_TEMP/developer-id-private.pem"
