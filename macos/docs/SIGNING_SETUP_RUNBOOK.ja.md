@@ -10,11 +10,20 @@
 - 証明書: `Developer ID Application: Cybereye Technology Co., Ltd. (8XUK86NH38)`
 - App 用パスワードの用途名: `alive-for-mac notarytool`
 - 登録先: このリポジトリの Actions repository secrets。
-- Actions 実機検証は p12 の MAC 検証で停止。署名・公証は未確認（詳細は検証記録）。
+- 初回の Actions は p12 の MAC 検証で停止。新しい秘密鍵付き証明書を用意し、所有者が
+  コピーした書き出し用パスワードで MAC・証明書・秘密鍵の一致を確認して両 Secret を更新。
+  再検証ではアプリ・DMGとも `Accepted`、staple・配布 ZIP・Gatekeeper の検証と終了処理も成功。
 - p12 と Base64 の値、各パスワード、Apple Account の認証コードは記録しない。
 - 一時 p12・CSR・秘密鍵ファイルを削除し、クリップボードを消去済み。
-- このMacへの p12 取り込みは認証エラーの後にキャンセル。ローカルキーチェーンに
-  署名用 identity があるとは限らない。GitHub Secrets の登録とは別に扱う。
+- 最初の p12 取り込みは認証エラーの後にキャンセル。復旧時はキーチェーンの証明書
+  アシスタントで CSR を作り直し、新しい秘密鍵をログインキーチェーンに保持した。
+  「自分の証明書」の対象証明書を展開し、秘密鍵 `Alive for Mac Developer ID 2026-11-05` の付属を確認済み。
+- 復旧時の証明書ID: `M3M5AHH47V`、SHA-256:
+  `C7747868782FACDCC8C21678DF79F32219003DDF834E7AADBAF532F3AC92E3F9`。
+  同じ証明書名が複数ある場合は、名前だけでなく指紋と秘密鍵の対応を確認する。既存証明書は失効させていない。
+- このMacのキーチェーンでは証明書の信頼警告が表示された。信頼設定は変更していない。
+  秘密鍵の付属とローカルの信頼チェーンは別の確認事項で、ローカルでの署名は今回の検証対象外。
+  GitHubのランナーでは対象チームの有効な署名 identity として取り込めた。
 
 ## 次回の最短経路
 
@@ -34,6 +43,8 @@
 
 Apple Account のサインイン、2FA、Mac・キーチェーンのパスワード入力は所有者が行う。
 エージェントには値を渡さず、入力が終わったことだけを伝える。
+画面を引き継ぐときは対象タブを前面に出し、ブラウザ名とタブ名を伝える。
+Chromeで見つからない場合は `Shift + Command + A` のタブ検索で「サインイン - Apple」を探せる。
 
 今回、Web では Account Holder、Xcode では同じアカウント・チームが Admin と表示された。
 Xcode の「This operation can only be performed by the Account Holder」だけで
@@ -72,6 +83,10 @@ Cloud-managed 証明書の権限は、秘密鍵付き p12 を用意する今回�
 openssl rand -base64 24 | tr -d '\n' | pbcopy
 ```
 
+対象証明書の行をクリックして選択し、ファイル →「書き出す…」を使う。
+検索欄にフォーカスしたままだと「書き出す…」が無効になる場合がある。
+今回のMacでは右クリックのメニューに書き出しが無かったため、ファイルメニューを使用した。
+
 対象の証明書と秘密鍵を個人情報交換 `.p12` として `~/Desktop/DeveloperID.p12` へ書き出し、
 パスワードと確認欄に貼り付ける。キーチェーンのパスワードを求められたら所有者が入力。
 **クリップボードを別の用途に使う前に**、すぐにパスワードを登録する。
@@ -85,15 +100,19 @@ OpenSSL で p12 を作る場合も `-passout stdin` またはファイル記述�
 `-passout pass:...`、`security import -P ...` のように秘密の値をプロセスの引数へ入れない。
 必要なら Python の `subprocess.run(..., input=...)` から標準入力で渡す。
 
+パスワードを生成しても、後の画面操作や所有者の操作でクリップボードの内容が変わることがある。
+今回も準備済みの値では検証に通らず、所有者が実際の書き出し用パスワードをコピーした後に
+一致を確認できた。ファイルの存在だけで成功と扱わず、実際に書き出しに使った値を検証する。
+
 GitHub は Secret の値を後から読み戻せない。ローカル署名にも使うなら、削除前に
 秘密鍵付き identity がキーチェーンに保存できているか確認する。
 クリップボードが別の内容に変わったら、推測した値で既存 Secret を上書きしない。
 
 ### OpenSSL 3/4 で作った p12 の互換性
 
-今回、OpenSSL 4.0.3 の既定形式で作った p12 は、パスワードが正しくても macOS の
+OpenSSL 4.0.3 の既定形式で作ったダミー p12 では、パスワードが正しくても macOS の
 `SecKeychainItemImport` が「The user name or passphrase you entered is not correct」で拒否した。
-オフラインのダミー証明書で、既定形式の取り込み失敗・互換形式の取り込み成功を再現済み。
+オフラインで、既定形式の取り込み失敗・互換形式の取り込み成功を再現済み。
 パスワードの誤りと即断せず、まず OpenSSL の MAC 検証で一致を確認する。
 
 OpenSSL で書き出す場合の互換オプションは
@@ -103,11 +122,29 @@ CI の `ci-signing.py` は元の p12 を OpenSSL で検証した後、runner 内
 この形式に変換する。GitHub Secret 自体は変更しない。一時的に復号した PEM と
 互換 p12 も、成功・失敗の両方で削除する。復号した標準出力をエラーログに出さない。
 
+### Mac 標準の p12 を OpenSSL 3/4 で読む場合
+
+キーチェーンアクセスが書き出した p12 は、証明書バッグの暗号形式によって
+OpenSSL 3/4 で `unsupported`（例: RC2-40-CBC）になることがある。
+今回の復旧用 p12 では、標準 LibreSSL の検証成功、OpenSSL 4 の通常読み込み失敗、
+`-legacy` を付けた MAC 検証・読み込み成功を確認した。
+[OpenSSL公式の説明](https://docs.openssl.org/4.0/man1/openssl-pkcs12/)も参照。
+
+```sh
+# Mac 標準の LibreSSL を明示し、値を表示せず確認
+pbpaste | /usr/bin/openssl pkcs12 -in ~/Desktop/DeveloperID.p12 -noout -passin stdin
+# OpenSSL 3/4 で unsupported が出る場合だけ legacy provider を使う
+pbpaste | openssl pkcs12 -legacy -in ~/Desktop/DeveloperID.p12 -noout -passin stdin
+```
+
+CI は `unsupported` の場合だけ `-legacy` 付きで再試行する。MAC 検証は常に行い、
+`-nomacver` は使わない。パスワード不一致の MAC エラーではこの再試行を行わない。
+
 ### MAC 検証で失敗した場合
 
 `Mac verify error: invalid password?` が OpenSSL の MAC 検証で出た場合、
 `SecKeychainItemImport` の形式互換性エラーとは別に扱う。MAC 検証を無効にして先へ進まない。
-今回の Actions 実行はこの段階で停止し、互換形式への変換・署名・公証には到達していない。
+初回の Actions 実行はこの段階で停止し、互換形式への変換・署名・公証には到達しなかった。
 別のダミー p12 は OpenSSL 4 と標準 LibreSSL の両方で MAC 検証に成功しているため、
 今回の失敗を OpenSSL 4 の既定形式だけが原因と断定しない。
 
@@ -116,7 +153,7 @@ CI の `ci-signing.py` は元の p12 を OpenSSL で検証した後、runner 内
 3. クリップボードの値を表示せず、登録前にローカルで一致を確認する。
 
    ```sh
-   pbpaste | openssl pkcs12 -in ~/Desktop/DeveloperID.p12 -noout -passin stdin
+   pbpaste | /usr/bin/openssl pkcs12 -in ~/Desktop/DeveloperID.p12 -noout -passin stdin
    ```
 
 4. 検証成功後、手順3の2コマンドで p12 とパスワードの両 Secret を登録し、後片付け・Actions 再検証。
@@ -189,6 +226,23 @@ gh run view <run-id> -R bassmicrobe/alive-for-mac
 通常のブランチ・PRではテストだけを行う。
 手動実行の `runner` は既定で `macos-26`。長く割り当て待ちになる場合は `-f runner=macos-15`
 を指定して検証できる。ランナーを変えても署名・公証・Gatekeeper の検証条件は同じ。
+
+### 公証の待ち時間が長いとき
+
+別の照会ジョブで、再ビルド・再送・公開をせずに Apple の申請状況を確認できる。
+
+```sh
+gh workflow run macos-ci.yml -R bassmicrobe/alive-for-mac \
+  --ref <署名対応ブランチ> -f notary_status_only=true -f verify_only=true
+```
+
+`Check notarization status` だけを実行し、Alive for Mac の申請ID・ファイル名・状態・作成日時だけを出す。
+本体の検証とは concurrency group を分けており、実行中の公証ジョブをキャンセルしない。
+照会用キーチェーンも終了時に削除する。`In Progress` なら Apple が受け付けて処理中であり、
+この状態だけを理由に証明書や App 用パスワードを再発行しない。
+照会ジョブの成功は、パッケージの公証完了を意味しない。`Accepted` と配布物の検証を別に確認する。
+今回のアプリは 11:09 JST 受付から 11:52 JST の受理まで約44分かかった。待機中の照会は
+`In Progress` で、後に正常に受理された。これは今回の実測であり、次回の所要時間を保証するものではない。
 
 成功の判断は以下のすべてを満たした場合。
 
