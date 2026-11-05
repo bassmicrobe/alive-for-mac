@@ -31,6 +31,8 @@ final class AppModel {
     var toasts: [ToastMessage] = []
     /// Bumped by ⌘F; the toolbar's search field focuses itself when it changes.
     var searchFocusRequest = 0
+    /// Bumped by ↓ in the search field: the active tab's list takes the keyboard (see `focusResults`).
+    var resultsFocusRequest = 0
     /// Files handed to the app by Finder ("Open With", `open -a`) that wait for the catalog.
     private(set) var pendingOpenPaths: [String] = []
     /// Paths whose folder was just added as a root: select them once that scan is done.
@@ -44,6 +46,10 @@ final class AppModel {
     /// sounds never overlap. Its errors surface as toasts.
     @ObservationIgnored let audio = AudioPlayback()
     @ObservationIgnored private var started = false
+    /// The folded search texts of the catalog's sets, shared by Home and Sets (kept per catalog revision and tags revision).
+    @ObservationIgnored let searchHaystacks = SearchHaystacks()
+    /// Files already announced as unreadable this session, so each is announced once.
+    @ObservationIgnored private var toldUnread: Set<String> = []
     @ObservationIgnored private let widgetPublisher = WidgetSnapshotPublisher()
 
     @ObservationIgnored lazy var prefs = AppPreferences(app: self)
@@ -66,6 +72,7 @@ final class AppModel {
         self.dataDir = dataDir
         settings = AppSettings.load(dir: dataDir)
         Localizer.shared.preference = LanguagePreference(configValue: settings.lang)
+        ThemeScale.shared.apply(percent: settings.uiScale)
         audio.onError = { [weak self] error in
             MainActor.assumeIsolated {
                 self?.toast(CommonStrings.audioFailed.f(error.localizedDescription), kind: .error)
@@ -78,11 +85,9 @@ final class AppModel {
         guard !started else { return }
         started = true
         RescueProbe.cleanupStale(dir: dataDir)
-        // The lazily read files are read now, so a damaged one is noticed (and backed up before
-        // anything can overwrite it) at launch and the person is told once.
-        _ = ProjectMeta.shared.allTags()
-        _ = HomeStore.shared.pins
-        announceBackedUpFiles()
+        let swept = AppHome.sweepLeftoverTemps(dir: dataDir)
+        if swept > 0 { Diag.info("removed \(swept) leftover temporary file(s) from the data folder") }
+        announceDataFileProblems()
         catalog.start()
         integration.start()
         samples.expandsRootsOnFirstLoad = true
@@ -95,17 +100,28 @@ final class AppModel {
     /// A failed write is logged and shown; the in-memory value stays.
     func mutateSettings(_ change: (inout AppSettings) -> Void) {
         var next = settings
+        // A settings.cfg that could not be read at start is read again: if that works, this change
+        // goes on top of what the file holds instead of the defaults this session started with.
+        var recovered = false
+        if next.isUnread {
+            let fresh = AppSettings.load(dir: dataDir)
+            if !fresh.isUnread { next = fresh; recovered = true }
+        }
         change(&next)
         guard next != settings else { return }
         let groupingChanged = next.groupByFolder != settings.groupByFolder
         let sampleRootsChanged = next.sampleRoots != settings.sampleRoots
             || next.disabledSampleRoots != settings.disabledSampleRoots
+        let rootsChanged = recovered && (next.roots != settings.roots || next.disabledRoots != settings.disabledRoots)
         let previous = settings
         settings = next
+        if recovered { Diag.info("settings.cfg is readable again; its content is back") }
+        if next.uiScale != previous.uiScale { ThemeScale.shared.apply(percent: next.uiScale) }
         saveSettings()
         integration.settingsDidChange(from: previous)
         if groupingChanged { catalog.settingsDidChange() }
         if sampleRootsChanged { samples.syncRoots() }
+        if rootsChanged { catalog.rescan() }
     }
 
     func saveSettings() {
@@ -114,6 +130,22 @@ final class AppModel {
         } catch {
             Diag.fail("save settings.cfg", error)
             toast(CommonStrings.settingsSaveFailed.f(error.localizedDescription), kind: .error)
+        }
+        // `save` leaves an unread file alone (and logs it); the person is told once.
+        if settings.isUnread, toldUnread.insert("settings.cfg").inserted {
+            toast(CommonStrings.settingsUnread.s, kind: .error)
+        }
+    }
+
+    /// How a store's save ended, for the ones that have no screen of their own to say it (the pins).
+    /// An unread file is announced once per session; a failed write each time.
+    func reportStoreSave(_ save: StoreSave, file: String) {
+        switch save {
+        case .saved: break
+        case .unread:
+            if toldUnread.insert(file).inserted { toast(CommonStrings.fileUnread.f(file), kind: .error) }
+        case .failed:
+            toast(CommonStrings.fileSaveFailed.f(file), kind: .error)
         }
     }
 
@@ -132,7 +164,7 @@ final class AppModel {
     /// projects · sets; Samples: "12,923 samples · 23.7 GB"); nil: the plain count.
     var shownLabel: String? {
         switch tab {
-        case .home: return CommonStrings.shownProjects.f(home.shownCount)
+        case .home: return home.shownLabel
         case .sets: return sets.shownLabel
         case .samples: return samples.shownLabel
         case .plugins: return nil
@@ -154,11 +186,35 @@ final class AppModel {
 
     // MARK: - Toasts
 
-    /// One toast per data file that was unreadable and has been copied to `<file>.bak`.
+    /// The lazily read files are read now, so a damaged one is noticed (and copied aside before
+    /// anything can overwrite it) at launch and the person is told once. The unread check is what
+    /// reads notes.cfg, home.cfg and previews.cfg, so it comes first: the copies it makes are
+    /// announced right after.
+    func announceDataFileProblems() {
+        announceUnreadFiles()
+        announceBackedUpFiles()
+    }
+
+    /// One toast per data file that was unreadable and has been copied to `<file>.orig`.
     func announceBackedUpFiles() {
-        for name in AppHome.takeBackupNotices() {
-            toast(CommonStrings.dataFileBackedUp.f(name), kind: .error)
+        for notice in AppHome.takeBackupNotices() {
+            toast(CommonStrings.dataFileBackedUp.f(notice.file, notice.copy), kind: .error)
         }
+    }
+
+    /// One toast at launch when a data file exists but could not be read: nothing is saved over it, so
+    /// the person learns now that changes to it are not kept. Reads through the stores the app writes
+    /// with (`sets.meta`, `home`, `player.pins`), not through the `.shared` ones, which may point
+    /// elsewhere.
+    func announceUnreadFiles() {
+        var unread: [String] = []
+        if settings.isUnread { unread.append("settings.cfg") }
+        if sets.meta.isUnread { unread.append("notes.cfg") }
+        if home.isStoreUnread { unread.append("home.cfg") }
+        if player.pins.isUnread { unread.append("previews.cfg") }
+        guard !unread.isEmpty else { return }
+        toldUnread.formUnion(unread)
+        toast(CommonStrings.dataFilesUnread.f(unread.joined(separator: ", ")), kind: .error)
     }
 
     /// How long a toast stays: errors wait much longer (and can be dismissed), so they are not missed.
@@ -272,6 +328,8 @@ final class AppModel {
     }
 
     func rescan() {
+        // The Stat window shows the catalog, whatever tab is behind it (upstream's F5 there).
+        if stat.isKeyWindow { catalog.rescan(); return }
         if tab == .samples {
             samples.rescan()
         } else {
@@ -308,6 +366,19 @@ final class AppModel {
     func togglePinSelected() { withSelectedSet { togglePin(path: $0) } }
 
     func focusSearch() { searchFocusRequest += 1 }
+
+    /// ↓ in the search field: on into what it found, as from a browser's address bar (a6c8dc1
+    /// `IntoResults`). The list of the active tab takes the keyboard and picks its first row when
+    /// nothing is selected; a list that wants this watches `resultsFocusRequest`.
+    func focusResults() {
+        resultsFocusRequest += 1
+        switch tab {
+        case .home: home.enterFromSearch()
+        case .sets: sets.focusList()
+        case .plugins: plugins.focusList()
+        case .samples: samples.focusList()
+        }
+    }
 
     // MARK: - Internals
 

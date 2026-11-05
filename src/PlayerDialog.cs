@@ -157,7 +157,7 @@ namespace AbletonManager
             _pin.Click += delegate { PinSelected(); };
             Controls.Add(_pin);
 
-            _reveal.Text = "Show in folder";
+            _reveal.Text = "Show in Explorer";
             _reveal.FitToText(18);
             _reveal.Click += delegate { Reveal(SelectedFile()); };
             Controls.Add(_reveal);
@@ -551,7 +551,8 @@ namespace AbletonManager
             pin.Click += delegate { Pin(f); };
             m.Items.Add(pin);
 
-            ToolStripMenuItem show = new ToolStripMenuItem("Show in folder");
+            ToolStripMenuItem show = new ToolStripMenuItem("Show in Explorer");
+            show.ShortcutKeyDisplayString = "Shift+Enter";
             show.Click += delegate { Reveal(f); };
             m.Items.Add(show);
 
@@ -782,9 +783,39 @@ namespace AbletonManager
             base.WndProc(ref m);
         }
 
+        protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
+        {
+            if (keyData == (Keys.Shift | Keys.Enter) || keyData == (Keys.Shift | Keys.Return))
+            {
+                if (Visible && (Form.ActiveForm == this || ContainsFocus))
+                {
+                    RenderFile f = SelectedFile();
+                    if (f == null && _current >= 0 && _current < _files.Count)
+                        f = _files[_current];
+                    if (f != null)
+                        Reveal(f);
+                    return true;
+                }
+            }
+            return base.ProcessCmdKey(ref msg, keyData);
+        }
+
         protected override void OnKeyDown(KeyEventArgs e)
         {
             if (e.KeyCode == Keys.Space) { TogglePlay(); e.Handled = e.SuppressKeyPress = true; return; }
+            if ((e.KeyCode == Keys.Enter || e.KeyCode == Keys.Return) && e.Shift)
+            {
+                if (Visible && (Form.ActiveForm == this || ContainsFocus))
+                {
+                    RenderFile f = SelectedFile();
+                    if (f == null && _current >= 0 && _current < _files.Count)
+                        f = _files[_current];
+                    if (f != null)
+                        Reveal(f);
+                    e.Handled = e.SuppressKeyPress = true;
+                    return;
+                }
+            }
             if (e.KeyCode == Keys.Right && e.Control) { Step(+1); e.Handled = true; return; }
             if (e.KeyCode == Keys.Left && e.Control) { Step(-1); e.Handled = true; return; }
             if (e.KeyCode == Keys.Escape)
@@ -854,12 +885,12 @@ namespace AbletonManager
             Graphics g = e.Graphics;
             Chrome.PaintBase(this, g, Surface);
             Theme.Smooth(g);
-            PaintWave(g, new Rectangle(0, 0, Width, Height), Wave, Progress, true, Hint, DeviceDpi / 96f);
+            PaintWave(g, new Rectangle(0, 0, Width, Height), Wave, Progress, true, Hint, Theme.Dpi);
         }
 
         /// <summary>
         /// The envelope in a recessed box — shared by the player window and the details panel of
-        /// a sample. k is the screen scale (DeviceDpi / 96). Without a playhead the whole wave is
+        /// a sample. k is the screen scale (Theme.Dpi). Without a playhead the whole wave is
         /// drawn light: nothing is playing, so nothing is "already played".
         /// </summary>
         public static void PaintWave(Graphics g, Rectangle box, Waveform wave, float progress, bool playhead,
@@ -952,18 +983,19 @@ namespace AbletonManager
             }
         }
 
-        Rectangle Track
+        /// <summary>The track within a slider's box — for the control, and for an owner drawing
+        /// the slider itself (the sample panel's row under the wave).</summary>
+        public static Rectangle TrackOf(Rectangle r, float dpi)
         {
-            get
-            {
-                int x = Sc(28);
-                return new Rectangle(x, Height / 2 - Sc(2), Math.Max(Sc(20), Width - x - Sc(8)), Sc(4));
-            }
+            int x = r.X + S(28, dpi);
+            return new Rectangle(x, r.Y + r.Height / 2 - S(2, dpi), Math.Max(S(20, dpi), r.Right - x - S(8, dpi)), S(4, dpi));
         }
+
+        static int S(int v, float dpi) { return (int)Math.Round(v * dpi); }
 
         void Grab(int x)
         {
-            Rectangle t = Track;
+            Rectangle t = TrackOf(ClientRectangle, Theme.Dpi);
             Value = (x - t.X) / (float)Math.Max(1, t.Width);
         }
 
@@ -988,25 +1020,34 @@ namespace AbletonManager
             Graphics g = e.Graphics;
             Chrome.PaintBase(this, g, Surface);
             Theme.Smooth(g);
+            PaintSlider(g, ClientRectangle, _value, Hot || _drag, Theme.Surface, Theme.Dpi);
+        }
 
-            float iconW = Sc(17);
-            float iconH = Sc(13);
-            RectangleF iconRect = new RectangleF(Sc(3), (Height - iconH) / 2f, iconW, iconH);
-            Color iconColor = Hot || _drag ? Color.White : Theme.Light;
-            Glyph volGlyph = _value <= 0.001f ? Glyph.Volume0
-                           : _value <= 0.5f ? Glyph.VolumeLow
+        /// <summary>
+        /// The slider's look in a box: the glyph, the track with its filled part, the knob. The
+        /// sample panel draws one with it under the wave, on its card — where an empty track in
+        /// Surface, the card's own fill, would vanish, so the track's colour is given.
+        /// </summary>
+        public static void PaintSlider(Graphics g, Rectangle r, float value, bool hot, Color track, float dpi)
+        {
+            float iconW = S(17, dpi);
+            float iconH = S(13, dpi);
+            RectangleF iconRect = new RectangleF(r.X + S(3, dpi), r.Y + (r.Height - iconH) / 2f, iconW, iconH);
+            Color iconColor = hot ? Color.White : Theme.Light;
+            Glyph volGlyph = value <= 0.001f ? Glyph.Volume0
+                           : value <= 0.5f ? Glyph.VolumeLow
                            : Glyph.VolumeHigh;
             Icons.Draw(g, volGlyph, iconRect, iconColor, 1.5f);
 
-            Rectangle t = Track;
-            Theme.FillRound(g, t, t.Height / 2f, Theme.Surface);
-            int done = (int)(t.Width * _value);
+            Rectangle t = TrackOf(r, dpi);
+            Theme.FillRound(g, t, t.Height / 2f, track);
+            int done = (int)(t.Width * value);
             if (done > 0)
                 Theme.FillRound(g, new Rectangle(t.X, t.Y, done, t.Height), t.Height / 2f, Theme.Light);
 
-            float knob = Sc(11);
-            Theme.FillRound(g, new RectangleF(t.X + done - knob / 2f, Height / 2f - knob / 2f, knob, knob),
-                            knob / 2f, Hot || _drag ? Color.White : Theme.Light);
+            float knob = S(11, dpi);
+            Theme.FillRound(g, new RectangleF(t.X + done - knob / 2f, r.Y + r.Height / 2f - knob / 2f, knob, knob),
+                            knob / 2f, hot ? Color.White : Theme.Light);
         }
     }
 }

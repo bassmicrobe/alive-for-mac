@@ -1,6 +1,7 @@
 // Mac-only: Sets tab state (upstream: the sets half of MainForm). Rows = catalog → search →
 // filters → fold → sort → pinned first (`SetsPipeline`), the filter itself, the column layout,
 // which versions are unfolded and the tags/notes store.
+import AppKit
 import Foundation
 import Observation
 import SwiftUI
@@ -84,10 +85,12 @@ final class SetsModel {
                           metaRevision: metaRevision, pluginsKnown: pluginsKnown)
         if let memo, memo.key == key { return memo.value }
         let meta = meta
+        app.searchHaystacks.validate(.init(catalog: key.revision, meta: key.metaRevision))
         let value = SetsPipeline.make(.init(
             sets: app.catalog.sets, query: key.query, filter: key.filter, groupByFolder: key.group,
             sort: key.sort, pinnedFirst: key.pinnedFirst, pins: key.pins,
-            tagsOf: { meta.tagsOf($0) }, pluginsKnown: key.pluginsKnown,
+            tagsOf: { meta.tagsOf($0) }, noteOf: { meta.noteOf($0) }, haystacks: app.searchHaystacks,
+            pluginsKnown: key.pluginsKnown,
             statusOf: { [weak self] in self?.status(of: $0) ?? SetFilter.basicStatus($0) }))
         memo = (key, value)
         return value
@@ -105,8 +108,12 @@ final class SetsModel {
         let p = pipeline
         let setCount = p.heads.count + p.hidden.values.reduce(0) { $0 + $1.count }
         let projectCount = Set(p.heads.map { SetsPipeline.key(forDirectory: $0.directory) }).count
-        return SetsStrings.shownSummary.f(projectCount, setCount)
+        return SetFormat.shownSummary(projects: projectCount, sets: setCount)
     }
+
+    /// The Filters window's counter. It counts what the list shows, so the number there is the one
+    /// in the list after you press OK.
+    var filterCounterText: String { SetFormat.matches(shownCount, perProject: app.settings.groupByFolder) }
 
     /// How many condition groups of the filter are on — the number for the Filters button.
     var activeFilterCount: Int { SetsPipeline.effectiveFilter(filter, pluginsKnown: pluginsKnown).activeCount }
@@ -154,6 +161,26 @@ final class SetsModel {
         }
         app.selectedSetPath = path
         scrollRequest = ScrollRequest(path: path, serial: scrollRequest.serial + 1)
+    }
+
+    /// Home / End in the table: the first or the last row shown.
+    func selectEdge(first: Bool) {
+        guard let row = pipeline.edge(first: first, expanded: expandedDirs) else { return }
+        select(path: row.path)
+    }
+
+    /// Down from the search field: on into what it found, as from a browser's address bar. The
+    /// first result is picked if none is, and a picked one stays (9ce4b4b, a6c8dc1).
+    func focusList() {
+        let rows = pipeline.flattened(expanded: expandedDirs)
+        let picked = app.selectedSetPath.map { path in rows.contains { $0.path == path } } ?? false
+        if !picked, let first = rows.first { select(path: first.path) }
+        // The table takes the keyboard once the selection has been applied to it.
+        DispatchQueue.main.async {
+            guard let window = NSApp.keyWindow,
+                  let table = TableScrollBridge.findTable(in: window.contentView) else { return }
+            window.makeFirstResponder(table)
+        }
     }
 
     func isExpanded(_ directory: String) -> Bool {

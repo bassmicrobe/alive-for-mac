@@ -18,6 +18,7 @@ final class ArrangementParser {
     private var mainTrackDepth = -1
     private var tempoDepth = -1
     private var tempoSeen = false
+    private var meterDepth = -1
 
     // MARK: events
 
@@ -33,6 +34,7 @@ final class ArrangementParser {
         if trackDepth >= 0 && d <= trackDepth { closeTrack(); track = nil; trackDepth = -1 }
         if mainTrackDepth >= 0 && d <= mainTrackDepth { mainTrackDepth = -1 }
         if tempoDepth >= 0 && d <= tempoDepth { tempoDepth = -1 }
+        if meterDepth >= 0 && d <= meterDepth { meterDepth = -1 }
     }
 
     func start(_ e: XMLTag) {
@@ -45,6 +47,9 @@ final class ArrangementParser {
         if tempoDepth >= 0, e.name == "Manual", e.depth == tempoDepth + 1 {
             let t = e.double(0)
             if t > 0 { arr.tempo = t; tempoSeen = true }
+        }
+        if meterDepth >= 0, e.name == "Manual", e.depth == meterDepth + 1 {
+            arr.barBeats = Self.meter(e.int(-1))
         }
     }
 
@@ -76,8 +81,26 @@ final class ArrangementParser {
             if Self.isTrack(e.parent) { trackNameDepth = e.depth }
         case "Tempo":
             if mainTrackDepth >= 0 && !tempoSeen { tempoDepth = e.depth }
+        case "TimeSignature":
+            // The song's meter, beside the tempo in the main track's mixer. A clip has a
+            // TimeSignature of its own, but clips never sit in the main track.
+            //
+            // ponytail: one meter for the whole song — the main track's TimeSignature. A meter
+            // changed mid-song is an automation envelope of that parameter and keeps the bars of
+            // the first; reading its EnumEvents would lift that (upstream a6c8dc1).
+            if mainTrackDepth >= 0 { meterDepth = e.depth }
         default: break
         }
+    }
+
+    /// Live writes the meter as one number: 99 × log2(denominator) + numerator − 1 — 201 is
+    /// 4/4, 200 is 3/4, 302 is 6/8. Returns the beats (quarter notes) in a bar. Anything that
+    /// does not decode keeps 4/4.
+    static func meter(_ code: Int) -> Double {
+        if code < 0 { return 4 }
+        let numerator = code % 99 + 1, power = code / 99
+        if power > 5 { return 4 }
+        return Double(numerator) * 4.0 / Double(1 << power)
     }
 
     private func trackChild(_ e: XMLTag) {

@@ -23,7 +23,7 @@ enum PluginsStrings: LocalizedStrings {
     // Filters sheet
     case filtersTitle, filterStatus, filterFormat, filterType, filterDeveloper, filterSetsCount
     case filterFrom, filterTo, filterAnyType, filterAnyDeveloper, filterOther, filterUnknown
-    case filterMatches, filterReset, filterAdd, filterSearch, filterNothing
+    case filterMatches, filterMatchesOne, filterReset, filterAdd, filterSearch, filterNothing
 
     var en: String { text.en }
     var ja: String { text.ja }
@@ -108,6 +108,7 @@ enum PluginsStrings: LocalizedStrings {
         case .filterOther: return ("Other", "その他")
         case .filterUnknown: return ("Unknown", "不明")
         case .filterMatches: return ("%lld plugins match", "%lld 件が一致")
+        case .filterMatchesOne: return ("1 plugin matches", "1 件が一致")
         case .filterReset: return ("Reset", "リセット")
         case .filterAdd: return ("Add", "追加")
         case .filterSearch: return ("Search", "検索")

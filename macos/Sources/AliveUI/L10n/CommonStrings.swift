@@ -8,7 +8,7 @@ enum CommonStrings: LocalizedStrings {
     case tabHome, tabSets, tabPlugins, tabSamples, tabStat
     case windowStat, windowPlayer
     // Toolbar
-    case filters, searchIn, shownCount, shownProjects, scanFolders, foldersLabel, clearSearch, settings, help
+    case filters, searchIn, shownCount, scanFolders, foldersLabel, clearSearch, settings, help
     // Accessibility state values (VoiceOver)
     case setReadFailed
     case stateExpanded, stateCollapsed, stateOn, stateOff, dismiss
@@ -21,10 +21,10 @@ enum CommonStrings: LocalizedStrings {
     case comingSoonTitle, comingSoonBody
     // Toasts
     case liveNotFound, liveOpenFailed, liveLaunchFailed, audioFailed, folderOpenFailed
-    case pathMissing, settingsSaveFailed, dataFileBackedUp, rootAdded, rootsAdded, alreadyWatching, notAFolder
+    case pathMissing, settingsSaveFailed, settingsUnread, fileUnread, fileSaveFailed, dataFilesUnread, dataFileBackedUp, rootAdded, rootsAdded, alreadyWatching, notAFolder
     // Scan status and first run
     case scanning, scanProgress
-    case emptyRootsTitle, emptyRootsBody, addProjectsFolder, chooseFolderPrompt, chooseFolderMessage
+    case emptyRootsTitle, emptyRootsBody, emptyRootsSettingsUnread, addProjectsFolder, chooseFolderPrompt, chooseFolderMessage
     case suggestionsTitle, addSuggestion, noSetsTitle, noSetsBody
     case catalogReadFailedTitle, catalogReadFailedBody, catalogUnreadableFolders
     case catalogRetainedNotice, catalogPartialNotice
@@ -47,7 +47,6 @@ enum CommonStrings: LocalizedStrings {
         case .filters: return ("Filters", "フィルター")
         case .searchIn: return ("Search in %@…", "%@を検索…")
         case .shownCount: return ("%lld shown", "%lld 件を表示")
-        case .shownProjects: return ("%lld projects shown", "%lld 件のプロジェクトを表示")
         case .foldersLabel: return ("Folders", "フォルダ")
         case .clearSearch: return ("Clear search", "検索をクリア")
         case .setReadFailed: return ("This set could not be read. See alive.log for details.",
@@ -66,7 +65,7 @@ enum CommonStrings: LocalizedStrings {
         case .showInFinder: return ("Show in Finder", "Finder に表示")
         case .pin: return ("Pin / Unpin", "ピン留め / 解除")
         case .tagsAndNotes: return ("Tags and Notes…", "タグとメモ…")
-        case .rescue: return ("Rescue…", "レスキュー…")
+        case .rescue: return ("Rescue Project…", "プロジェクトをレスキュー…")
         case .exportSet: return ("Export…", "エクスポート…")
         case .arrangementPreview: return ("Arrangement Preview", "アレンジメントのプレビュー")
         case .playPause: return ("Play / Pause", "再生 / 一時停止")
@@ -91,9 +90,21 @@ enum CommonStrings: LocalizedStrings {
         case .folderOpenFailed: return ("Could not open the folder: %@", "フォルダを開けませんでした: %@")
         case .pathMissing: return ("The file no longer exists: %@", "ファイルが見つかりません: %@")
         case .settingsSaveFailed: return ("Could not save settings: %@", "設定を保存できませんでした: %@")
+        case .settingsUnread:
+            return ("settings.cfg can't be read right now, so changes are not being saved.",
+                    "settings.cfg を今読み込めないため、変更は保存されていません。")
+        case .fileUnread:
+            return ("“%@” can't be read right now, so changes to it are not being saved.",
+                    "「%@」を今読み込めないため、変更は保存されていません。")
+        case .fileSaveFailed:
+            return ("Could not save “%@”. See alive.log for details.",
+                    "「%@」を保存できませんでした。詳細は alive.log を確認してください。")
+        case .dataFilesUnread:
+            return ("These files exist but can't be read, so changes to them will not be saved: %@",
+                    "次のファイルは存在しますが読み込めないため、変更は保存されません: %@")
         case .dataFileBackedUp:
-            return ("“%1$@” was not a plain UTF-8 text file. The original was kept as “%1$@.bak”.",
-                    "「%1$@」は通常の UTF-8 テキストではありませんでした。元のファイルは「%1$@.bak」として残してあります。")
+            return ("“%1$@” was not a plain UTF-8 text file. The original was kept as “%2$@”.",
+                    "「%1$@」は通常の UTF-8 テキストではありませんでした。元のファイルは「%2$@」として残してあります。")
         case .rootAdded: return ("Added %@", "%@を追加しました")
         case .rootsAdded: return ("Added %lld folders", "%lld 個のフォルダを追加しました")
         case .alreadyWatching: return ("Already watching that folder", "そのフォルダはすでに監視しています")
@@ -104,6 +115,9 @@ enum CommonStrings: LocalizedStrings {
         case .emptyRootsTitle: return ("Nothing to show yet", "まだ表示するものがありません")
         case .emptyRootsBody: return ("Alive reads your Live sets from the folders you point it at. It only reads; it never changes a set.",
                                       "Alive は指定したフォルダの Live セットを読み込みます。読み取り専用で、セットは変更しません。")
+        case .emptyRootsSettingsUnread:
+            return ("settings.cfg exists but can't be read, so your folders are not shown. They come back once it can be read; changes made now are not saved.",
+                    "settings.cfg は存在しますが読み込めないため、フォルダを表示できません。読み込めるようになると元に戻ります。今行った変更は保存されません。")
         case .addProjectsFolder: return ("Add the folder with your Live projects", "Live プロジェクトのフォルダを追加")
         case .chooseFolderPrompt: return ("Add", "追加")
         case .chooseFolderMessage: return ("Choose the folders that contain your Live projects", "Live プロジェクトが入っているフォルダを選択")

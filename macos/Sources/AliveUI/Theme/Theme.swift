@@ -47,36 +47,45 @@ enum Theme {
     /// Selected table row fill; text on it must be `text` (secondary colours drop below 4.5:1).
     static let tableSelection = Color(hex: 0x4A4A52)
 
-    // MARK: Sizes (points)
-    static let pad: CGFloat = 24            // window margin (upstream 30 px)
-    static let controlH: CGFloat = 30       // every pill and field in the toolbar (35 px)
-    static let iconSize: CGFloat = 30       // a round icon button (35 px)
-    static let iconGap: CGFloat = 8         // (10 px)
-    static let rowH: CGFloat = 44           // table row pitch (57 px)
-    static let rowPillH: CGFloat = 42       // the row highlight itself (55 px)
-    static let cellPadX: CGFloat = 18       // (24 px)
-    static let panelW: CGFloat = 300        // the detail panel (332 px)
-    static let panelPad: CGFloat = 14       // (16 px)
-    static let windowR: CGFloat = 18
-    static let cardR: CGFloat = 14
-    static let thumbR: CGFloat = 6
+    // MARK: Sizes (points; every one follows Settings → Interface scale through `s`)
+    /// `value` at the current interface scale (75 / 100 / 125 %, upstream Theme.Zoom). Read it while
+    /// a view builds its `body` and the view follows a scale change at once; kept in a `static let`
+    /// it keeps the value it had at its first use.
+    static func s(_ value: CGFloat) -> CGFloat { value * ThemeScale.shared.factor }
+
+    static var pad: CGFloat { s(24) }            // window margin (upstream 30 px)
+    static var controlH: CGFloat { s(30) }       // every pill and field in the toolbar (35 px)
+    static var iconSize: CGFloat { s(30) }       // a round icon button (35 px)
+    static var iconGap: CGFloat { s(8) }         // (10 px)
+    static var rowH: CGFloat { s(44) }           // table row pitch (57 px)
+    static var rowPillH: CGFloat { s(42) }       // the row highlight itself (55 px)
+    static var cellPadX: CGFloat { s(18) }       // (24 px)
+    static var panelW: CGFloat { s(300) }        // the detail panel (332 px)
+    static var panelPad: CGFloat { s(14) }       // (16 px)
+    static var windowR: CGFloat { s(18) }
+    static var cardR: CGFloat { s(14) }
+    static var thumbR: CGFloat { s(6) }
     /// Gap between a list and its inspector panel (Sets, Plugins, Samples use the same).
-    static let panelGap: CGFloat = 16
+    static var panelGap: CGFloat { s(16) }
 
     // MARK: Fonts (SF Pro is the counterpart of Segoe UI)
-    static let fTitle = Font.system(size: 13, weight: .semibold)
-    static let fBody = Font.system(size: 13)
-    static let fButton = Font.system(size: 13)
-    static let fLabel = Font.system(size: 12)
-    static let fSmall = Font.system(size: 12)
-    static let fBadge = Font.system(size: 11)
-    static let fMini = Font.system(size: 9.5)
-    static let fHead = Font.system(size: 17, weight: .semibold)
-    static let fDialogTitle = Font.system(size: 22, weight: .semibold)
+    static var fTitle: Font { .system(size: s(13), weight: .semibold) }
+    static var fBody: Font { .system(size: s(13)) }
+    static var fButton: Font { .system(size: s(13)) }
+    static var fLabel: Font { .system(size: s(12)) }
+    static var fSmall: Font { .system(size: s(12)) }
+    static var fBadge: Font { .system(size: s(11)) }
+    static var fMini: Font { .system(size: s(9.5)) }
+    static var fHead: Font { .system(size: s(17), weight: .semibold) }
+    static var fDialogTitle: Font { .system(size: s(22), weight: .semibold) }
     /// Project tile / card titles.
-    static let fCardTitle = Font.system(size: 15, weight: .semibold)
-    /// Smallest caption that stays legible (heatmap months, slider captions): never below 11 pt.
-    static let fCaption = Font.system(size: 11)
+    static var fCardTitle: Font { .system(size: s(15), weight: .semibold) }
+    /// Smallest caption that stays legible at 100 % (heatmap months, slider captions): never below 11 pt.
+    static var fCaption: Font { .system(size: s(11)) }
+    /// The large figure on an Overview card.
+    static var fFigure: Font { .system(size: s(15), weight: .semibold) }
+    /// Medium-weight SF Symbol or caption at `size` points (the base value at 100 %, scaled).
+    static func fGlyph(_ size: CGFloat) -> Font { .system(size: s(size), weight: .medium) }
 
     // MARK: Motion
     static let hoverAnimation = Animation.easeOut(duration: 0.12)

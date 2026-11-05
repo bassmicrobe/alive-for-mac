@@ -78,7 +78,8 @@ private struct RootsEditor: View {
         }
     }
 
-    private static let rowPitch = Theme.rowPillH + 6
+    /// Computed, never stored: the interface scale changes while the app runs.
+    private static var rowPitch: CGFloat { Theme.rowPillH + 6 }
     private static let maxListHeight: CGFloat = 264
 
     /// The list is as tall as its rows, up to a bound; past it, it scrolls. (A list that always
@@ -177,7 +178,7 @@ private struct RootsEditor: View {
             page.add(folder)
         }
         draft.page = page
-        if failed > 0 { app.toast(SetsStrings.rootsNotFolders.f(failed), kind: .error) }
+        if failed > 0 { app.toast(SetFormat.plural(failed, one: .rootsNotFoldersOne, many: .rootsNotFolders), kind: .error) }
     }
 
     private func toggleLive(_ item: LiveFolderSuggestion, on: Bool) {
@@ -241,7 +242,8 @@ private struct RootRow: View {
             Text(SetsStrings.rootNested.s).font(Theme.fSmall).foregroundStyle(Theme.secondaryText)
         } else if let count {
             Text(count < 0 ? SetsStrings.rootNoAccess.s
-                 : (kind == .projects ? SetsStrings.rootSetCount : SetsStrings.rootSampleCount).f(count))
+                 : kind == .projects ? SetFormat.plural(count, one: .rootSetCountOne, many: .rootSetCount)
+                 : SetFormat.plural(count, one: .rootSampleCountOne, many: .rootSampleCount))
                 .font(Theme.fSmall)
                 .foregroundStyle(count < 0 ? Theme.errorText : Theme.secondaryText)
                 .monospacedDigit()

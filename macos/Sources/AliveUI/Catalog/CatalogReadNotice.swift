@@ -11,22 +11,22 @@ struct CatalogReadNotice: View {
     @Environment(AppModel.self) private var app
 
     var body: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: Theme.s(8)) {
             if showsGenericLine || retainedPreviousCatalog { genericLine }
             if !missingRoots.isEmpty { MissingRootRows(roots: missingRoots) }
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
+        .padding(.horizontal, Theme.s(14))
+        .padding(.vertical, Theme.s(10))
         .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.cardR, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: Theme.cardR, style: .continuous)
             .strokeBorder(Theme.cardBorder, lineWidth: 1))
         .padding(.horizontal, Theme.pad)
-        .padding(.bottom, 12)
+        .padding(.bottom, Theme.s(12))
         .accessibilityElement(children: .contain)
     }
 
     private var genericLine: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: Theme.s(12)) {
             IconView(icon: .warning, size: 13).foregroundStyle(Theme.secondaryText)
                 .accessibilityHidden(true)
             Text(retainedPreviousCatalog ? CommonStrings.catalogRetainedNotice.s : CommonStrings.catalogPartialNotice.s)

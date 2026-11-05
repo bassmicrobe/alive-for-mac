@@ -14,7 +14,7 @@ struct ToastOverlay: View {
     let app: AppModel
 
     var body: some View {
-        VStack(alignment: .trailing, spacing: 8) {
+        VStack(alignment: .trailing, spacing: Theme.s(8)) {
             ForEach(app.toasts) { toast in
                 ToastView(message: toast, onDismiss: { app.dismissToast(toast.id) })
                     .transition(.move(edge: .bottom).combined(with: .opacity))
@@ -31,10 +31,10 @@ private struct ToastView: View {
     let onDismiss: () -> Void
 
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: Theme.s(8)) {
             Circle()
                 .fill(message.kind == .error ? Theme.red : Theme.green)
-                .frame(width: 7, height: 7)
+                .frame(width: Theme.s(7), height: Theme.s(7))
             Text(message.text)
                 .font(Theme.fBody)
                 .foregroundStyle(Theme.text)
@@ -47,15 +47,15 @@ private struct ToastView: View {
                     .accessibilityLabel(CommonStrings.dismiss.s)
             }
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 11)
+        .padding(.horizontal, Theme.s(16))
+        .padding(.vertical, Theme.s(11))
         .background(Theme.surfacePressed, in: RoundedRectangle(cornerRadius: Theme.cardR, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: Theme.cardR, style: .continuous)
                 .strokeBorder(Theme.cardHighlight, lineWidth: 1)
         )
         .shadow(color: .black.opacity(0.35), radius: 12, y: 4)
-        .frame(maxWidth: 420, alignment: .trailing)
+        .frame(maxWidth: Theme.s(420), alignment: .trailing)
         // Only an error toast has something to click (its dismiss button); the rest lets the
         // mouse through. The message is announced when it is posted (`AppModel.toast`).
         .allowsHitTesting(message.kind == .error)

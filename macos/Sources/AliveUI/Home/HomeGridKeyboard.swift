@@ -8,7 +8,7 @@ enum HomeGridKeyboard {
         case move(TileNavigation.Direction)
     }
 
-    static let keys: Set<KeyEquivalent> = [.return, .space, .leftArrow, .rightArrow, .downArrow, .upArrow]
+    static let keys: Set<KeyEquivalent> = [.return, .space, .leftArrow, .rightArrow, .downArrow, .upArrow, .home, .end]
 
     static func action(for key: KeyEquivalent, modifiers: EventModifiers = [],
                        phase: KeyPress.Phases = .down) -> Action? {
@@ -21,6 +21,8 @@ enum HomeGridKeyboard {
         case .rightArrow: return .move(.right)
         case .downArrow: return .move(.down)
         case .upArrow: return .move(.up)
+        case .home: return .move(.first)
+        case .end: return .move(.last)
         default: return nil
         }
     }

@@ -128,7 +128,7 @@ public enum AlsSamplePatch {
         guard let at = node.range(of: tag), let close = node[at.upperBound...].firstIndex(of: "\"") else {
             return node
         }
-        return node[..<at.upperBound] + value + node[close...]
+        return String(node[..<at.upperBound]) + value + String(node[close...])
     }
 
     /// XML-escaping of an attribute value: a folder called "Drum & Bass" turns up all the time

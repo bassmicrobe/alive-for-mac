@@ -60,6 +60,9 @@ public final class ProjectIndex: @unchecked Sendable {
     var _sets: [SetEntry] = []
     var _env = LiveEnvironment()
     var _history = Activity.empty
+    /// activity.cache is there but could not be read: the history in `_history` is only what the
+    /// Backup folders still hold, so the file is not replaced with it (see `Activity.readCache`).
+    var _activityCacheUnread = false
     var _inventory = PluginInventory()
     var _settings: Settings
     var _generation = 0                       // bumps whenever sets or inventory change
@@ -129,9 +132,9 @@ public final class ProjectIndex: @unchecked Sendable {
         let cache = cachedEntries()
         guard !cache.isEmpty else { return false }
         let list = cache.values.sorted { $0.path.localizedStandardCompare($1.path) == .orderedAscending }
-        let history = Activity.loadCache(dir: dir)
+        let read = Activity.readCache(dir: dir)
         lock.lock()
-        _sets = list; _history = history; _generation += 1
+        _sets = list; _history = read.activity; _activityCacheUnread = read.isUnread; _generation += 1
         lock.unlock()
         loadFacts()
         if refreshInventory { refreshInstalled() } else { rebuildStatuses() }
@@ -254,7 +257,16 @@ public final class ProjectIndex: @unchecked Sendable {
             stats.seconds = Date().timeIntervalSince(started)
             return true
         }
-        let previousActivity = history.total > 0 ? history : Activity.loadCache(dir: dir)
+        // The cache is read again when the history in hand is empty or came from a cache that could
+        // not be read: what a scan builds from Backup alone is not the whole history.
+        var previousActivity = history
+        var activityCacheUnread = false
+        lock.lock(); let heldUnread = _activityCacheUnread; lock.unlock()
+        if history.total == 0 || heldUnread {
+            let read = Activity.readCache(dir: dir)
+            activityCacheUnread = read.isUnread
+            if !read.isUnread { previousActivity = read.activity }
+        }
         let incompleteRegions = Set(keep.regions)
         let regions = diff.values.flatMap { $0 }.filter { !incompleteRegions.contains($0) }   // an unreadable folder keeps its last facts
         let reusable = diff.isEmpty ? [:] : cleanProjects(known.projects, diffRoots: Array(diff.keys), regions: regions)
@@ -270,14 +282,18 @@ public final class ProjectIndex: @unchecked Sendable {
 
         // Publish the catalog whole; readers saw the previous one until this moment.
         lock.lock()
-        _sets = fresh; _history = activity; _generation += 1
+        _sets = fresh; _history = activity; _activityCacheUnread = activityCacheUnread; _generation += 1
         _weightMemo = walked.memo
         _facts = newFacts.sets; _projectFacts = newFacts.projects
         // A mount notification may have published a newer table while the scan was walking.
         // Its view of the connected drives wins over the scan's earlier snapshot.
         if _mountGeneration == mountGeneration { _mounted = mounted; _mountGeneration += 1 }
         lock.unlock()
-        activity.saveCache(dir: dir)
+        if activityCacheUnread {
+            Diag.warn("scan: activity.cache could not be read; the history was not saved over it")
+        } else {
+            activity.saveCache(dir: dir)
+        }
         // The reuse map follows the file on disk: a failed save leaves it as it was.
         let indexSaved = IndexCache.save(fresh, dir: dir)
         if indexSaved != .failed { rememberCache(fresh) }

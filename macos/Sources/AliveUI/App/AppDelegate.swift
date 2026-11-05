@@ -79,6 +79,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return true
     }
 
+    /// A slider move less than 300 ms before ⌘Q would otherwise never reach settings.cfg.
+    func applicationWillTerminate(_ notification: Notification) {
+        MainActor.assumeIsolated { AppDelegate.model?.samples.flushPreviewVolume() }
+    }
+
     /// With the menu bar extra on, the app lives on after the last window is closed.
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         MainActor.assumeIsolated { !(AppDelegate.model?.settings.menuBar ?? false) }

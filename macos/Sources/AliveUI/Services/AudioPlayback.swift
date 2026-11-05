@@ -33,9 +33,10 @@ final class AudioPlayback {
     }
 
     /// Starts playing `url` from the beginning. Returns false (after reporting via `onError`)
-    /// when the file cannot be played.
+    /// when the file cannot be played. The `volume:` argument is the level this one sound begins
+    /// at (a sample's own audition volume); the `volume` property stays the render player's level.
     @discardableResult
-    func play(url: URL) -> Bool {
+    func play(url: URL, volume startVolume: Float? = nil) -> Bool {
         stop()
         do {
             let player = try AVAudioPlayer(contentsOf: url)
@@ -43,7 +44,7 @@ final class AudioPlayback {
                 finished: { [weak self] player in self?.handleFinished(from: player) },
                 failed: { [weak self] player, error in self?.handleDecodeError(from: player, error: error) })
             player.delegate = delegate
-            player.volume = volume
+            player.volume = startVolume ?? volume
             guard player.play() else { throw PlaybackError.couldNotStart }
             self.player = player
             self.delegate = delegate
@@ -150,9 +151,15 @@ final class AudioPlayback {
             self.failed = failed
         }
 
+        /// `flag` is false when playback stopped because the audio could not be decoded: that is an
+        /// error to report, not the end of the file.
         func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
             nonisolated(unsafe) let player = player
-            Task { @MainActor in finished(player) }
+            if flag {
+                Task { @MainActor in finished(player) }
+            } else {
+                Task { @MainActor in failed(player, nil) }
+            }
         }
 
         func audioPlayerDecodeErrorDidOccur(_ player: AVAudioPlayer, error: Error?) {

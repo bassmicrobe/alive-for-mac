@@ -43,6 +43,9 @@ private struct SamplesContent: View {
         .padding(.leading, Theme.pad)
         .padding(.trailing, Theme.pad)
         .padding(.bottom, Theme.pad)
+        // The gaps and margins around the list and the panel are empty spots too.
+        .contentShape(Rectangle())
+        .onTapGesture { model.emptyClicked() }
         .task(id: model.indexGeneration) { openSingleFolderChains() }
     }
 

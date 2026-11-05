@@ -109,11 +109,12 @@ private extension Date {
     }
 }
 
-/// The cell size that makes the grid fit the width (never smaller than 7 or larger than 14 pt).
+/// The cell size that makes the grid fit the width (never smaller than 7 or larger than 14 pt at
+/// 100 %; every size follows the interface scale, so these are computed, not stored).
 struct HeatmapMetrics: Equatable {
-    static let gap: CGFloat = 3
-    static let minCell: CGFloat = 7
-    static let maxCell: CGFloat = 14
+    static var gap: CGFloat { Theme.s(3) }
+    static var minCell: CGFloat { Theme.s(7) }
+    static var maxCell: CGFloat { Theme.s(14) }
 
     let cell: CGFloat
     var step: CGFloat { cell + Self.gap }
@@ -125,15 +126,43 @@ struct HeatmapMetrics: Equatable {
 
     func width(cols: Int) -> CGFloat { CGFloat(cols) * step - Self.gap }
     var height: CGFloat { CGFloat(HeatmapGrid.rows) * step - Self.gap }
+
+    /// Where a cell is drawn, in the canvas's coordinates (below the month captions).
+    func rect(col: Int, row: Int) -> CGRect {
+        CGRect(x: CGFloat(col) * step, y: HeatmapFit.gridTop + CGFloat(row) * step, width: cell, height: cell)
+    }
+}
+
+extension HeatmapGrid {
+    /// The cell under a point of the canvas, or nil between cells, over the captions and outside the range.
+    func cell(at point: CGPoint, metrics m: HeatmapMetrics) -> HeatmapCell? {
+        let y = point.y - HeatmapFit.gridTop
+        guard point.x >= 0, y >= 0, point.x.truncatingRemainder(dividingBy: m.step) < m.cell,
+              y.truncatingRemainder(dividingBy: m.step) < m.cell else { return nil }
+        return cell(col: Int(point.x / m.step), row: Int(y / m.step))
+    }
+}
+
+/// A day of the calendar that was clicked: where its list opens and what it holds.
+struct HeatmapDayPick: Identifiable {
+    let cell: HeatmapCell
+    let rect: CGRect
+    let projects: [DayProject]
+    var id: Date { cell.day }
 }
 
 /// Sizes its one child to the calendar for the proposed width, without any state feedback: a
 /// size measured into @State made the window's structural-region pass loop at start-up.
 struct HeatmapFit: Layout {
     let cols: Int
+    /// The interface scale the sizes below were read at. A layout is not observed: a new value makes
+    /// SwiftUI measure the calendar again after a change of Settings → Interface scale.
+    let scale: CGFloat
 
-    static let monthH: CGFloat = 17
-    static let monthGap: CGFloat = 7
+    static var monthH: CGFloat { Theme.s(17) }
+    static var monthGap: CGFloat { Theme.s(7) }
+    /// Where the first row of cells begins.
+    static let gridTop = monthH + monthGap
 
     static func size(cols: Int, available: CGFloat) -> CGSize {
         let m = HeatmapMetrics(cols: cols, available: available)
@@ -151,30 +180,47 @@ struct HeatmapFit: Layout {
 }
 
 struct ActivityHeatmap: View {
+    @Environment(AppModel.self) private var app
     let grid: HeatmapGrid
     @Binding var hovered: HeatmapCell?
+    /// The day whose projects are listed (a click on a day with saves, a6c8dc1).
+    @State private var pick: HeatmapDayPick?
 
     var body: some View {
-        HeatmapFit(cols: grid.cols) {
+        HeatmapFit(cols: grid.cols, scale: ThemeScale.shared.factor) {
             GeometryReader { proxy in
                 // The cell size is recovered from the size we were given: width = cols * step - gap.
                 let m = HeatmapMetrics(cols: grid.cols, available: proxy.size.width)
-                Canvas { context, _ in draw(&context, m) }
+                let monthFont = Theme.fGlyph(12)
+                Canvas { context, _ in draw(&context, m, monthFont: monthFont) }
                     .onContinuousHover { phase in hover(phase, m) }
+                    .onTapGesture { point in tap(at: point, m) }
+                    .dayPointer(hovered.map { $0.saves > 0 } ?? false)
+                    .popover(item: $pick, attachmentAnchor: .rect(.rect(pick?.rect ?? .zero)), arrowEdge: .bottom) { pick in
+                        DayProjectsList(pick: pick) { path in
+                            self.pick = nil
+                            app.home.show(path: path)
+                        }
+                    }
             }
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(HomeStrings.activeDays.s)
     }
 
-    /// Month captions: 12 pt medium, so they stay readable at the calendar's real size.
-    private static let monthFont = Font.system(size: 12, weight: .medium)
+    private var gridTop: CGFloat { HeatmapFit.gridTop }
 
-    private var gridTop: CGFloat { HeatmapFit.monthH + HeatmapFit.monthGap }
+    /// A day with saves opens the list of its projects; an empty day has nothing to open.
+    private func tap(at point: CGPoint, _ m: HeatmapMetrics) {
+        guard let cell = grid.cell(at: point, metrics: m), cell.saves > 0 else { return }
+        pick = HeatmapDayPick(cell: cell, rect: m.rect(col: cell.col, row: cell.row),
+                              projects: app.home.dayProjects(on: cell.day))
+    }
 
-    private func draw(_ context: inout GraphicsContext, _ m: HeatmapMetrics) {
+    /// `monthFont` is 12 pt medium (scaled), so the captions stay readable at the calendar's real size.
+    private func draw(_ context: inout GraphicsContext, _ m: HeatmapMetrics, monthFont: Font) {
         for label in grid.monthLabels {
-            let text = context.resolve(Text(monthName(label.month)).font(Self.monthFont).foregroundStyle(Theme.secondaryText))
+            let text = context.resolve(Text(monthName(label.month)).font(monthFont).foregroundStyle(Theme.secondaryText))
             let width = m.width(cols: grid.cols)
             let labelWidth = text.measure(in: CGSize(width: width, height: HeatmapFit.monthH)).width
             let x = max(0, min(CGFloat(label.col) * m.step, width - labelWidth))
@@ -189,7 +235,7 @@ struct ActivityHeatmap: View {
         }
         if let hovered {
             let rect = CGRect(x: CGFloat(hovered.col) * m.step, y: gridTop + CGFloat(hovered.row) * m.step,
-                              width: m.cell, height: m.cell).insetBy(dx: -1, dy: -1)
+                              width: m.cell, height: m.cell).insetBy(dx: -Theme.s(1), dy: -Theme.s(1))
             context.fill(Path(roundedRect: rect, cornerRadius: radius), with: .color(Theme.lightTop))
         }
     }
@@ -197,10 +243,7 @@ struct ActivityHeatmap: View {
     private func hover(_ phase: HoverPhase, _ m: HeatmapMetrics) {
         switch phase {
         case .active(let point):
-            let y = point.y - gridTop
-            let inside = y >= 0 && point.x.truncatingRemainder(dividingBy: m.step) < m.cell
-                && y.truncatingRemainder(dividingBy: m.step) < m.cell
-            let next = inside ? grid.cell(col: Int(point.x / m.step), row: Int(y / m.step)) : nil
+            let next = grid.cell(at: point, metrics: m)
             if next != hovered { hovered = next }
         case .ended:
             if hovered != nil { hovered = nil }

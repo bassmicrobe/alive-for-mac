@@ -4,6 +4,7 @@ import Foundation
 enum SettingsStrings: LocalizedStrings {
     case tabGeneral, tabAbout
     case language, languageSystem, languageNote
+    case appearance, interfaceScale, interfaceScaleHelp, scalePercent
     case transparency, transparencyHelp
     case pluginSource, pluginSourceLive, pluginSourceFolders, pluginSourceHelp
     case dataFolder, openDataFolder
@@ -24,6 +25,11 @@ enum SettingsStrings: LocalizedStrings {
         case .languageSystem: return ("System", "システム")
         case .languageNote: return ("Alive switches immediately. macOS menus and file dialogs follow after you relaunch the app.",
                                     "Alive の表示はすぐに切り替わります。macOS のメニューとファイルダイアログは、アプリを再起動すると切り替わります。")
+        case .appearance: return ("Appearance", "外観")
+        case .interfaceScale: return ("Interface scale", "インターフェースの大きさ")
+        case .interfaceScaleHelp: return ("Text and controls. The window follows at once.",
+                                          "文字とコントロールの大きさです。ウィンドウにはすぐ反映されます。")
+        case .scalePercent: return ("%lld%%", "%lld%%")
         case .transparency: return ("Transparent window", "ウィンドウを透明にする")
         case .transparencyHelp: return ("Blurs what is behind the window, like upstream's glass.",
                                         "ウィンドウの背後をぼかします（オリジナルのグラス効果）。")

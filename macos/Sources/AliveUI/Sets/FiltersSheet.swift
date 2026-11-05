@@ -139,9 +139,9 @@ struct FiltersSheet: View {
 
     private var footer: some View {
         HStack(spacing: 10) {
-            Text(SetsStrings.fltMatches.f(facets.matches, app.catalog.sets.count))
+            Text(app.sets.filterCounterText)
                 .font(Theme.fBody)
-                .foregroundStyle(Theme.secondaryText)
+                .foregroundStyle(app.sets.shownCount == 0 ? Theme.errorText : Theme.secondaryText)
                 .lineLimit(2)
                 .fixedSize(horizontal: false, vertical: true)
                 .monospacedDigit()

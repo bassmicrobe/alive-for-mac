@@ -50,7 +50,10 @@ struct SpotlightDocument: Equatable, Sendable {
             parts.append("\(bpm) BPM")
         }
         if !set.key.isEmpty { parts.append(set.key) }
-        if set.tracks > 0 { parts.append(IntegrationStrings.itemTracks.f(lang: lang, locale: locale, set.tracks)) }
+        if set.tracks > 0 {
+            let item: IntegrationStrings = set.tracks == 1 ? .itemTrackOne : .itemTracks    // "1 track"
+            parts.append(item.f(lang: lang, locale: locale, set.tracks))
+        }
         if !set.creator.isEmpty { parts.append(IntegrationStrings.itemLive.f(lang: lang, locale: locale, set.shortVersion)) }
         return parts.joined(separator: " · ")
     }

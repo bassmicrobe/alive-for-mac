@@ -46,6 +46,11 @@ public struct Arrangement: Sendable {
     public var tempo = 0.0
     /// The last beat with anything on it.
     public var end = 0.0
+    /// How many beats (quarter notes) a bar holds, from the set's time signature: 4 for 4/4,
+    /// 3 for 3/4, 3.5 for 7/8 (upstream a6c8dc1 `BarBeats`). The parser fills it; 4/4 until then.
+    public var barBeats = 4.0
+    /// Length in bars — for the caption; the grid is counted the same way.
+    public var bars: Int { barBeats > 0 ? Int((end / barBeats).rounded(.up)) : 0 }
     public var tracks: [TrackLane] = []
     public var clipCount = 0, noteCount = 0
     public var error: String?
@@ -53,9 +58,6 @@ public struct Arrangement: Sendable {
     public init() {}
 
     public var hasContent: Bool { clipCount > 0 }
-
-    /// Length in bars at 4/4 — for the caption; the grid is counted the same way.
-    public var bars: Int { Int((end / 4.0).rounded(.up)) }
 
     /// A cap for the whole set: large projects have hundreds of thousands of notes, and the
     /// preview reduces them to a couple of pixels anyway.

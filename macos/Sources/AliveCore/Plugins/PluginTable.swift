@@ -59,6 +59,11 @@ public struct PluginRow: Identifiable, Sendable {
         self.lastUsed = lastUsed
     }
 
+    /// The words of a search box text.
+    public static func words(in query: String) -> [String] {
+        query.components(separatedBy: .whitespacesAndNewlines).filter { !$0.isEmpty }
+    }
+
     /// Search over name, vendor, type and format, all words must hit (upstream: the whole text as
     /// one substring; words are friendlier for "fabfilter eq").
     public func matches(search words: [String]) -> Bool {

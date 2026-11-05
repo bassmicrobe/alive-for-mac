@@ -37,6 +37,16 @@ final class AppPreferences {
         set { app.mutateSettings { $0.disableGlass = !newValue } }
     }
 
+    /// Interface scale in percent, one of `Settings.uiScales` (`settings.uiScale`, key `uiscale`).
+    /// `Theme` follows at once (`ThemeScale`); `AppModel` applies it at launch too.
+    var uiScale: Int {
+        get { app.settings.uiScale }
+        set {
+            guard AppSettings.uiScales.contains(newValue) else { return }
+            app.mutateSettings { $0.uiScale = newValue }
+        }
+    }
+
     /// Daily update check (`settings.checkUpdates`).
     var dailyUpdateCheck: Bool {
         get { app.settings.checkUpdates }

@@ -8,7 +8,7 @@ import AliveCore
 private enum CellStyle {
     /// Every cell is at least this tall, so the row pitch is the shared `Theme.rowH` rhythm of
     /// Plugins and Samples whatever a cell holds (the table adds its own row padding).
-    static let height: CGFloat = Theme.rowH - 8
+    static var height: CGFloat { Theme.rowH - 8 }
 }
 
 /// Text cell with the table's vertical rhythm. Metadata is `secondaryText` (AA on hover and
@@ -46,7 +46,7 @@ struct SetNameCell: View {
                 .help(set.name)
             if set.collapsedCount > 0 {
                 TagPill(text: SetsStrings.moreVersions.f(set.collapsedCount))
-                    .help(SetsStrings.moreVersionsHelp.f(set.collapsedCount))
+                    .help(SetFormat.plural(set.collapsedCount, one: .moreVersionsHelpOne, many: .moreVersionsHelp))
             }
             if !set.error.isEmpty {
                 IconView(icon: .warning, size: 11)

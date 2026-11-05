@@ -54,7 +54,11 @@ namespace Alive
             CultureInfo.DefaultThreadCurrentUICulture = en;
             Thread.CurrentThread.CurrentUICulture = en;
 
-            if (Settings.Load().DisableGlass) Glass.Enabled = false;
+            Settings startup = Settings.Load();
+            if (startup.DisableGlass) Glass.Enabled = false;
+            // Before the first window and before Theme's fonts are made: both are computed
+            // once off this (see Theme.Zoom).
+            Theme.Zoom = startup.UiScale / 100f;
 
             // The rescue helper's probe copies live inside other people's project folders and
             // have to disappear the moment the probe is over. If the last run was killed
@@ -101,7 +105,7 @@ namespace Alive
 
             EventHandler place = delegate
             {
-                float k = main.DeviceDpi / 96f;
+                float k = Theme.Dpi;
                 int pad = (int)Math.Round(Theme.Pad * k);
                 int icon = (int)Math.Round(Theme.IconSize * k);
                 int panelW = (int)Math.Round(Theme.PanelW * k);
@@ -139,6 +143,17 @@ namespace Alive
                     mf.SelectSetByPath(path);
                 }
             };
+
+            // One catalog for both windows: Stat shows the main window's index and hears its
+            // rescans, and its F5 is the main window's.
+            MainForm main = owner as MainForm;
+            if (main != null)
+            {
+                nf.Share(main.Index, main.Rescan);
+                Action rebuilt = nf.CatalogRebuilt;
+                main.CatalogRebuilt += rebuilt;
+                nf.FormClosed += delegate { main.CatalogRebuilt -= rebuilt; };
+            }
 
             _stat = nf;
             _stat.FormClosed += delegate { _stat = null; };

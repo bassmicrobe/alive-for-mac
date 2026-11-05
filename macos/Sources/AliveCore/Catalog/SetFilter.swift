@@ -214,6 +214,27 @@ public struct SetFilter: Equatable, Sendable {
 
 /// What the filter window offers: only the values that occur in the sets, and which of them
 /// would still leave something (upstream FiltersDialog: BuildKeyOptions / UpdateFacets).
+extension SetFilter {
+    /// The search field's rule — one for both views of the catalog (upstream `MatchesSearch`,
+    /// 9ce4b4b): name, project, path, plugins, render names, the project's tags and note.
+    /// `query` is already trimmed and non-empty. Mac addition: the query is split on white space
+    /// and every word must hit some field ("song vocals" finds a set whose name has one word and
+    /// whose tag has the other), and case, diacritics and full/half width are ignored ("ｍｉｘ"
+    /// finds "Mix", "cafe" finds "Café").
+    public static func matchesSearch(_ s: SetEntry, query q: String,
+                                     tagsOf: (String) -> [String], noteOf: (String) -> String) -> Bool {
+        guard let query = SearchQuery(q) else { return true }
+        return query.matches(SearchHaystacks.build(s, tagsOf: tagsOf, noteOf: noteOf))
+    }
+
+    /// The same rule with the folded texts kept in `haystacks` (validated by the caller against the
+    /// catalog and tags revisions): what a keystroke over thousands of sets runs.
+    public static func matchesSearch(_ s: SetEntry, query: SearchQuery, haystacks: SearchHaystacks,
+                                     tagsOf: (String) -> [String], noteOf: (String) -> String) -> Bool {
+        query.matches(haystacks.text(for: s, tagsOf: tagsOf, noteOf: noteOf))
+    }
+}
+
 public struct SetFilterFacets: Equatable, Sendable {
     /// Live versions present, newest first.
     public var versions: [String] = []

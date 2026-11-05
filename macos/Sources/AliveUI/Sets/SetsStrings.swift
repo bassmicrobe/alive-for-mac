@@ -6,29 +6,33 @@ enum SetsStrings: LocalizedStrings {
     case colName, colPlace, colModified, colCreated, colLive, colBPM, colKey, colTracks
     case colPluginCount, colFileCount, colPluginsMissed, colFilesMissed, colTags, colProjectSize
     // List
-    case moreVersions, moreVersionsHelp, pin, unpin, pinHelp, unpinHelp, playRender, playRenderHelp
+    case moreVersions, moreVersionsHelp, moreVersionsHelpOne, copyPath, pin, unpin, pinHelp, unpinHelp, playRender, playRenderHelp
     case pinnedFirst, pinnedFirstHelp, resetColumns, resetColumnsHelp, clearFilters, unreadable
-    case noMatchesTitle, noMatchesBody, shownSummary
+    case noMatchesTitle, noMatchesBody, shownSummary, shownSummaryOneProject, shownSummaryOne
     // Inspector
     case detailEmptyTitle, detailEmptyBody, moreActions, projectSizeHelp, addTagsOrNote, noteHeading
-    case versionsHeading, filesHeading, fileCount, missingCount, notInstalledCount, sampleFoldersHeading
-    case pluginsHeading, onlyLiveDevices, otherFormat, showPluginHelp, pluginStatusUnknown
+    case versionsHeading, filesHeading, missingCount, notInstalledCount, sampleFoldersHeading
+    case pluginsHeading, copyPluginList, copyPluginListHelp, pluginListCopied, onlyLiveDevices, otherFormat, showPluginHelp, pluginStatusUnknown
+    case pluginListInstalled, pluginListMissing
     case rendersHeading, moreItems
     // Readiness (Mac-only)
-    case readyNow, readyNowHelp, statusHeading, statusReady, statusOffline, statusMissingFiles
+    case readyNow, readyNowCountOne, readyNowCount, readyNowHelp, statusHeading, statusReady, statusOffline, statusMissingFiles
     case statusMissingPlugins, statusUnknown, statusUnreadable, statusUnreadableHelp, statusOfflineLine, statusStaleLine, staleRender, staleRenderHelp
     case fltReadiness, fltStaleRender, fltReadinessNone
     // Filters
     case filtersTitle, fltModified, fltFrom, fltTo, fltDateHint, fltVersion, fltKeyRoot, fltScale, fltTags, fltTracks
     case fltPluginCount, fltPlugins, fltFiles, fltRenders, fltMin, fltMax, fltNone, fltNoTags
     case fltAnyKey, fltNoKey, fltSomeMissing, fltAllInstalled, fltComplete, fltMissingFiles
-    case fltHasRenders, fltNoRenders, fltMatches, fltReset, pickDate, fltShowAll, fltShowFewer
+    case fltHasRenders, fltNoRenders, fltMatchesProjects, fltMatchesProject1, fltMatchesSets, fltMatchesSet1, fltReset, pickDate, fltShowAll, fltShowFewer
+    case calendarPrevious, calendarNext, calendarToday
     // Tags and notes
     case tagsTitle, tagsLabel, noteLabel, notePlaceholder, tagCue, removeTag, addTag, save, appliesToProject, setGone
+    case notesUnreadable, notesWriteFailed
     // Folders
     case rootsTitle, rootsProjectsTab, rootsSamplesTab, rootsHint, rootsSamplesHint
     case rootsEmpty, rootsSamplesEmpty, rootsDropHint, rootsDropRelease, rootsFromLive, rootsProjectsMark
-    case rootsScan, rootsNotFolders, rootOffHelp, rootRemoveHelp, rootSetCount, rootSampleCount
+    case rootsScan, rootsNotFolders, rootsNotFoldersOne, rootOffHelp, rootRemoveHelp, rootSetCount, rootSetCountOne
+    case rootSampleCount, rootSampleCountOne
     case rootNoAccess, rootNested
 
     var en: String { text.en }
@@ -53,6 +57,8 @@ enum SetsStrings: LocalizedStrings {
 
         case .moreVersions: return ("+%lld", "+%lld")
         case .moreVersionsHelp: return ("%lld more versions of this project", "このプロジェクトの他のバージョン %lld 件")
+        case .moreVersionsHelpOne: return ("1 more version of this project", "このプロジェクトの他のバージョン 1 件")
+        case .copyPath: return ("Copy path", "パスをコピー")
         case .pin: return ("Pin", "ピン留め")
         case .unpin: return ("Unpin", "ピン留めを解除")
         case .pinHelp: return ("Pin this set", "このセットをピン留め")
@@ -68,6 +74,8 @@ enum SetsStrings: LocalizedStrings {
         case .unreadable: return ("unreadable", "読み込めません")
         case .noMatchesTitle: return ("No sets match", "一致するセットがありません")
         case .shownSummary: return ("%1$lld projects · %2$lld sets", "%1$lld プロジェクト・%2$lld セット")
+        case .shownSummaryOneProject: return ("1 project · %lld sets", "1 プロジェクト・%lld セット")
+        case .shownSummaryOne: return ("1 project · 1 set", "1 プロジェクト・1 セット")
         case .noMatchesBody: return ("Nothing passes the search and the filters.", "検索とフィルターに一致するセットはありません。")
 
         case .detailEmptyTitle: return ("No set selected", "セットが選択されていません")
@@ -78,11 +86,16 @@ enum SetsStrings: LocalizedStrings {
         case .noteHeading: return ("Note:", "メモ:")
         case .versionsHeading: return ("Versions (%lld):", "バージョン (%lld):")
         case .filesHeading: return ("Files:", "ファイル:")
-        case .fileCount: return ("%lld files", "%lld 個のファイル")
         case .missingCount: return ("%lld missing", "%lld 個が見つかりません")
         case .notInstalledCount: return ("%lld not installed", "%lld 個が未インストール")
         case .sampleFoldersHeading: return ("Sample folders (%lld):", "サンプルフォルダ (%lld):")
         case .pluginsHeading: return ("Plugins (%lld):", "プラグイン (%lld):")
+        case .copyPluginList: return ("copy list", "リストをコピー")
+        case .copyPluginListHelp: return ("Copy this set's plugins as text: name, version, format and developer, installed ones first",
+                                          "このセットのプラグインを、名前・バージョン・フォーマット・メーカーのテキストでコピー（インストール済みが先）")
+        case .pluginListCopied: return ("Plugin list copied", "プラグインのリストをコピーしました")
+        case .pluginListInstalled: return ("Installed:", "インストール済み:")
+        case .pluginListMissing: return ("Missing:", "未インストール:")
         case .onlyLiveDevices: return ("only Live's own devices", "Live 標準のデバイスのみ")
         case .otherFormat: return ("other format", "別の形式")
         case .showPluginHelp: return ("Show %@ in the Plugins tab", "%@ をプラグインタブで表示")
@@ -92,6 +105,9 @@ enum SetsStrings: LocalizedStrings {
         case .moreItems: return ("… %lld more", "… ほか %lld 件")
 
         case .readyNow: return ("Ready to open", "今すぐ開ける")
+        // The toggle's count is a number of sets (Home's bar counts projects).
+        case .readyNowCountOne: return ("%lld set", "%lld セット")
+        case .readyNowCount: return ("%lld sets", "%lld セット")
         case .readyNowHelp: return ("Only sets that open as saved right now: every file found, every plugin installed, no drive missing",
                                     "保存したとおりに今すぐ開けるセットだけを表示（ファイルがすべてあり、プラグインがすべてインストール済みで、未接続のドライブがない）")
         case .statusHeading: return ("Status:", "状態:")
@@ -138,12 +154,17 @@ enum SetsStrings: LocalizedStrings {
         case .fltMissingFiles: return ("missing files", "見つからないファイル")
         case .fltHasRenders: return ("has renders", "レンダーあり")
         case .fltNoRenders: return ("no renders", "レンダーなし")
-        case .fltMatches: return ("%1$lld of %2$lld sets match (every saved version counts)",
-                                  "%2$lld 個のセット中 %1$lld 個が一致（保存されたすべてのバージョンを数えます）")
+        case .fltMatchesProjects: return ("%lld projects match", "%lld 件のプロジェクトが一致")
+        case .fltMatchesProject1: return ("1 project matches", "1 件のプロジェクトが一致")
+        case .fltMatchesSets: return ("%lld sets match", "%lld 件のセットが一致")
+        case .fltMatchesSet1: return ("1 set matches", "1 件のセットが一致")
         case .fltReset: return ("Reset", "リセット")
         case .fltShowAll: return ("Show all %lld", "すべて表示（%lld）")
         case .fltShowFewer: return ("Show fewer", "折りたたむ")
         case .pickDate: return ("Pick a date", "日付を選択")
+        case .calendarPrevious: return ("Previous month", "前の月")
+        case .calendarNext: return ("Next month", "次の月")
+        case .calendarToday: return ("Today: %@", "今日: %@")
 
         case .tagsTitle: return ("Tags and Notes", "タグとメモ")
         case .tagsLabel: return ("Tags", "タグ")
@@ -155,6 +176,12 @@ enum SetsStrings: LocalizedStrings {
         case .save: return ("Save", "保存")
         case .appliesToProject: return ("Applies to the whole project folder “%@”", "プロジェクトフォルダ「%@」全体に適用されます")
         case .setGone: return ("This set is no longer in the catalog.", "このセットはカタログにありません。")
+        case .notesUnreadable:
+            return ("Couldn't save: notes.cfg can't be read right now. Your text is kept.",
+                    "保存できません：notes.cfg を今読み込めません。入力した内容はそのまま残っています。")
+        case .notesWriteFailed:
+            return ("Couldn't save notes.cfg. Your text is kept.",
+                    "notes.cfg を保存できませんでした。入力した内容はそのまま残っています。")
 
         case .rootsTitle: return ("Where to look", "探す場所")
         case .rootsProjectsTab: return ("Projects", "プロジェクト")
@@ -171,10 +198,13 @@ enum SetsStrings: LocalizedStrings {
         case .rootsProjectsMark: return ("%@ (projects)", "%@（プロジェクト）")
         case .rootsScan: return ("Scan", "スキャン")
         case .rootsNotFolders: return ("%lld items were not folders", "フォルダではない項目が %lld 件ありました")
+        case .rootsNotFoldersOne: return ("1 item was not a folder", "フォルダではない項目が 1 件ありました")
         case .rootOffHelp: return ("Include this folder when scanning", "スキャンにこのフォルダを含める")
         case .rootRemoveHelp: return ("Remove this folder from the list", "このフォルダをリストから削除")
         case .rootSetCount: return ("%lld sets", "%lld セット")
+        case .rootSetCountOne: return ("1 set", "1 セット")
         case .rootSampleCount: return ("%lld samples", "%lld サンプル")
+        case .rootSampleCountOne: return ("1 sample", "1 サンプル")
         case .rootNoAccess: return ("no access", "アクセスできません")
         case .rootNested: return ("inside another folder", "他のフォルダ内")
         }

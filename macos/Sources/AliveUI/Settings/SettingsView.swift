@@ -1,5 +1,5 @@
-// Port of src/SettingsDialog.cs, reduced to the Mac settings: language, transparency, plugin
-// source, data folder. Update controls come from `UpdatesSection` (S5).
+// Port of src/SettingsDialog.cs, reduced to the Mac settings: language, appearance (interface
+// scale, transparency), plugin source, data folder. Update controls come from `UpdatesSection` (S5).
 import SwiftUI
 import AliveCore
 
@@ -19,7 +19,7 @@ struct SettingsView: View {
                 .tabItem { Label(SettingsStrings.tabAbout.s, systemImage: "info.circle") }
                 .tag(Pane.about)
         }
-        .frame(width: 540, height: 680)
+        .frame(width: Theme.s(540), height: Theme.s(680))
     }
 }
 
@@ -36,6 +36,17 @@ private struct GeneralSettingsView: View {
                     }
                 }
                 Text(SettingsStrings.languageNote.s)
+                    .font(Theme.fSmall).foregroundStyle(Theme.secondaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Section(SettingsStrings.appearance.s) {
+                Picker(SettingsStrings.interfaceScale.s, selection: $prefs.uiScale) {
+                    ForEach(AppSettings.uiScales, id: \.self) { percent in
+                        Text(SettingsStrings.scalePercent.f(percent)).tag(percent)
+                    }
+                }
+                .pickerStyle(.segmented)
+                Text(SettingsStrings.interfaceScaleHelp.s)
                     .font(Theme.fSmall).foregroundStyle(Theme.secondaryText)
                     .fixedSize(horizontal: false, vertical: true)
                 Toggle(SettingsStrings.transparency.s, isOn: $prefs.transparency)

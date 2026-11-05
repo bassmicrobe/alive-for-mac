@@ -20,6 +20,8 @@ final class PluginsModel {
     var selectedID: String?
     /// Set by `show(pluginNamed:)`; the list scrolls to it once it exists and clears it.
     var pendingScrollID: String?
+    /// Bumped by `focusList()`; the list takes the keyboard when it changes.
+    private(set) var listFocusRequest = 0
 
     /// The last finished snapshot, published once per catalog revision (see `current`).
     private(set) var snapshot: Snapshot?
@@ -140,7 +142,7 @@ final class PluginsModel {
                           query: app.searchText, card: card, filter: filter,
                           sortColumn: sortColumn, sortAscending: sortAscending)
         if let rowsMemo, rowsMemo.key == key { return rowsMemo.rows }
-        let words = SetSearch.words(in: key.query)
+        let words = PluginRow.words(in: key.query)
         var list = snapshot.table.rows.filter { row in
             (card?.passes(row.stat) ?? true) && filter.matches(row.stat) && row.matches(search: words)
         }
@@ -201,6 +203,22 @@ final class PluginsModel {
         }
         selectedID = list[target].id
         pendingScrollID = selectedID
+    }
+
+    /// Down from the search field: on into the list. The first row is picked if none is shown
+    /// selected, and a picked one stays (a6c8dc1).
+    func focusList() {
+        if !rows.contains(where: { $0.id == selectedID }) { moveSelection(by: nil) }
+        listFocusRequest += 1
+    }
+
+    /// Space on the Plugins tab pauses (or resumes) what the player has loaded; with nothing loaded
+    /// the key is left alone (0bb4915). True when the key was used.
+    @discardableResult
+    func togglePlayerIfLoaded() -> Bool {
+        guard app.player.setPath != nil || app.player.isPlaying else { return false }
+        app.player.togglePlayPause()
+        return true
     }
 
     /// Opens the Plugins tab on one plugin (from a set's plugin list in the Sets inspector).

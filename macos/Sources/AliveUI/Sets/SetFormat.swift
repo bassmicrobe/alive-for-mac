@@ -27,6 +27,50 @@ enum SetFormat {
         return SetFilter.formatDate(date, calendar: calendar)
     }
 
+    /// How many of `versions` were saved on each calendar day (the key is the start of the day).
+    static func dayCounts(of versions: [SetEntry], calendar: Calendar = .current) -> [Date: Int] {
+        var counts: [Date: Int] = [:]
+        for v in versions { counts[calendar.startOfDay(for: v.modified), default: 0] += 1 }
+        return counts
+    }
+
+    /// A version's date in the Versions block, with the time when another version of the folder was
+    /// saved the same day: two equal dates told nothing apart (9ce4b4b). `version` is one of the
+    /// `all` that `dayCounts` counted.
+    static func versionStamp(_ version: SetEntry, among all: [SetEntry], calendar: Calendar = .current) -> String {
+        versionStamp(version, dayCounts: dayCounts(of: all, calendar: calendar), calendar: calendar)
+    }
+
+    /// The same with the per-day counts made once for the whole block, not once per row.
+    static func versionStamp(_ version: SetEntry, dayCounts: [Date: Int], calendar: Calendar = .current) -> String {
+        let date = day(version.modified, calendar: calendar)
+        guard !date.isEmpty, dayCounts[calendar.startOfDay(for: version.modified), default: 0] > 1 else { return date }
+        let time = calendar.dateComponents([.hour, .minute], from: version.modified)
+        return date + String(format: " %02d:%02d", time.hour ?? 0, time.minute ?? 0)
+    }
+
+    /// "1 set" / "3 sets": English needs the singular form, Japanese carries the same text in both.
+    static func plural(_ n: Int, one: SetsStrings, many: SetsStrings) -> String {
+        (n == 1 ? one : many).f(n)
+    }
+
+    /// The "Ready to open" toggle's count: "1 set", "24 sets".
+    static func readyCount(_ n: Int) -> String { plural(n, one: .readyNowCountOne, many: .readyNowCount) }
+
+    /// The toolbar's "553 projects · 754 sets", with the singular forms ("1 project · 1 set").
+    static func shownSummary(projects: Int, sets: Int) -> String {
+        if sets == 1 { return SetsStrings.shownSummaryOne.s }
+        if projects == 1 { return SetsStrings.shownSummaryOneProject.f(sets) }
+        return SetsStrings.shownSummary.f(projects, sets)
+    }
+
+    /// The Filters window's counter: the number of rows the list shows (search applied, one row per
+    /// project when versions are folded), so the two never disagree (9ce4b4b).
+    static func matches(_ count: Int, perProject: Bool) -> String {
+        perProject ? plural(count, one: .fltMatchesProject1, many: .fltMatchesProjects)
+                   : plural(count, one: .fltMatchesSet1, many: .fltMatchesSets)
+    }
+
     /// Names (and paths) from real libraries often start with a space; shown as they are, that
     /// looks like broken layout. Display only: the exact text goes into help and file operations.
     static func displayName(_ text: String) -> String {

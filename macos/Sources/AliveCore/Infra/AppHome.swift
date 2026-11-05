@@ -44,19 +44,29 @@ public enum AppHome {
         case missing
         case lines([String])
         /// Not UTF-8 (a hand edit, or the Windows app's ANSI file): decoded with a fallback
-        /// encoding, and the original was copied to `<file>.bak` first.
+        /// encoding, and the original was copied to `<file>.orig` first.
         case recovered([String])
         /// There is a file, but its content cannot be read as text: it was copied to
-        /// `<file>.bak` (when possible) and the caller starts from empty.
+        /// `<file>.orig` (when possible) and the caller starts from empty.
         case unreadable
+        /// There is a file, but the system would not hand over its bytes (no permission, an I/O
+        /// error). Nothing is known about what it holds, so a store that rewrites it must not
+        /// save over it (see `readStore`).
+        case inaccessible
+    }
+
+    /// A data file that was found unreadable (or not UTF-8) and the name its original was kept under.
+    public struct BackupNotice: Equatable, Sendable {
+        public var file: String
+        public var copy: String
     }
 
     private static let noticeGate = NSLock()
-    private static var backupNotices: [String] = []
+    private static var backupNotices: [BackupNotice] = []
 
-    /// File names that were found unreadable (or not UTF-8) and backed up since the last call;
+    /// Files that were found unreadable (or not UTF-8) and copied aside since the last call;
     /// the UI tells the user once.
-    public static func takeBackupNotices() -> [String] {
+    public static func takeBackupNotices() -> [BackupNotice] {
         noticeGate.lock(); defer { noticeGate.unlock() }
         defer { backupNotices = [] }
         return backupNotices
@@ -65,16 +75,26 @@ public enum AppHome {
     /// Reads a text file as lines (handles \r\n and a UTF-8 or UTF-16 byte order mark).
     /// A missing file and an unreadable one are different things: the stores rewrite their file
     /// on the next change, and an unreadable file must not be silently replaced by an empty
-    /// one — it is backed up (`<file>.bak`, never over an earlier backup) before that can happen.
+    /// one — it is copied aside (`<file>.orig`, never over an earlier copy) before that can happen.
     public static func readConfig(_ path: String) -> ConfigRead {
         let name = (path as NSString).lastPathComponent
-        guard FileManager.default.fileExists(atPath: path) else { return .missing }
-        guard let data = FileManager.default.contents(atPath: path) else {
-            Diag.warn("\(name) exists but cannot be read")
-            noteBackup(path)
-            return .unreadable
+        // The read itself says why it failed: `fileExists` is false for "no such file" and for "could
+        // not be determined" alike (a data folder that denies traversal for a moment), and a store
+        // that took the second for the first would start empty and later save over the real file.
+        let data: Data
+        do {
+            data = try Data(contentsOf: URL(fileURLWithPath: path))
+        } catch {
+            if isAbsent(error) { return .missing }
+            // No copy can be made of bytes the system will not hand over, so there is nothing
+            // to announce as "backed up".
+            Diag.warn("\(name) exists but cannot be read: \(error.localizedDescription)")
+            return .inaccessible
         }
-        if data.isEmpty { return .lines([]) }
+        if data.isEmpty {
+            Diag.info("\(name) is empty")
+            return .lines([])
+        }
         if let text = decodeUTF8(data) { return .lines(splitLines(text)) }
         if let text = decodeUTF16(data) { return .lines(splitLines(text)) }
         if data.contains(0) {
@@ -89,11 +109,41 @@ public enum AppHome {
         return .recovered(splitLines(text))
     }
 
+    /// Whether a read failed because there is no such file (ENOENT) — the only failure that means
+    /// "an ordinary first run". Permission and I/O errors are not absence.
+    static func isAbsent(_ error: Error) -> Bool {
+        let ns = error as NSError
+        if ns.domain == NSPOSIXErrorDomain { return ns.code == Int(ENOENT) }
+        if ns.domain == NSCocoaErrorDomain,
+           ns.code == CocoaError.fileReadNoSuchFile.rawValue || ns.code == CocoaError.fileNoSuchFile.rawValue {
+            return true
+        }
+        if let underlying = ns.userInfo[NSUnderlyingErrorKey] as? NSError { return isAbsent(underlying) }
+        return false
+    }
+
     /// Lines of a text file; nil when missing or unreadable (see `readConfig`).
     public static func readLines(_ path: String) -> [String]? {
         switch readConfig(path) {
         case .lines(let l), .recovered(let l): return l
-        case .missing, .unreadable: return nil
+        case .missing, .unreadable, .inaccessible: return nil
+        }
+    }
+
+    /// The lines of a data file for a store that rewrites that file (settings, notes, pins,
+    /// previews). `isUnread` is set when the file is there but could not be read at all: this
+    /// copy then holds defaults, and saving them would put them in place of everything on disk,
+    /// so the store saves nothing until the next start reads the file (upstream `_unread`,
+    /// 9ce4b4b). A file that is read but is not text is different: it was backed up by
+    /// `readConfig` and the store starts empty — overwriting it is the way out, a flag that
+    /// never clears would leave the person unable to save anything.
+    public static func readStore(_ path: String) -> (lines: [String], isUnread: Bool) {
+        switch readConfig(path) {
+        case .lines(let l), .recovered(let l): return (l, false)
+        case .missing, .unreadable: return ([], false)
+        case .inaccessible:
+            Diag.warn("\((path as NSString).lastPathComponent): not read, so nothing will be saved over it")
+            return ([], true)
         }
     }
 
@@ -115,23 +165,31 @@ public enum AppHome {
         text.components(separatedBy: "\n").map { $0.hasSuffix("\r") ? String($0.dropLast()) : $0 }
     }
 
-    /// Copies `path` to the first free `<path>.bak`, `.bak2`, … and remembers the file name.
+    /// Copies `path` to the first free `<path>.orig`, `.orig2`, … and remembers the names. Not `.bak`:
+    /// that one is the writer's own previous version (`writeKeepingBackup`) and is replaced at every
+    /// save, so the only copy of a Shift-JIS file from the Windows app would be gone after two saves.
     private static func noteBackup(_ path: String) {
         let fm = FileManager.default
         let name = (path as NSString).lastPathComponent
-        var target = path + ".bak"
+        var target = path + ".orig"
         var n = 2
-        while fm.fileExists(atPath: target), n < 10 {
-            if fm.contentsEqual(atPath: path, andPath: target) { return }    // already backed up
-            target = path + ".bak\(n)"; n += 1
+        while fm.fileExists(atPath: target) {
+            if fm.contentsEqual(atPath: path, andPath: target) { return }    // already copied
+            guard n < 10 else {
+                Diag.warn("\(name): no free name for a copy of the original (.orig … .orig9 are taken)")
+                return
+            }
+            target = path + ".orig\(n)"; n += 1
         }
+        let copy = (target as NSString).lastPathComponent
         do {
-            if !fm.fileExists(atPath: target) { try fm.copyItem(atPath: path, toPath: target) }
-            Diag.info("backed up \(name) to \((target as NSString).lastPathComponent)")
+            try fm.copyItem(atPath: path, toPath: target)
+            Diag.info("kept the original \(name) as \(copy)")
         } catch {
             Diag.fail("back up \(name)", error)
+            return
         }
         noticeGate.lock(); defer { noticeGate.unlock() }
-        if !backupNotices.contains(name) { backupNotices.append(name) }
+        if !backupNotices.contains(where: { $0.file == name }) { backupNotices.append(BackupNotice(file: name, copy: copy)) }
     }
 }

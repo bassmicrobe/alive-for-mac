@@ -27,6 +27,7 @@ namespace AbletonManager
 
         readonly PillToggle _compat = new PillToggle();
         readonly PillToggle _smooth = new PillToggle();
+        readonly Segmented _scale = new Segmented();
 
         readonly Segmented _source = new Segmented();
         readonly DropField _install = new DropField();
@@ -44,9 +45,9 @@ namespace AbletonManager
         readonly PillToggle _autoUpdate = new PillToggle();
         readonly GlassButton _restart = new GlassButton();
 
-        /// <summary>The transparency toggle was touched — we offer a restart. This used to be
-        /// asked by a system MessageBox: a foreign style over a glass window, and a mandatory
-        /// answer to an accidental click on top of that.</summary>
+        /// <summary>The transparency toggle or the scale was touched — we offer a restart. This
+        /// used to be asked by a system MessageBox: a foreign style over a glass window, and a
+        /// mandatory answer to an accidental click on top of that.</summary>
         bool _restartPending;
 
         /// <summary>Rebuild the catalog: the plugin settings changed.</summary>
@@ -92,6 +93,20 @@ namespace AbletonManager
             _compat.CheckedChanged += delegate { ToggleCompat(); };
             State(_compat);
 
+            string[] scales = new string[Settings.UiScales.Length];
+            for (int i = 0; i < scales.Length; i++) scales[i] = Settings.UiScales[i] + "%";
+            _scale.SetItems(scales);
+            _scale.SelectedIndex = Math.Max(0, Array.IndexOf(Settings.UiScales, _s.UiScale));
+            _scale.SelectedChanged += delegate
+            {
+                _s.UiScale = Settings.UiScales[_scale.SelectedIndex];
+                _s.Save();
+                CheckRestart();
+                Relayout();
+            };
+            _body.Controls.Add(_scale);
+            CheckRestart();
+
             _source.SetItems("Live's database", "Scan folders");
             _source.SelectedIndex = _s.PluginsFromFolders ? 1 : 0;
             _source.SelectedChanged += delegate
@@ -127,12 +142,12 @@ namespace AbletonManager
 
             Browse(_vst2Browse, delegate
             {
-                string p = Pick("VST2 plug-in folder", _s.Vst2CustomPath);
+                string p = Pick("VST2 plugin folder", _s.Vst2CustomPath);
                 if (p != null) { _s.Vst2CustomPath = p; _s.Vst2CustomOn = true; _vst2On.Checked = true; }
             });
             Browse(_vst3Browse, delegate
             {
-                string p = Pick("VST3 plug-in folder", _s.Vst3CustomPath);
+                string p = Pick("VST3 plugin folder", _s.Vst3CustomPath);
                 if (p != null) { _s.Vst3CustomPath = p; _s.Vst3CustomOn = true; _vst3On.Checked = true; }
             });
 
@@ -236,14 +251,23 @@ namespace AbletonManager
         {
             _s.DisableGlass = !_compat.Checked;
             _s.Save();
-
-            // The offer to restart lives as a line in this same window: an accidentally clicked
-            // toggle must not demand an answer in a foreign dialog. The line is visible only
-            // while the setting disagrees with the current session (DisableGlass and
-            // Glass.Enabled are of opposite polarity, hence the == comparison): put the toggle
-            // back and there is nothing to restart for, and the line goes.
-            _restartPending = Glass.Supported() && _s.DisableGlass == Glass.Enabled;
+            CheckRestart();
             Relayout();
+        }
+
+        /// <summary>
+        /// The offer to restart lives as a line in this same window: an accidentally clicked
+        /// toggle must not demand an answer in a foreign dialog. The line is visible only while
+        /// the settings disagree with the current session (DisableGlass and Glass.Enabled are of
+        /// opposite polarity, hence the == comparison; the scale against the Theme.Zoom this
+        /// session started with): put them back and there is nothing to restart for, and the
+        /// line goes.
+        /// </summary>
+        void CheckRestart()
+        {
+            bool glass = Glass.Supported() && _s.DisableGlass == Glass.Enabled;
+            bool scale = _s.UiScale != (int)Math.Round(Theme.Zoom * 100f);
+            _restartPending = glass || scale;
         }
 
         // ------------------------------------------------------------------ state
@@ -335,7 +359,7 @@ namespace AbletonManager
                       : "";
                 string text = inv.All.Count == 0
                     ? (inv.Error ?? "nothing found")
-                    : inv.All.Count + " plug-ins"
+                    : Chrome.Plural(inv.All.Count, "plugin")
                       + (where.Length > 0 ? "   ·   " + where : "");
                 try
                 {
@@ -485,6 +509,9 @@ namespace AbletonManager
 
             Separator(x, ref y, w);
             Section(x, ref y, w, "Appearance");
+            Line(x, ref y, w, h, _scale,
+                 "Interface scale",
+                 "Text and controls, on top of the Windows scale. Applies after restart.");
             Line(x, ref y, w, h, _smooth,
                  "Smooth scrolling",
                  "");
@@ -503,9 +530,9 @@ namespace AbletonManager
             }
 
             Separator(x, ref y, w);
-            Section(x, ref y, w, "Plug-ins");
+            Section(x, ref y, w, "Plugins");
             Line(x, ref y, w, h, _source,
-                 "Plug-in source",
+                 "Plugin source",
                  Folders
                  ? "Direct folder scan (VST2 / VST3 files)."
                  : "Uses internal database from installed Live versions.");

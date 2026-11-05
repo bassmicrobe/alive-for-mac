@@ -20,6 +20,9 @@ struct SetsPipeline {
         var pinnedFirst = false
         var pins: Set<String> = []
         var tagsOf: (String) -> [String] = { _ in [] }
+        var noteOf: (String) -> String = { _ in "" }
+        /// The folded search texts kept between keystrokes (validated by the caller); nil: folded on the spot.
+        var haystacks: SearchHaystacks?
         /// Whether the installed-plugin list could be read. When it could not, "missing" is not a
         /// fact but an unknown, so the missing/installed conditions are left out.
         var pluginsKnown = true
@@ -40,12 +43,20 @@ struct SetsPipeline {
     }
 
     static func make(_ input: Input) -> SetsPipeline {
-        let words = SetSearch.words(in: input.query)
+        let query = input.query.trimmingCharacters(in: .whitespacesAndNewlines)
         // Filter first and only then fold (a query for a name only an older version carries still
-        // finds it).
+        // finds it). The search is the catalog's one rule, `SetFilter.matchesSearch`: Home asks the
+        // same, so a search shows the same projects on both tabs (9ce4b4b).
         let filter = effectiveFilter(input.filter, pluginsKnown: input.pluginsKnown)
+        let search = SearchQuery(query)
         var matched = input.sets.filter { set in
-            filter.matches(set, tagsOf: input.tagsOf, statusOf: input.statusOf) && (words.isEmpty || SetSearch.matches(set, query: input.query))
+            guard filter.matches(set, tagsOf: input.tagsOf, statusOf: input.statusOf) else { return false }
+            guard let search else { return true }
+            guard let haystacks = input.haystacks else {
+                return SetFilter.matchesSearch(set, query: query, tagsOf: input.tagsOf, noteOf: input.noteOf)
+            }
+            return SetFilter.matchesSearch(set, query: search, haystacks: haystacks,
+                                           tagsOf: input.tagsOf, noteOf: input.noteOf)
         }
         var out = SetsPipeline()
         if input.groupByFolder {
@@ -101,6 +112,20 @@ struct SetsPipeline {
     /// (filtered out, or folded under a row that is not open).
     func rowIndex(of path: String, expanded: Set<String>) -> Int? {
         flattened(expanded: expanded).firstIndex { $0.path == path }
+    }
+
+    /// Home / End: the first or last row the table shows.
+    func edge(first: Bool, expanded: Set<String>) -> SetEntry? {
+        let rows = flattened(expanded: expanded)
+        return first ? rows.first : rows.last
+    }
+
+    /// Whether a row of the list is pinned: until then the header's star ("Pinned first") has
+    /// nothing to act on and stays hidden (0bb4915).
+    func hasPinnedRows(pins: Set<String>) -> Bool {
+        guard !pins.isEmpty else { return false }
+        let lower = Set(pins.map { $0.lowercased() })
+        return heads.contains { lower.contains($0.path.lowercased()) }
     }
 
     /// The head row that stands for `path` (the row itself, or the row it is folded under).

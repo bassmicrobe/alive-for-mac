@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -64,6 +64,11 @@ namespace AbletonManager
         Rectangle _waveRect;
         bool _waveHot;
 
+        // The preview's volume: a slider drawn right under the wave, scrolling with it.
+        Rectangle _volRect;
+        bool _volHot, _volDrag;
+        float _volume = 0.8f;
+
         int _scroll;
         int _contentHeight;
         float _scrollTarget, _scrollCurrent;
@@ -86,6 +91,14 @@ namespace AbletonManager
         readonly List<Rectangle> _pluginRowRects = new List<Rectangle>();
         readonly List<string> _pluginRowNames = new List<string>();
         int _pluginRowHot = -1;
+
+        Rectangle _plugHeadRect;
+        Rectangle _plugSectionRect;
+        Rectangle _copyPluginsRect;
+        bool _copyPluginsHot;
+        bool _pluginsSectionHot;
+
+        public event Action<string> StatusToastRequested;
 
         public ProjectIndex Index;
         public ArrangementLoader Loader;
@@ -137,10 +150,11 @@ namespace AbletonManager
             Surface = Theme.Backdrop;
 
             _action.Primary = true;
-            // The button lies on the panel's card rather than on the bare window — we repeat
-            // both layers.
-            _action.Surface = Theme.Backdrop;
-            _action.SurfaceOverlay = Theme.Surface;
+            // The button lies on the panel's card rather than on the bare window, so its corners
+            // are filled with the card's own fill. The window background with an opaque Surface
+            // over it matched the card only without glass: on glass the button stood in a solid
+            // grey rectangle.
+            _action.Surface = Theme.CardFill;
             _action.Click += delegate
             {
                 if (_mode != PanelMode.Set) { if (RevealRequested != null) RevealRequested(); }
@@ -163,6 +177,35 @@ namespace AbletonManager
         }
 
         int Pad { get { return Sc(Theme.PanelPad); } }
+
+        /// <summary>The sample preview's volume, 0..1 — the slider right under a sample's wave.
+        /// Set from outside quietly; moved by hand, it raises PreviewVolumeChanged.</summary>
+        public float PreviewVolume
+        {
+            get { return _volume; }
+            set { _volume = Math.Max(0f, Math.Min(1f, value)); Invalidate(_volRect); }
+        }
+
+        public event Action<float> PreviewVolumeChanged;
+
+        /// <summary>A press on an empty spot of the panel — nothing there to click. A playing
+        /// sample stops on it.</summary>
+        public event Action EmptyClicked;
+
+        void MoveVolume(float v)
+        {
+            v = Math.Max(0f, Math.Min(1f, v));
+            if (Math.Abs(v - _volume) < 0.001f) return;
+            _volume = v;
+            Invalidate(_volRect);
+            if (PreviewVolumeChanged != null) PreviewVolumeChanged(v);
+        }
+
+        void VolumeAt(int x)
+        {
+            Rectangle t = VolumeSlider.TrackOf(_volRect, Theme.Dpi);
+            MoveVolume((x - t.X) / (float)Math.Max(1, t.Width));
+        }
 
         static readonly TextFormatFlags PanelLeft =
             TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine |
@@ -464,11 +507,12 @@ namespace AbletonManager
             else
             {
                 // The order is that of the former column of pills: Collect All on top.
-                ToolStripMenuItem collect = new ToolStripMenuItem("Export");
+                ToolStripMenuItem collect = new ToolStripMenuItem("Export…");
+                collect.ShortcutKeyDisplayString = "Ctrl+E";
                 collect.Click += delegate { if (CollectRequested != null) CollectRequested(); };
                 m.Items.Add(collect);
 
-                ToolStripMenuItem rescue = new ToolStripMenuItem("Rescue Project");
+                ToolStripMenuItem rescue = new ToolStripMenuItem("Rescue project…");
                 rescue.ShortcutKeyDisplayString = "Ctrl+R";
                 rescue.Click += delegate { if (RescueRequested != null) RescueRequested(); };
                 m.Items.Add(rescue);
@@ -538,7 +582,14 @@ namespace AbletonManager
 
         protected override void OnMouseWheel(MouseEventArgs e)
         {
-            _scroller.OnMouseWheel(e.Delta, Sc(60));
+            // Over the volume the wheel turns it, in the player slider's steps of 5%.
+            if (!_volRect.IsEmpty && _volRect.Contains(e.Location))
+            {
+                int steps = e.Delta / 120;
+                if (steps == 0) steps = e.Delta > 0 ? 1 : -1;
+                MoveVolume((float)Math.Round((_volume + steps * 0.05f) / 0.05f) * 0.05f);
+            }
+            else _scroller.OnMouseWheel(e.Delta, Sc(60));
             base.OnMouseWheel(e);
         }
 
@@ -546,8 +597,15 @@ namespace AbletonManager
 
         protected override void OnMouseMove(MouseEventArgs e)
         {
-            UpdateHot(e.Location);
+            if (_volDrag) VolumeAt(e.X);
+            else UpdateHot(e.Location);
             base.OnMouseMove(e);
+        }
+
+        protected override void OnMouseUp(MouseEventArgs e)
+        {
+            if (_volDrag) { _volDrag = false; Invalidate(_volRect); }
+            base.OnMouseUp(e);
         }
 
         /// <summary>
@@ -584,16 +642,30 @@ namespace AbletonManager
                      && !_waveRect.IsEmpty && _waveRect.Contains(p);
 
             bool n = _set != null && _mode == PanelMode.Set && _notesRect.Contains(p);
+            bool vol = !_volRect.IsEmpty && _volRect.Contains(p);
             bool up = !_topRect.IsEmpty && _topRect.Contains(p);
-            if (up) { t = l = n = wave = false; rowHot = pluginRowHot = linkRowHot = chartHot = -1; }
+            if (up) { t = l = n = wave = vol = false; rowHot = pluginRowHot = linkRowHot = chartHot = -1; }
+
+            bool copyPluginsHot = false;
+            bool pluginsSectionHot = false;
+            if (_mode == PanelMode.Set && _set != null && _set.Plugins != null && _set.Plugins.Length > 0)
+            {
+                copyPluginsHot = !_copyPluginsRect.IsEmpty && _copyPluginsRect.Contains(p);
+                pluginsSectionHot = copyPluginsHot
+                    || (!_plugHeadRect.IsEmpty && _plugHeadRect.Contains(p))
+                    || pluginRowHot >= 0
+                    || (!_plugSectionRect.IsEmpty && _plugSectionRect.Contains(p));
+            }
 
             if (t != _thumbHot || l != _linkHot || n != _notesHot || up != _topHot || wave != _waveHot
+                || vol != _volHot
                 || rowHot != _setRowHot || pluginRowHot != _pluginRowHot || linkRowHot != _linkRowHot
-                || chartHot != _chartHot)
+                || chartHot != _chartHot || copyPluginsHot != _copyPluginsHot || pluginsSectionHot != _pluginsSectionHot)
             {
-                _thumbHot = t; _linkHot = l; _notesHot = n; _topHot = up; _waveHot = wave;
+                _thumbHot = t; _linkHot = l; _notesHot = n; _topHot = up; _waveHot = wave; _volHot = vol;
                 _setRowHot = rowHot; _pluginRowHot = pluginRowHot; _linkRowHot = linkRowHot; _chartHot = chartHot;
-                Cursor = (t || l || n || up || wave || rowHot >= 0 || pluginRowHot >= 0 || linkRowHot >= 0)
+                _copyPluginsHot = copyPluginsHot; _pluginsSectionHot = pluginsSectionHot;
+                Cursor = (t || l || n || up || wave || vol || rowHot >= 0 || pluginRowHot >= 0 || linkRowHot >= 0 || _copyPluginsHot)
                        ? Cursors.Hand : Cursors.Default;
                 Invalidate();
             }
@@ -601,14 +673,17 @@ namespace AbletonManager
 
         protected override void OnMouseLeave(EventArgs e)
         {
-            if (_thumbHot || _linkHot || _notesHot || _topHot || _waveHot
-                || _setRowHot >= 0 || _pluginRowHot >= 0 || _linkRowHot >= 0 || _chartHot >= 0)
+            if (_thumbHot || _linkHot || _notesHot || _topHot || _waveHot || _volHot
+                || _setRowHot >= 0 || _pluginRowHot >= 0 || _linkRowHot >= 0 || _chartHot >= 0
+                || _copyPluginsHot || _pluginsSectionHot)
             {
-                _thumbHot = _linkHot = _notesHot = _topHot = _waveHot = false;
+                _thumbHot = _linkHot = _notesHot = _topHot = _waveHot = _volHot = false;
                 _setRowHot = -1;
                 _pluginRowHot = -1;
                 _linkRowHot = -1;
                 _chartHot = -1;
+                _copyPluginsHot = false;
+                _pluginsSectionHot = false;
                 Cursor = Cursors.Default;
                 Invalidate();
             }
@@ -620,6 +695,17 @@ namespace AbletonManager
             if (e.Button == MouseButtons.Left)
             {
                 UpdateHot(e.Location);
+                if (_copyPluginsHot)
+                {
+                    CopyPluginsToClipboard();
+                    return;
+                }
+                if (_volHot)
+                {
+                    _volDrag = true;
+                    VolumeAt(e.X);
+                    return;
+                }
                 if (_topHot)
                 {
                     _scroll = 0;
@@ -659,6 +745,7 @@ namespace AbletonManager
                     WaveClicked(Math.Max(0f, Math.Min(1f, at)));
                     return;
                 }
+                if (EmptyClicked != null) EmptyClicked();
             }
             base.OnMouseDown(e);
         }
@@ -690,7 +777,8 @@ namespace AbletonManager
             int y = Pad - _scroll - over;
 
             // Every clickable rectangle is laid out anew by the paint below.
-            _thumbRect = _linkRect = _topRect = _waveRect = _chartRect = Rectangle.Empty;
+            _thumbRect = _linkRect = _topRect = _waveRect = _chartRect = _volRect = Rectangle.Empty;
+            _copyPluginsRect = _plugHeadRect = _plugSectionRect = Rectangle.Empty;
             _setRowRects.Clear();
             _setRowSets.Clear();
             _pluginRowRects.Clear();
@@ -729,7 +817,8 @@ namespace AbletonManager
             y = Line(g, "Files:", Theme.FLabel, Theme.TextDim, Pad, y, w) + Sc(8);
             if (!Below(y + Sc(28)))
             {
-                Chrome.DrawText(g, Chrome.Plural(_set.TotalRefs, "file"), Theme.FLabel,
+                // The number alone: "Files:" above already names it, and "78 files" said it twice.
+                Chrome.DrawText(g, _set.TotalRefs.ToString("N0", Inv), Theme.FLabel,
                     new Rectangle(Pad, y, w, Sc(28)), Theme.Text, PanelLeft);
                 // Colour only when things are bad. A green zero promised an event that is not
                 // there, and red among it stopped catching the eye.
@@ -759,14 +848,41 @@ namespace AbletonManager
 
             // Plugins — the count of missing ones opposite the heading, by the same device as
             // Files.
+            int plugSecY = y;
             Rectangle plugHead = new Rectangle(Pad, y, w, Sc(28));
+            _plugHeadRect = plugHead;
+            int missingW = 0;
             if (!Below(plugHead.Bottom))
             {
-                Chrome.DrawText(g, "Plugins" + " (" + _set.Plugins.Length + "):",
+                string plugTitle = "Plugins" + " (" + _set.Plugins.Length + "):";
+                Chrome.DrawText(g, plugTitle,
                                 Theme.FLabel, plugHead, Theme.TextDim, PanelLeft);
                 if (_set.MissingPlugins > 0)
-                    Chrome.DrawText(g, _set.MissingPlugins + " missing", Theme.FLabel,
+                {
+                    string missingText = _set.MissingPlugins + " missing";
+                    missingW = TextRenderer.MeasureText(missingText, Theme.FLabel).Width;
+                    Chrome.DrawText(g, missingText, Theme.FLabel,
                         plugHead, Theme.Red, PanelRight);
+                }
+
+                if (_set.Plugins.Length > 0)
+                {
+                    int titleW = TextRenderer.MeasureText(plugTitle, Theme.FLabel).Width;
+                    string btnText = "copy list";
+                    int btnW = TextRenderer.MeasureText(g, btnText, Theme.FLabel, new Size(w, plugHead.Height), PanelLeft).Width;
+                    int btnX = Pad + titleW + Sc(12);
+                    int maxRight = Pad + w - (_set.MissingPlugins > 0 ? missingW + Sc(12) : 0);
+                    if (btnX + btnW > maxRight) btnX = Math.Max(Pad, maxRight - btnW);
+                    _copyPluginsRect = new Rectangle(btnX, plugHead.Y, btnW, plugHead.Height);
+
+                    if (_pluginsSectionHot)
+                    {
+                        Color btnInk = _copyPluginsHot ? Color.White : Theme.TextDim;
+                        Chrome.DrawText(g, btnText, Theme.FLabel, _copyPluginsRect, btnInk, PanelLeft);
+                        if (_copyPluginsHot)
+                            Underline(g, btnText, Theme.FLabel, _copyPluginsRect, Color.White);
+                    }
+                }
             }
             y += Sc(28) + Sc(8);
 
@@ -816,6 +932,7 @@ namespace AbletonManager
                     else
                         y += Sc(28) * (_set.Plugins.Length - shown);
                 }
+                _plugSectionRect = new Rectangle(Pad, plugSecY, w, Math.Max(Sc(28), y - plugSecY));
             }
 
             _contentHeight = y + _scroll + over + Pad;
@@ -947,12 +1064,12 @@ namespace AbletonManager
                 Rectangle rr = new Rectangle(Pad, y, w, Sc(24));
 
                 Color c = current ? Theme.Text : Theme.TextDim;
-                Size ds = TextRenderer.MeasureText(g, v.Modified.ToLocalTime().ToString("yyyy-MM-dd"), Theme.FBadge, new Size(rr.Width, rr.Height), PanelRight);
+                string stamp = VersionStamp(v, all);
+                Size ds = TextRenderer.MeasureText(g, stamp, Theme.FBadge, new Size(rr.Width, rr.Height), PanelRight);
                 Chrome.DrawText(g, v.Name, Theme.FBadge,
                                 new Rectangle(rr.X, rr.Y, rr.Width - ds.Width - Sc(8), rr.Height),
                                 hot ? Color.White : c, PanelLeft);
-                Chrome.DrawText(g, v.Modified.ToLocalTime().ToString("yyyy-MM-dd"), Theme.FBadge,
-                                rr, Theme.TextDim, PanelRight);
+                Chrome.DrawText(g, stamp, Theme.FBadge, rr, Theme.TextDim, PanelRight);
 
                 // We do not underline the current one even under the cursor: there is no point
                 // clicking it.
@@ -963,6 +1080,17 @@ namespace AbletonManager
                 y += Sc(24);
             }
             return y + Sc(14);
+        }
+
+        /// <summary>A version's date in the Versions block, with the time when another version
+        /// of the folder was saved the same day — two equal dates told nothing apart.</summary>
+        internal static string VersionStamp(SetEntry v, List<SetEntry> all)
+        {
+            DateTime t = v.Modified.ToLocalTime();
+            foreach (SetEntry o in all)
+                if (!ReferenceEquals(o, v) && o.Modified.ToLocalTime().Date == t.Date)
+                    return t.ToString("yyyy-MM-dd HH:mm", Inv);
+            return t.ToString("yyyy-MM-dd", Inv);
         }
 
         /// <summary>
@@ -990,7 +1118,7 @@ namespace AbletonManager
             PluginStat p = _plugin;
             if (p == null)
             {
-                PaintEmpty(g, pad, w, "No plug-in selected", "Pick one to see where it is used");
+                PaintEmpty(g, pad, w, "No plugin selected", "Pick one to see where it is used");
                 return;
             }
             InstalledPlugin inst = p.Installed;
@@ -1145,7 +1273,7 @@ namespace AbletonManager
             SampleFile f = _sample;
             if (f == null)
             {
-                PaintEmpty(g, Pad, w, "No folder selected", "Pick a folder or a sample");
+                PaintEmpty(g, Pad, w, "No sample selected", "Pick a folder or a sample");
                 return;
             }
 
@@ -1156,8 +1284,17 @@ namespace AbletonManager
             string hint = !f.CanPreview ? "only Live plays this file"
                         : _wave == null ? "reading…"
                         : _wave.Ok ? "" : _wave.Note;
-            WaveView.PaintWave(g, _waveRect, _wave, _waveProgress, _wavePlaying, hint, DeviceDpi / 96f);
+            WaveView.PaintWave(g, _waveRect, _wave, _waveProgress, _wavePlaying, hint, Theme.Dpi);
             y = _waveRect.Bottom + Sc(16);
+
+            // How loud it previews, right under what is heard — at the bottom of the panel it
+            // was far from it. A file only Live plays has nothing to turn up.
+            if (f.CanPreview)
+            {
+                _volRect = new Rectangle(Pad, _waveRect.Bottom + Sc(4), w, Sc(30));
+                VolumeSlider.PaintSlider(g, _volRect, _volume, _volHot || _volDrag, Theme.SurfacePressed, Theme.Dpi);
+                y = _volRect.Bottom + Sc(10);
+            }
 
             y = PathLink(g, f.Path, y, w) + Sc(16);
 
@@ -1465,7 +1602,7 @@ namespace AbletonManager
                         _thumbRendering = true;
                         DropThumb();
                         Size sz = inner.Size;
-                        float dpi = DeviceDpi / 96f;
+                        float dpi = Theme.Dpi;
                         Arrangement arr = _arr;
                         System.Threading.ThreadPool.QueueUserWorkItem(_ =>
                         {
@@ -1477,10 +1614,20 @@ namespace AbletonManager
                             {
                                 BeginInvoke((MethodInvoker)delegate
                                 {
+                                    _thumbRendering = false;
+                                    // Another set was picked while this one was drawing (the
+                                    // arrows run through the list faster than a picture draws):
+                                    // the late picture is not this set's, and it went up under
+                                    // the new name. The repaint draws the set on show instead.
+                                    if (!ReferenceEquals(arr, _arr))
+                                    {
+                                        if (bmp != null) bmp.Dispose();
+                                        Invalidate(_thumbRect);
+                                        return;
+                                    }
                                     DropThumb();
                                     _thumb = bmp;
                                     _thumbSize = sz;
-                                    _thumbRendering = false;
                                     Invalidate(_thumbRect);
                                 });
                             }
@@ -1534,6 +1681,66 @@ namespace AbletonManager
             int vw = Math.Max(Sc(24), x + w - vx);
             Chrome.DrawText(g, value, Theme.FLabel, new Rectangle(vx, y, vw, h), valueColor, PanelRight);
             return y + h;
+        }
+
+        void CopyPluginsToClipboard()
+        {
+            if (_set == null || _set.Plugins == null || _set.Plugins.Length == 0) return;
+
+            List<string> installedLines = new List<string>();
+            List<string> missingLines = new List<string>();
+
+            for (int i = 0; i < _set.Plugins.Length; i++)
+            {
+                string name = _set.Plugins[i] ?? "";
+                string uid = (i < _set.PluginUids.Length && _set.PluginUids[i] != null) ? _set.PluginUids[i] : "";
+
+                PluginMatch match = default(PluginMatch);
+                if (Index != null && Index.Inventory != null)
+                {
+                    match = Index.Inventory.Match(uid, name);
+                }
+
+                string plugin_name = name;
+                string version = match.Plugin != null ? (match.Plugin.Version ?? "") : "";
+                string format = match.Plugin != null
+                    ? match.Plugin.Format
+                    : (uid.StartsWith("vst3", StringComparison.OrdinalIgnoreCase) ? "VST3"
+                       : uid.StartsWith("vst2", StringComparison.OrdinalIgnoreCase) ? "VST2"
+                       : uid.StartsWith("au", StringComparison.OrdinalIgnoreCase) ? "AU" : "");
+                string developer = (match.Plugin != null && !string.IsNullOrEmpty(match.Plugin.Vendor))
+                    ? match.Plugin.Vendor
+                    : (i < _set.PluginVendors.Length && _set.PluginVendors[i] != null ? _set.PluginVendors[i] : "");
+
+                string line = string.Format("{0}\t{1}\t{2}\t{3}", plugin_name, version, format, developer);
+                if (match.Found)
+                    installedLines.Add(line);
+                else
+                    missingLines.Add(line);
+            }
+
+            System.Text.StringBuilder sb = new System.Text.StringBuilder();
+            sb.AppendLine(_set.Name);
+            if (installedLines.Count > 0)
+            {
+                sb.AppendLine("Installed:");
+                foreach (string line in installedLines)
+                    sb.AppendLine(line);
+            }
+            if (missingLines.Count > 0)
+            {
+                sb.AppendLine("Missing:");
+                foreach (string line in missingLines)
+                    sb.AppendLine(line);
+            }
+
+            try
+            {
+                Clipboard.SetText(sb.ToString().TrimEnd());
+                if (StatusToastRequested != null)
+                    StatusToastRequested("Plugin list copied to clipboard");
+            }
+            catch { }
         }
 
         protected override void Dispose(bool disposing)

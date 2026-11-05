@@ -72,7 +72,7 @@ struct OverviewPanel: View {
     @State private var hovered: HeatmapCell?
     @State private var headerHover = false
 
-    private static let minContent: CGFloat = 560
+    private static var minContent: CGFloat { Theme.s(560) }
 
     /// The panel takes two thirds of the width: across the full width a card stretches into a
     /// six-to-one strip and the whole block reads as having come apart.
@@ -82,12 +82,12 @@ struct OverviewPanel: View {
 
     var body: some View {
         let open = app.settings.overviewOpen
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: Theme.s(14)) {
             header(open: open)
             if open {
                 let stats = app.home.overviewStats
-                OverviewColumn {
-                    VStack(alignment: .leading, spacing: 20) {
+                OverviewColumn(scale: ThemeScale.shared.factor) {
+                    VStack(alignment: .leading, spacing: Theme.s(20)) {
                         cards(stats)
                         ReadySetsCard(summary: app.home.readySummary) { app.home.showReadySets() }
                         ActivityHeatmap(grid: app.home.heatmap, hovered: $hovered)
@@ -103,10 +103,10 @@ struct OverviewPanel: View {
         Button {
             withAnimation(Theme.selectAnimation) { app.mutateSettings { $0.overviewOpen.toggle() } }
         } label: {
-            HStack(spacing: 10) {
+            HStack(spacing: Theme.s(10)) {
                 IconView(icon: .chevronDown, size: 10, weight: .semibold)
                     .rotationEffect(.degrees(open ? 0 : -90))
-                    .frame(width: 14)
+                    .frame(width: Theme.s(14))
                 Text(HomeStrings.overview.s).font(Theme.fHead)
             }
             .foregroundStyle(headerHover ? Theme.text : (open ? Theme.text : Theme.secondaryText))
@@ -118,7 +118,7 @@ struct OverviewPanel: View {
     }
 
     private func cards(_ s: OverviewStats) -> some View {
-        HStack(spacing: 8) {
+        HStack(spacing: Theme.s(8)) {
             StatCard(label: HomeStrings.activeDays.s, value: OverviewFormat.number(s.activeDays))
             StatCard(label: HomeStrings.streak.s,
                      value: s.streak > 0 ? OverviewFormat.days(s.streak) : HomeStrings.noStreak.s)
@@ -132,13 +132,17 @@ struct OverviewPanel: View {
              ?? OverviewFormat.footer(diskBytes: s.diskBytes))
             .font(Theme.fLabel)
             .foregroundStyle(Theme.secondaryText)
-            .frame(minHeight: 16, alignment: .leading)
+            .frame(minHeight: Theme.s(16), alignment: .leading)
             .lineLimit(1)
     }
 }
 
 /// Gives its child `OverviewPanel.contentWidth` of the proposed width (state-free, see `HeatmapFit`).
+/// `scale` is the interface scale the width was measured at: a new value makes SwiftUI lay the
+/// column out again, which a change of `ThemeScale` alone would not (a layout is not observed).
 struct OverviewColumn: Layout {
+    let scale: CGFloat
+
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
         let width = proposal.width ?? OverviewPanel.contentWidth(for: 800)
         let inner = subviews.first?.sizeThatFits(ProposedViewSize(width: OverviewPanel.contentWidth(for: width), height: nil)) ?? .zero
@@ -151,6 +155,13 @@ struct OverviewColumn: Layout {
     }
 }
 
+/// Sizes of the Overview's cards: the base values at 100 %, scaled.
+private enum CardMetric {
+    static var radius: CGFloat { Theme.s(10) }
+    static var padX: CGFloat { Theme.s(12) }
+    static var padY: CGFloat { Theme.s(7) }
+}
+
 /// A small grey caption over a large white number.
 private struct StatCard: View {
     let label: String
@@ -160,17 +171,18 @@ private struct StatCard: View {
         VStack(alignment: .leading, spacing: 0) {
             Text(label).font(Theme.fBadge).foregroundStyle(Theme.secondaryText).lineLimit(1)
             Text(value)
-                .font(.system(size: 15, weight: .semibold))
+                .font(Theme.fFigure)
                 .foregroundStyle(Theme.text)
                 .monospacedDigit()
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 7)
+        .padding(.horizontal, CardMetric.padX)
+        .padding(.vertical, CardMetric.padY)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(Theme.cardBorder, lineWidth: 1))
+        .background(Theme.surface, in: RoundedRectangle(cornerRadius: CardMetric.radius, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: CardMetric.radius, style: .continuous)
+            .strokeBorder(Theme.cardBorder, lineWidth: 1))
         .accessibilityElement(children: .combine)
     }
 }
@@ -183,27 +195,29 @@ private struct ReadySetsCard: View {
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 8) {
-                Image(systemName: "checkmark.circle").font(.system(size: 12, weight: .medium)).foregroundStyle(Theme.green)
+            HStack(spacing: Theme.s(8)) {
+                Image(systemName: "checkmark.circle").font(Theme.fGlyph(12)).foregroundStyle(Theme.green)
                 Text(HomeStrings.readySets.s).font(Theme.fLabel).foregroundStyle(Theme.secondaryText)
-                Spacer(minLength: 8)
-                Text("\(summary.ready) / \(summary.total)")
-                    .font(.system(size: 15, weight: .semibold)).foregroundStyle(Theme.text).monospacedDigit()
+                Spacer(minLength: Theme.s(8))
+                Text(HomeStrings.readyProjects(ready: summary.ready, total: summary.total))
+                    .font(Theme.fFigure).foregroundStyle(Theme.text).monospacedDigit()
                 IconView(icon: .chevronDown, size: 9, weight: .semibold)
                     .rotationEffect(.degrees(-90))
                     .foregroundStyle(hovering ? Theme.text : Theme.secondaryText)
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 7)
+            .padding(.horizontal, CardMetric.padX)
+            .padding(.vertical, CardMetric.padY)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(hovering ? Theme.surfaceHover : Theme.surface, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(Theme.cardBorder, lineWidth: 1))
+            .background(hovering ? Theme.surfaceHover : Theme.surface,
+                        in: RoundedRectangle(cornerRadius: CardMetric.radius, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: CardMetric.radius, style: .continuous)
+                .strokeBorder(Theme.cardBorder, lineWidth: 1))
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
         .animation(Theme.hoverAnimation, value: hovering)
         .help(HomeStrings.readySetsHelp.s)
-        .accessibilityValue("\(summary.ready) / \(summary.total)")
+        .accessibilityValue(HomeStrings.readyProjects(ready: summary.ready, total: summary.total))
     }
 }

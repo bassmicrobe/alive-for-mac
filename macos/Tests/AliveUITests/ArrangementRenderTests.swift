@@ -31,6 +31,9 @@ enum SyntheticArrangement {
 }
 
 final class ArrangementRenderTests: XCTestCase {
+    /// A track's height in points when every name must be legible (the old "taller tracks" preview).
+    private static let tallLane = 14.0
+
     private func pixels(_ image: CGImage) -> [UInt8] {
         var data = [UInt8](repeating: 0, count: image.width * image.height * 4)
         let ctx = CGContext(data: &data, width: image.width, height: image.height, bitsPerComponent: 8,
@@ -100,15 +103,15 @@ final class ArrangementRenderTests: XCTestCase {
         var lastClip = ClipBlock()
         lastClip.start = 0; lastClip.end = 16; lastClip.color = 14
         arrangement.tracks[399].clips = [lastClip]
-        let options = RenderOptions.preview(scale: 0.25, minLane: PreviewSizing.tallLane)
-        let logicalHeight = ArrangementRender.fullHeight(trackCount: 400, options: .preview(scale: 1, minLane: PreviewSizing.tallLane)) + 24
+        let options = RenderOptions.preview(scale: 0.25, minLane: Self.tallLane)
+        let logicalHeight = ArrangementRender.fullHeight(trackCount: 400, options: .preview(scale: 1, minLane: Self.tallLane)) + 24
         let image = try XCTUnwrap(ArrangementRender.makeImage(arrangement, width: 500,
                                  height: Int(Double(logicalHeight) * options.scale), options: options))
         let data = pixels(image)
         // Only the final track has a clip. Its centre must contain the clip's opaque fill,
         // rather than a ruler/grid pixel from a preview that silently cropped that track.
         let layout = ArrangementRender.layout(area: CGRect(x: 0, y: 0, width: 2000, height: logicalHeight),
-                                             trackCount: 400, options: .preview(scale: 1, minLane: PreviewSizing.tallLane))
+                                             trackCount: 400, options: .preview(scale: 1, minLane: Self.tallLane))
         let lastY = Int(Double(layout.top + 399 * (layout.laneH + layout.gap) + layout.laneH / 2) * options.scale)
         let p = pixel(data, image, 250, lastY)
         XCTAssertEqual(p.a, 0xEE, accuracy: 2)

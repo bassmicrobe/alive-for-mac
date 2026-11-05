@@ -115,6 +115,8 @@ public final class PreviewPins: @unchecked Sendable {
     private let dir: String
     private let lock = NSLock()
     private var map: [String: Pin]?     // keyed case-insensitively; the file keeps the original root
+    /// previews.cfg is there but could not be read: nothing is saved over it until a read works (see `AppHome.readStore`).
+    private var unread = false
 
     public init(dir: String) { self.dir = dir }
 
@@ -122,14 +124,39 @@ public final class PreviewPins: @unchecked Sendable {
 
     private func loaded() -> [String: Pin] {
         if let m = map { return m }
-        var m: [String: Pin] = [:]
-        for line in AppHome.readLines(filePath) ?? [] {
-            guard let tab = line.firstIndex(of: "\t"), tab != line.startIndex else { continue }
-            let root = String(line[..<tab])
-            m[Self.key(root)] = Pin(root: root, file: String(line[line.index(after: tab)...]))
-        }
+        let read = AppHome.readStore(filePath)
+        unread = read.isUnread
+        let m = Self.parse(read.lines)
         map = m
         return m
+    }
+
+    private static func parse(_ lines: [String]) -> [String: Pin] {
+        var m: [String: Pin] = [:]
+        for line in lines {
+            guard let tab = line.firstIndex(of: "\t"), tab != line.startIndex else { continue }
+            let root = String(line[..<tab])
+            m[key(root)] = Pin(root: root, file: String(line[line.index(after: tab)...]))
+        }
+        return m
+    }
+
+    /// The pins to change: when the file could not be read at start, it is read again first, and
+    /// if that works the change goes on top of what the file holds. Lock held.
+    private func loadedForEdit() -> [String: Pin] {
+        let m = loaded()
+        guard unread else { return m }
+        let read = AppHome.readStore(filePath)
+        guard !read.isUnread else { return m }
+        unread = false
+        return Self.parse(read.lines)
+    }
+
+    /// The file could not be read (yet), so pins changed since are kept in memory only.
+    public var isUnread: Bool {
+        lock.lock(); defer { lock.unlock() }
+        _ = loaded()
+        return unread
     }
 
     public func get(_ projectRoot: String) -> String {
@@ -137,20 +164,22 @@ public final class PreviewPins: @unchecked Sendable {
         return loaded()[Self.key(projectRoot)]?.file ?? ""
     }
 
-    public func set(_ projectRoot: String, file: String) {
+    @discardableResult
+    public func set(_ projectRoot: String, file: String) -> StoreSave {
         lock.lock(); defer { lock.unlock() }
-        var m = loaded()
+        var m = loadedForEdit()
         m[Self.key(projectRoot)] = Pin(root: projectRoot, file: file)
         map = m
-        save(m)
+        return save(m)
     }
 
-    public func clear(_ projectRoot: String) {
+    @discardableResult
+    public func clear(_ projectRoot: String) -> StoreSave {
         lock.lock(); defer { lock.unlock() }
-        var m = loaded()
+        var m = loadedForEdit()
         m[Self.key(projectRoot)] = nil
         map = m
-        save(m)
+        return save(m)
     }
 
     /// Lookup is case-insensitive like upstream's dictionary; trailing separators are ignored.
@@ -160,10 +189,15 @@ public final class PreviewPins: @unchecked Sendable {
         return r.lowercased()
     }
 
-    private func save(_ m: [String: Pin]) {
+    private func save(_ m: [String: Pin]) -> StoreSave {
+        guard !unread else {
+            Diag.warn("previews.cfg was not read at start; not saving over it")
+            return .unread
+        }
         let lines = m.values.filter { !$0.file.isEmpty }.sorted { $0.root < $1.root }
             .map { "\($0.root)\t\($0.file)" }
-        do { try AppHome.writeAtomically(lines.joined(separator: "\n") + (lines.isEmpty ? "" : "\n"), to: filePath) }
-        catch { Diag.fail("previews.cfg write", error) }
+        do { try AppHome.writeKeepingBackup(lines.joined(separator: "\n") + (lines.isEmpty ? "" : "\n"), to: filePath) }
+        catch { Diag.fail("previews.cfg write", error); return .failed }
+        return .saved
     }
 }

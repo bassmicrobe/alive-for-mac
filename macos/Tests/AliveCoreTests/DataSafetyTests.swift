@@ -213,10 +213,10 @@ final class TextFileSafetyTests: XCTestCase {
         let bin = t.sub("bin.cfg")
         try Data([0x72, 0x6F, 0x00, 0xFF, 0xFE, 0x00, 0x01]).write(to: URL(fileURLWithPath: bin))
         XCTAssertEqual(AppHome.readConfig(bin), .unreadable)
-        XCTAssertTrue(FileManager.default.fileExists(atPath: bin + ".bak"), "backed up before anything can overwrite it")
-        XCTAssertTrue(AppHome.takeBackupNotices().contains("bin.cfg"))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: bin + ".orig"), "backed up before anything can overwrite it")
+        XCTAssertTrue(AppHome.takeBackupNotices().contains(AppHome.BackupNotice(file: "bin.cfg", copy: "bin.cfg.orig")))
         XCTAssertEqual(AppHome.readConfig(bin), .unreadable)
-        XCTAssertFalse(FileManager.default.fileExists(atPath: bin + ".bak2"), "the same content is backed up once")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: bin + ".orig2"), "the same content is backed up once")
     }
 
     func testInvalidUTF8IsRecoveredAndTheOriginalKept() throws {
@@ -227,7 +227,7 @@ final class TextFileSafetyTests: XCTestCase {
         try original.write(to: URL(fileURLWithPath: path))
         let s = Settings.load(dir: t.path)
         XCTAssertEqual(s.roots, ["/Caf\u{E9}"])
-        XCTAssertEqual(try Data(contentsOf: URL(fileURLWithPath: path + ".bak")), original)
+        XCTAssertEqual(try Data(contentsOf: URL(fileURLWithPath: path + ".orig")), original)
     }
 
     func testUTF16FilesFromWindowsAreRead() throws {

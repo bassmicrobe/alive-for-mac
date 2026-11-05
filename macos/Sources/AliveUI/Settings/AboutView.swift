@@ -9,10 +9,10 @@ struct AboutView: View {
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 14) {
+            VStack(spacing: Theme.s(14)) {
                 header
                 Text(SettingsStrings.credit.s).font(Theme.fBody).foregroundStyle(Theme.text)
-                HStack(spacing: 18) {
+                HStack(spacing: Theme.s(18)) {
                     Link(SettingsStrings.linkUpstream.s, destination: Self.upstreamURL)
                     Link(SettingsStrings.linkPort.s, destination: Self.portURL)
                 }
@@ -26,9 +26,9 @@ struct AboutView: View {
     }
 
     private var header: some View {
-        VStack(spacing: 6) {
+        VStack(spacing: Theme.s(6)) {
             Image(nsImage: NSApp.applicationIconImage)
-                .resizable().frame(width: 72, height: 72)
+                .resizable().frame(width: Theme.s(72), height: Theme.s(72))
             Text(CommonStrings.appName.s).font(Theme.fHead).foregroundStyle(Theme.text)
             Text(SettingsStrings.version.f(AboutInfo.version))
                 .font(Theme.fSmall).foregroundStyle(Theme.secondaryText)
@@ -38,7 +38,7 @@ struct AboutView: View {
     }
 
     private var notes: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: Theme.s(8)) {
             Text(SettingsStrings.disclaimer.s)
             Text(SettingsStrings.trademarks.s).foregroundStyle(Theme.secondaryText)
         }
@@ -48,7 +48,7 @@ struct AboutView: View {
     }
 
     private var licenses: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: Theme.s(8)) {
             SectionHeader(SettingsStrings.licenses.s)
             LicenseBox(title: SettingsStrings.licenseUpstream.s, resource: "LICENSE")
             LicenseBox(title: SettingsStrings.licenseMac.s, resource: "LICENSE-macos")
@@ -79,13 +79,13 @@ private struct LicenseBox: View {
         DisclosureGroup(title) {
             ScrollView {
                 Text(licenseText)
-                    .font(.system(size: 11, design: .monospaced))
+                    .font(.system(size: Theme.s(11), design: .monospaced))
                     .foregroundStyle(Theme.secondaryText)
                     .textSelection(.enabled)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(10)
+                    .padding(Theme.s(10))
             }
-            .frame(height: 150)
+            .frame(height: Theme.s(150))
             .background(Theme.sunken, in: RoundedRectangle(cornerRadius: Theme.thumbR + 2, style: .continuous))
         }
         .font(Theme.fBody)

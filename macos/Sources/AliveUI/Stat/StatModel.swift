@@ -25,6 +25,10 @@ final class StatModel {
     private(set) var visibleCount = 0
     /// The name under the pointer, for accessibility and the status line.
     private(set) var hoveredName = ""
+    /// The Stat window is the key window. A rescan asked for from it (⌘R, upstream F5) is the
+    /// catalog's, which this cloud shows, whatever tab the main window is on — `AppModel.rescan()`
+    /// reads this (notes/E1.md).
+    @ObservationIgnored var isKeyWindow = false
 
     init(app: AppModel) {
         self.app = app
@@ -255,6 +259,10 @@ final class StatModel {
     func saveNow() {
         saveTask?.cancel()
         saveTask = nil
+        guard !config.isUnread else {
+            Diag.warn("nebula.cfg was not read at start; not saving over it")
+            return
+        }
         do {
             try config.save(dir: app.dataDir)
         } catch {

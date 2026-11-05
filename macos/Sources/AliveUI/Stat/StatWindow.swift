@@ -6,16 +6,19 @@ import AppKit
 struct StatWindow: View {
     @Environment(AppModel.self) private var app
     @Environment(\.openWindow) private var openWindow
+    @Environment(\.controlActiveState) private var activeState
     @State private var folderSheet: AppSheet?
 
     private var model: StatModel { app.stat }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        // Grows with the interface scale like the main window (9ce4b4b), never past the screen.
+        let size = StatWindowSize.make(uiScale: app.settings.uiScale, screen: ScaledWindowSize.availableRoom)
+        return VStack(alignment: .leading, spacing: 14) {
             toolbar
             HStack(alignment: .top, spacing: 16) {
                 StatMappingPanel(model: model)
-                    .frame(width: 300)
+                    .frame(width: Theme.panelW)
                 cloudArea
                 StatInspector(model: model, onShowInList: showInList)
             }
@@ -23,17 +26,24 @@ struct StatWindow: View {
         .padding(.horizontal, Theme.pad)
         .padding(.top, 12)
         .padding(.bottom, 14)
-        .frame(minWidth: 1040, idealWidth: 1320, minHeight: 640, idealHeight: 820)
+        .frame(minWidth: size.minimum.width, idealWidth: size.ideal.width,
+               minHeight: size.minimum.height, idealHeight: size.ideal.height)
         .background(Theme.bg)
-        .background(WindowSizer(size: CGSize(width: 1320, height: 820)))
+        .background(WindowSizer(size: size.ideal))
         .preferredColorScheme(.dark)
         .sheet(item: $folderSheet) { SheetHost(sheet: $0).environment(app) }
         .onAppear {
             model.syncCatalog(force: true)
+            model.isKeyWindow = activeState == .key
         }
+        // The cloud shows the main window's catalog: it follows each rescan of it by revision.
         .onChange(of: app.catalog.revision) { _, _ in model.syncCatalog() }
         .onChange(of: app.selectedSetPath) { _, _ in model.followMainSelection() }
-        .onDisappear { model.saveNow() }
+        .onChange(of: activeState) { _, state in model.isKeyWindow = state == .key }
+        .onDisappear {
+            model.isKeyWindow = false
+            model.saveNow()
+        }
     }
 
     // MARK: toolbar
@@ -77,7 +87,7 @@ struct StatWindow: View {
         let progress = app.catalog.progress
         let lead = app.catalog.isScanning
             ? (progress.total > 0 ? CommonStrings.scanProgress.f(progress.done, progress.total) : CommonStrings.scanning.s)
-            : StatStrings.projectsCount.f(model.visibleCount)
+            : StatStrings.projects(model.visibleCount)
         // The hints are dropped from the end as the width shrinks (Japanese is longer), never cut
         // mid-word; the full line is the tooltip.
         let line: (Int) -> String = { count in

@@ -211,7 +211,7 @@ final class ExportModel {
         case .success(let r):
             result = r
             phase = .done
-            app.toast(ExportStrings.toastDone.f((r.output as NSString).lastPathComponent))
+            announce(r)
         case .failure(let error):
             let f = ExportFailure(error)
             if f != .cancelled { Diag.fail("export", error) }
@@ -221,6 +221,29 @@ final class ExportModel {
         }
         progress = nil
         cancelling = false
+    }
+
+    /// A toast for the outcome. When files could not be copied it says so, and the log that names
+    /// them is shown selected in Finder instead of leaving the person to look for it (upstream
+    /// 9ce4b4b: the half-collected folder is not what needs looking at).
+    private func announce(_ r: CollectResult) {
+        let name = (r.output as NSString).lastPathComponent
+        guard !r.failed.isEmpty else {
+            app.toast(ExportStrings.toastDone.f(name))
+            return
+        }
+        let outcome = Self.failureOutcome(name: name, failed: r.failed.count, logPath: Diag.currentLogPath)
+        app.toast(outcome.text, kind: .error)
+        if let log = outcome.reveal { app.revealInFinder(path: log) }
+    }
+
+    /// The toast after copies failed, and the log to show in Finder. Without a log (`Diag` writes
+    /// none when the data folder cannot be written) there is nothing to reveal and the toast does
+    /// not send the person to a file that is not there.
+    static func failureOutcome(name: String, failed: Int, logPath: String?) -> (text: String, reveal: String?) {
+        let count = ExportStrings.files(failed)
+        guard let logPath else { return (ExportStrings.toastDoneWithFailuresNoLog.f(name, count), nil) }
+        return (ExportStrings.toastDoneWithFailures.f(name, count), logPath)
     }
 
     private func report(_ p: CollectProgress, generation g: Int) {

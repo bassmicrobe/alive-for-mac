@@ -42,6 +42,8 @@ final class SamplesModel {
     @ObservationIgnored var expandsRootsOnFirstLoad = false
     var selection: String?
     private(set) var scrollTarget: SampleScrollTarget?
+    /// Bumped by `focusList()`; the list takes the keyboard when it changes.
+    private(set) var listFocusRequest = 0
     /// A folder that `showFolder` was asked for but that is not in the library.
     var outsideFolder: String?
     var info: SampleInfo?
@@ -51,10 +53,18 @@ final class SamplesModel {
     var auditioned: String?
     @ObservationIgnored var startedPath: String?
     @ObservationIgnored var lastStart = Date.distantPast
+    /// The level samples are auditioned at, 0...1 (`Settings.previewVolume`, a6c8dc1). The slider
+    /// under the wave moves it; settings.cfg follows a moment after the last change (+Volume).
+    var previewVolume = 0.8
+    @ObservationIgnored var volumeSaveTask: Task<Void, Never>?
 
     // MARK: scanning
     @ObservationIgnored var started = false
     @ObservationIgnored var scannedKey: String?
+    /// When the cache on disk was last walked (read with it at start; nil without a cache).
+    @ObservationIgnored var cachedWalkDate: Date?
+    /// A rescan was asked for before the tab started: the start then walks even if the cache is fresh.
+    @ObservationIgnored var walkOnStart = false
     @ObservationIgnored var restartRequested = false
     @ObservationIgnored var scanFlag: SampleCancelFlag?
     @ObservationIgnored var scanTask: Task<Void, Never>?
@@ -86,6 +96,7 @@ final class SamplesModel {
 
     init(app: AppModel) {
         self.app = app
+        previewVolume = Self.clampedVolume(app.settings.previewVolume)
     }
 
     // MARK: - Toolbar contract
@@ -106,7 +117,7 @@ final class SamplesModel {
 
     /// Reads the library again (⌘R on this tab). A walk under way is called off and started anew.
     func rescan() {
-        guard started else { start(); return }        // the first start walks by itself
+        guard started else { walkOnStart = true; start(); return }        // a start alone walks only when it is due
         guard hasEnabledRoots else { return }
         scannedKey = effectiveRoots.joined(separator: "\n")
         startScan(manual: true)
@@ -320,6 +331,14 @@ final class SamplesModel {
             guard let self, !Task.isCancelled, self.selection == path else { return }
             self.info = loaded
         }
+    }
+
+    /// Down from the search field: on into what it found (a6c8dc1 `IntoResults`). The first row
+    /// shown is picked if none of the rows shown is, and a picked one stays; like any arrow key,
+    /// picking a sample auditions it.
+    func focusList() {
+        if !listing.rows.contains(where: { $0.id == selection }) { moveSelection(by: 1) }
+        listFocusRequest += 1
     }
 
     func requestScroll(to id: String) {

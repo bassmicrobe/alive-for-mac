@@ -50,8 +50,11 @@ extension SamplesModel {
         started = true
         let dir = app.dataDir
         loadTask = Task { [weak self] in
-            let cached = await Task.detached(priority: .userInitiated) { SampleCache.load(dir: dir) }.value
+            let (cached, walked) = await Task.detached(priority: .userInitiated) {
+                (SampleCache.load(dir: dir), SampleCache.walkedAt(dir: dir))
+            }.value
             guard let self else { return }
+            self.cachedWalkDate = walked
             let s = self.app.settings
             self.adopt(cached.only(s.sampleRoots, disabled: s.disabledSampleRoots))
             self.isLoaded = true
@@ -60,13 +63,33 @@ extension SamplesModel {
                 self.pendingReveal = nil
                 self.reveal(path)
             }
-            self.syncRoots(force: true, manual: false)
+            let asked = self.walkOnStart
+            self.walkOnStart = false
+            self.syncRoots(force: true, manual: asked, atStartup: !asked)
+        }
+    }
+
+    /// The quiet walk of a session. Upstream walks only when the last whole walk is over a day old or
+    /// a switched-on root is missing from the cache (`SampleIndex.walkDue`), so a start does not fight
+    /// Live for the disk. F5, a new folder and a returning volume still go straight to `startScan`.
+    func walkAtStartup() {
+        let s = app.settings
+        if SampleIndex.walkDue(cached: index, roots: s.sampleRoots, disabled: s.disabledSampleRoots,
+                               walkedAt: cachedWalkDate) {
+            startScan(manual: false)
+            return
+        }
+        Diag.info("samples: last walked \(cachedWalkDate.map { String(describing: $0) } ?? "never"), not walked again")
+        // No walk will finish and reveal it, so do it now.
+        if let path = pendingReveal {
+            pendingReveal = nil
+            reveal(path)
         }
     }
 
     /// The list of folders changed (added, removed, switched on or off in the roots sheet): the tree
     /// follows at once, the walk follows behind. A no-op when nothing that counts changed.
-    func syncRoots(force: Bool = false, manual: Bool = true) {
+    func syncRoots(force: Bool = false, manual: Bool = true, atStartup: Bool = false) {
         guard started, isLoaded else { return }
         let roots = effectiveRoots
         let key = roots.joined(separator: "\n")
@@ -79,7 +102,7 @@ extension SamplesModel {
             return
         }
         adopt(index.only(app.settings.sampleRoots, disabled: app.settings.disabledSampleRoots))
-        startScan(manual: manual)
+        if atStartup { walkAtStartup() } else { startScan(manual: manual) }
     }
 
     func adopt(_ fresh: SampleIndex) {
@@ -127,12 +150,15 @@ extension SamplesModel {
         scanTask = Task { [weak self] in
             let began = Date()
             let fresh = await SampleWalkQueue.run { () -> SampleIndex? in
-                let built = SampleIndex.build(roots: roots, disabled: off, previous: previous,
-                                              mounted: VolumeState.mountedVolumeNames(),
-                                              mountedNow: { VolumeState.mountedVolumeNames() },
-                                              progress: relay.report, isCancelled: { flag.isCancelled })
+                let (built, incomplete) = SampleIndex.buildReporting(
+                    roots: roots, disabled: off, previous: previous,
+                    mounted: VolumeState.mountedVolumeNames(),
+                    mountedNow: { VolumeState.mountedVolumeNames() },
+                    progress: relay.report, isCancelled: { flag.isCancelled })
                 guard !flag.isCancelled else { return nil }
-                SampleCache.save(built, dir: dir)
+                // A root that would not open stands there with its old samples: that is not a whole
+                // walk, so the next start tries again instead of waiting a day.
+                SampleCache.save(built, dir: dir, walked: incomplete.isEmpty ? Date() : .distantPast)
                 return built
             }
             guard let self else { return }

@@ -85,6 +85,8 @@ struct PluginListView: View {
                 model.reveal(row)
                 return .handled
             }
+            .onKeyPress(.space) { model.togglePlayerIfLoaded() ? .handled : .ignored }
+            .onChange(of: model.listFocusRequest) { _, _ in focused = true }
             .onChange(of: model.pendingScrollID) { _, id in scroll(proxy, model, to: id) }
             .onAppear { scroll(proxy, model, to: model.pendingScrollID) }
             .accessibilityLabel(PluginsStrings.title.s)
@@ -236,9 +238,9 @@ private struct RoleGlyph: View {
 
     var body: some View {
         Image(systemName: symbol)
-            .font(.system(size: 11, weight: .medium))
+            .font(Theme.fGlyph(11))
             .foregroundStyle(Theme.secondaryText)
-            .frame(width: 16)
+            .frame(width: Theme.s(16))
             .opacity(role == .unknown ? 0.35 : 1)
             .help(PluginsFormat.role(role))
             .accessibilityHidden(true)
