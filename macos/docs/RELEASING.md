@@ -22,7 +22,12 @@
   再実行すると、公証済みのファイルを ad-hoc 署名のものに置き換えてしまうためです。既存のリリースが
   あり、かつ署名されていないビルドのときは `Publish GitHub Release` が失敗します。本当に上書きしたい
   ときだけ、Actions から手動実行（`workflow_dispatch`）して boolean の入力 `allow_adhoc_overwrite`
-  を true にします（既定は false。タグの push では常に false）。
+  を true にします（既定は false。タグの push では常に false）。手動実行は既定で公開しないので、
+  `verify_only` を false にする必要もあります。
+- **手動実行は既定で公開しません（`verify_only`、既定 true）。** タグを打つ前に任意のブランチで
+  署名・公証までを通し、zip と dmg を 7 日間の artifact `macos-packages` に保存します。Release は作らず、
+  既存のものも変えません（`gh workflow run macos-ci.yml --ref <ブランチ>`）。手動実行で公開するときだけ
+  `-f verify_only=false` を付けます。同じブランチへの push は、この実行を中断しません。
 
 ### 1. 一度だけ行う準備
 
@@ -88,8 +93,9 @@
 4. `Verify universal app and signature`: arm64 と x86_64 の両方が入っていること、署名が壊れていないこと。
 5. `Verify Developer ID signature and notarization`: `codesign -dvv` の Authority が Developer ID、
    ハードランタイム、`spctl`（`source=Notarized Developer ID`）、`stapler validate`（アプリと DMG）。
-6. `Publish GitHub Release`（既存のリリースへ署名なしで上書きするのは、上の `allow_adhoc_overwrite`
-   を付けたときだけ）。
+6. `Save packages (verify only)`（手動実行で `verify_only` のとき）: zip と dmg を artifact に保存。
+   `Publish GitHub Release`（`v*` タグの push、または `verify_only` を false にした手動実行のとき。
+   既存のリリースへ署名なしで上書きするのは、上の `allow_adhoc_overwrite` を付けたときだけ）。
 7. `Delete signing keychain`: 成功しても失敗してもキーチェーンを消す（`if: always()`）。公証の資格情報
    のプロファイルもこのキーチェーンごと消えます。
 
@@ -143,7 +149,7 @@ APPLE_ID="you@example.com" APPLE_APP_PASSWORD="xxxx-xxxx-xxxx-xxxx" APPLE_TEAM_I
 - プロファイルが既定の検索リストに無いキーチェーンにあるときは、そのパスを `ALIVE_NOTARY_KEYCHAIN`
   で渡します（CI がこの形）。
 - 署名だけ試すなら `ALIVE_SIGN_IDENTITY=… scripts/build-app.sh`（`--notarize` なし）。
-- 1 回の待ちの上限は `ALIVE_NOTARY_TIMEOUT`（既定 `60m`）。公証は通常数分で終わります。
+- 1 回の待ちの上限は `ALIVE_NOTARY_TIMEOUT`（既定 `60m`）。公証は数分〜1 時間ほどかかります（2026-11-05 はアプリで約 44 分）。
 - 署名には Apple のタイムスタンプサーバーへの接続が必要です。
 
 ### 5. 手で確認する
@@ -209,6 +215,18 @@ Sandbox の temporary-exception は公証の妨げになりません（制限さ
 - **証明書の有効期限:** Developer ID 証明書は 5 年です。期限が切れる前に作り直して .p12 と
   `APPLE_DEVELOPER_ID_P12*` を更新してください。期限前に署名・公証したアプリは、期限後も開けます。
 - **シークレットを入れ替えたい:** 同じ名前で登録し直すだけです。
+- **p12 のパスワードが合わない（`MAC verify` / `passphrase is not correct`）など、登録で詰まったとき:**
+  [SIGNING_SETUP_RUNBOOK.ja.md](SIGNING_SETUP_RUNBOOK.ja.md)（クリップボードの値が書き出しに使った値と
+  ずれる、登録前のローカルでの確かめ方、Account Holder と Admin の違いなど）。
+
+### 8. 記録
+
+- 2026-11-05: 5 つのシークレットを登録。最初の p12 はパスワードが合わず、同じチーム
+  （Team ID `8XUK86NH38`）の Developer ID Application 証明書を新しく発行して p12 とパスワードを登録し直した
+  （証明書 ID `M3M5AHH47V`。秘密鍵は所有者の Mac のログインキーチェーン）。PR #6 の検証用ワークフローで、
+  これらの値で Apple の公証が受理されることを確認した:
+  [SIGNING_VERIFICATION_2026-11-05.md](SIGNING_VERIFICATION_2026-11-05.md)。
+  Team ID とチーム名は署名済みのアプリにも入る公開情報です。
 
 ---
 
@@ -231,7 +249,13 @@ GitHub Release.
   without the secrets would otherwise put ad-hoc files over notarized ones. When the release exists
   and the build is not signed, `Publish GitHub Release` fails. Only when that is really wanted, run the
   workflow by hand (`workflow_dispatch`) and set the boolean input `allow_adhoc_overwrite` to true
-  (default false; always false on a tag push).
+  (default false; always false on a tag push). A manual run does not publish by default, so also set
+  `verify_only` to false.
+- **A manual run does not publish by default (`verify_only`, default true).** Before pushing a tag, run
+  the workflow on any branch to go through signing and notarization; the zip and dmg are kept as the
+  7-day artifact `macos-packages`, and no release is created or changed
+  (`gh workflow run macos-ci.yml --ref <branch>`). Add `-f verify_only=false` only to publish from a
+  manual run. A push to the same branch does not cancel such a run.
 
 ### 1. One-time setup
 
@@ -297,8 +321,9 @@ and so produce a notarized release; a GitHub Environment with required reviewers
 4. `Verify universal app and signature`: both arm64 and x86_64 present, signature intact.
 5. `Verify Developer ID signature and notarization`: `codesign -dvv` authority is Developer ID, hardened
    runtime, `spctl` (`source=Notarized Developer ID`), `stapler validate` for the app and the DMG.
-6. `Publish GitHub Release` (replacing the files of an existing release with an unsigned build only
-   with `allow_adhoc_overwrite`, above).
+6. `Save packages (verify only)` (manual run with `verify_only`): keeps the zip and dmg as an artifact.
+   `Publish GitHub Release` (a `v*` tag push, or a manual run with `verify_only` false; replacing the
+   files of an existing release with an unsigned build only with `allow_adhoc_overwrite`, above).
 7. `Delete signing keychain`: removes the keychain whether the job succeeded or not (`if: always()`).
    The notarization profile goes with it.
 
@@ -352,7 +377,7 @@ APPLE_ID="you@example.com" APPLE_APP_PASSWORD="xxxx-xxxx-xxxx-xxxx" APPLE_TEAM_I
 - When the profile lives in a keychain that is not on the default search list, pass its path as
   `ALIVE_NOTARY_KEYCHAIN` (this is what CI does).
 - To try signing only: `ALIVE_SIGN_IDENTITY=… scripts/build-app.sh` (no `--notarize`).
-- `ALIVE_NOTARY_TIMEOUT` (default `60m`) caps each wait. Notarization usually takes a few minutes.
+- `ALIVE_NOTARY_TIMEOUT` (default `60m`) caps each wait. Notarization takes from a few minutes to about an hour (the app took 44 minutes on 2026-11-05).
 - Signing needs a connection to Apple's timestamp server.
 
 ### 5. Checking by hand
@@ -420,3 +445,15 @@ update this section.
 - **Certificate expiry:** a Developer ID certificate lasts five years. Create a new one before it
   expires and update `APPLE_DEVELOPER_ID_P12*`. Apps signed and notarized before expiry keep opening.
 - **Replacing a secret:** register it again under the same name.
+- **Stuck registering, e.g. the p12 password does not match (`MAC verify` / `passphrase is not correct`):**
+  see [SIGNING_SETUP_RUNBOOK.ja.md](SIGNING_SETUP_RUNBOOK.ja.md) (Japanese): the clipboard drifting from the
+  password used for the export, checking locally before registering, Account Holder versus Admin.
+
+### 8. Record
+
+- 2026-11-05: the five secrets were registered. The first p12's password did not match, so a new
+  Developer ID Application certificate of the same team (Team ID `8XUK86NH38`) was issued and the p12 and
+  its password registered again (certificate ID `M3M5AHH47V`; the private key is in the owner's login
+  keychain). PR #6's verification workflow confirmed that Apple accepts notarization with these values:
+  [SIGNING_VERIFICATION_2026-11-05.md](SIGNING_VERIFICATION_2026-11-05.md) (Japanese). The Team ID and
+  team name are public: every signed app carries them.

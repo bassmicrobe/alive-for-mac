@@ -13,13 +13,18 @@ on:
       - ".github/workflows/macos-ci.yml"
   workflow_dispatch:
     inputs:
+      verify_only:
+        description: "Build, sign and notarize, keep the zip and dmg as a 7-day artifact, and do not create or change a GitHub Release"
+        type: boolean
+        default: true
       allow_adhoc_overwrite:
         description: "Let an ad-hoc signed (not notarized) build replace the files of a release that already exists"
         type: boolean
         default: false
 
 concurrency:
-  group: macos-ci-${{ github.ref }}
+  # Per event as well: a push to a branch must not cancel a manual verify run (an hour of notarization) on it.
+  group: macos-ci-${{ github.ref }}-${{ github.event_name }}
   # A release run on a tag is never cancelled by a newer run: it would leave the release half made.
   cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
 
@@ -239,7 +244,21 @@ jobs:
           spctl -a -t open --context context:primary-signature -vv "$DMG_PATH"
           echo "Notarization: accepted by Apple, ticket stapled to the app and the dmg." | tee -a "$GITHUB_STEP_SUMMARY"
 
+      # A manual run with verify_only (the default) checks the whole signing and notarization path on
+      # any branch before a tag is pushed; the packages are kept for download instead of published.
+      - name: Save packages (verify only)
+        if: github.event_name == 'workflow_dispatch' && inputs.verify_only
+        uses: actions/upload-artifact@v7
+        with:
+          name: macos-packages
+          path: |
+            ${{ steps.pkg.outputs.zip }}
+            ${{ steps.pkg.outputs.dmg }}
+          retention-days: 7
+          if-no-files-found: error
+
       - name: Publish GitHub Release
+        if: (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) || (github.event_name == 'workflow_dispatch' && !inputs.verify_only)
         env:
           GH_TOKEN: ${{ github.token }}
           ZIP_PATH: ${{ steps.pkg.outputs.zip }}
